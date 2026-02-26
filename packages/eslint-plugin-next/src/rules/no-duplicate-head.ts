@@ -45,9 +45,9 @@ export default defineRule({
           'children' in node.argument &&
           node.argument.children
         ) {
-          // @ts-expect-error - `node.argument` could be a `JSXElement` which has property `children`
-          const headComponents = node.argument.children.filter(
-            (childrenNode) =>
+          const children = (node.argument as { children: Array<any> }).children
+          const headComponents = children.filter(
+            (childrenNode: any) =>
               childrenNode.openingElement &&
               childrenNode.openingElement.name &&
               childrenNode.openingElement.name.name === 'Head'

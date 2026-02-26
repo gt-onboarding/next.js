@@ -60,6 +60,27 @@ const genericComponents = {
     )
   },
 
+  Video: (props: {
+    caption?: string
+    src: string
+    width?: number
+    height?: number
+  }) => (
+    <figure>
+      <video
+        className="rounded-md border border-gray-200 bg-gray-100"
+        src={props.src}
+        width={props.width}
+        height={props.height}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+      {props.caption ? <figcaption>{props.caption}</figcaption> : null}
+    </figure>
+  ),
+
   Check: ({ size }: { size: number }) => (
     <span className="inline-flex align-middle text-green-600">&#10003;</span>
   ),

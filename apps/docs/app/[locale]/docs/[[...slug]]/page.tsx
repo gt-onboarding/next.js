@@ -8,6 +8,7 @@ import {
 import { notFound } from 'next/navigation'
 import { createRelativeLink } from 'fumadocs-ui/mdx'
 import { getMDXComponents } from '@/mdx-components'
+import { getDefaultLocale } from 'gt-next/server'
 
 export default async function Page(props: {
   params: Promise<{ slug?: string[]; locale?: string }>
@@ -41,7 +42,11 @@ export default async function Page(props: {
 }
 
 export async function generateStaticParams() {
-  return source.generateParams('slug', 'locale')
+  const allParams = source.generateParams('slug', 'locale')
+  // Only prerender English pages at build time; other locales render on-demand
+  return allParams.filter(
+    (p: { locale?: string }) => p.locale === getDefaultLocale()
+  )
 }
 
 export async function generateMetadata(props: {

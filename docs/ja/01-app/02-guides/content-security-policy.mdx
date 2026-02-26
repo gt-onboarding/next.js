@@ -1,0 +1,726 @@
+---
+title: Next.js アプリケーションの Content Security Policy (CSP) の設定方法
+nav_title: Content Security Policy
+description: Next.js アプリケーションの Content Security Policy (CSP) の設定方法について説明します。
+related:
+  links:
+    - app/api-reference/file-conventions/proxy
+    - app/api-reference/functions/headers
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共有されています。Pages Router 固有の内容を追加する場合は、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+[Content Security Policy (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) は、クロスサイトスクリプティング (XSS)、クリックジャッキング、その他のコードインジェクション攻撃など、さまざまなセキュリティ脅威から Next.js アプリケーションを保護するために重要です。
+
+CSP を使用することで、開発者はコンテンツ、スクリプト、スタイルシート、画像、フォント、オブジェクト、メディア (音声・動画)、iframe などをどのオリジンから読み込むことを許可するか指定できます。
+
+<details>
+  <summary>例</summary>
+
+- [Strict CSP](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## Nonces
+
+[nonce](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) は、一度だけ使用される一意のランダムな文字列です。厳格な CSP ディレクティブの制約を受けつつ、特定のインライン `script` や `style` の実行のみを選択的に許可するために、CSP と組み合わせて使用されます。
+
+### なぜ nonce を使うのか？
+
+CSP は攻撃を防ぐために、インラインスクリプトと外部スクリプトの両方をブロックできます。nonce を使うと、特定のスクリプトだけを安全に実行させることができます。そのスクリプトに一致する nonce 値が含まれている場合に限ります。
+
+攻撃者があなたのページにスクリプトを読み込ませようとする場合、nonce の値を推測しなければなりません。そのため、nonce は予測不能であり、かつリクエストごとに一意でなければなりません。
+
+### Proxy を使用して nonce を追加する
+
+[Proxy](/docs/app/api-reference/file-conventions/proxy) を使用すると、ページがレンダーされる前にヘッダーを追加し、nonce を生成できます。
+
+ページが表示されるたびに、新しい nonce を生成する必要があります。つまり、**nonce を追加するには必ず [動的レンダリング](/docs/app/guides/caching#dynamic-rendering) を使用する必要があります**。
+
+例えば次のようになります。
+
+> **補足**: 開発環境では、React が `eval` を使用して、サーバー側のエラースタックをブラウザ上で再構築するといった、より詳細なデバッグ情報を提供するために、`'unsafe-eval'` が必要です。`unsafe-eval` は本番環境では不要です。React も Next.js も、デフォルトでは本番環境で `eval` を使用しません。
+
+```ts filename="proxy.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''};
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // 改行文字とスペースを置換する
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''};
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // 改行文字とスペースを置換する
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+デフォルトでは、Proxy はすべてのリクエストに対して動作します。[`matcher`](/docs/app/api-reference/file-conventions/proxy#matcher) を使用して、特定のパスでのみ Proxy が実行されるように絞り込むことができます。
+
+`next/link` によるプリフェッチや、CSP ヘッダーを必要としない静的アセットは、マッチ対象から除外することを推奨します。
+
+```ts filename="proxy.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * 以下で始まるパスを除く、すべてのリクエストパスにマッチ:
+     * - api (APIルート)
+     * - _next/static (静的ファイル)
+     * - _next/image (画像最適化ファイル)
+     * - favicon.ico (faviconファイル)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="proxy.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * 以下で始まるパスを除く、すべてのリクエストパスにマッチ:
+     * - api (APIルート)
+     * - _next/static (静的ファイル)
+     * - _next/image (画像最適化ファイル)
+     * - favicon.ico (faviconファイル)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### Next.js における nonce の仕組み
+
+nonce を使用するには、ページが**動的にレンダリング**されている必要があります。これは、Next.js がリクエストに含まれる CSP ヘッダーに基づいて、**サーバーサイドレンダリング**時に nonce を適用するためです。静的ページはビルド時に生成され、その時点ではリクエストやレスポンスヘッダーが存在しないため、nonce を挿入できません。
+
+動的にレンダリングされるページでの nonce サポートの動作は次のとおりです。
+
+1. **プロキシが nonce を生成する**: プロキシはリクエストごとに一意の nonce を生成し、それを `Content-Security-Policy` ヘッダーに追加するとともに、カスタムヘッダー `x-nonce` にも設定します。
+2. **Next.js が nonce を抽出する**: レンダリング中に、Next.js は `Content-Security-Policy` ヘッダーを解析し、`'nonce-{value}'` パターンを使って nonce を抽出します。
+3. **nonce が自動的に適用される**: Next.js は nonce を次のものに付与します:
+   - フレームワークスクリプト (React、Next.js ランタイム)
+   - ページ固有の JavaScript バンドル
+   - Next.js によって生成されるインラインスタイルおよびスクリプト
+   - `nonce` プロップを使用している任意の `<Script>` コンポーネント
+
+この自動処理により、各タグに nonce を手動で追加する必要はありません。
+
+### 動的レンダリングを強制する
+
+nonce を使用している場合、ページを動的レンダリングするよう明示的に指定する必要がある場合があります。
+
+```tsx filename="app/page.tsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  // このページをレンダリングするために受信リクエストを待機する
+  await connection()
+  // ページのコンテンツ
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  // このページをレンダリングするために受信リクエストを待機する
+  await connection()
+  // ページのコンテンツ
+}
+```
+
+### nonce の読み取り
+
+<PagesOnly>
+  [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) を使用して、nonce をページに渡すことができます。
+
+```tsx filename="pages/index.tsx" switcher
+import Script from 'next/script'
+
+import type { GetServerSideProps } from 'next'
+
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import Script from 'next/script'
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export async function getServerSideProps({ req }) {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+Pages Router アプリケーションでは、`_document.tsx` から nonce を取得することもできます。
+
+```tsx filename="pages/_document.tsx" switcher
+import Document, {
+  Html,
+  Head,
+  Main,
+  NextScript,
+  DocumentContext,
+  DocumentInitialProps,
+} from 'next/document'
+
+interface ExtendedDocumentProps extends DocumentInitialProps {
+  nonce?: string
+}
+
+class MyDocument extends Document<ExtendedDocumentProps> {
+  static async getInitialProps(
+    ctx: DocumentContext
+  ): Promise<ExtendedDocumentProps> {
+    const initialProps = await Document.getInitialProps(ctx)
+    const nonce = ctx.req?.headers?.['x-nonce'] as string | undefined
+
+    return {
+      ...initialProps,
+      nonce,
+    }
+  }
+
+  render() {
+    const { nonce } = this.props
+
+    return (
+      <Html lang="en">
+        <Head nonce={nonce} />
+        <body>
+          <Main />
+          <NextScript nonce={nonce} />
+        </body>
+      </Html>
+    )
+  }
+}
+
+export default MyDocument
+```
+
+```jsx filename="pages/_document.jsx" switcher
+import Document, { Html, Head, Main, NextScript } from 'next/document'
+
+class MyDocument extends Document {
+  static async getInitialProps(ctx) {
+    const initialProps = await Document.getInitialProps(ctx)
+    const nonce = ctx.req?.headers?.['x-nonce']
+
+    return {
+      ...initialProps,
+      nonce,
+    }
+  }
+
+  render() {
+    const { nonce } = this.props
+
+    return (
+      <Html lang="en">
+        <Head nonce={nonce} />
+        <body>
+          <Main />
+          <NextScript nonce={nonce} />
+        </body>
+      </Html>
+    )
+  }
+}
+
+export default MyDocument
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+[`headers`](/docs/app/api-reference/functions/headers) 関数を使用して、[Server Component](/docs/app/getting-started/server-and-client-components) から nonce を読み取ることができます。
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+</AppOnly>
+
+## CSP を用いた静的レンダリングと動的レンダリング
+
+nonce を使用すると、Next.js アプリケーションのレンダリング方法に重要な影響を及ぼします。
+
+### 動的レンダリングの要件
+
+CSP で nonce を使用する場合、**すべてのページは動的レンダリングである必要があります**。これは次のことを意味します:
+
+- ページのビルド自体は成功しますが、動的レンダリング向けに正しく構成されていない場合は実行時エラーが発生する可能性があります
+- 各リクエストごとに、新しい nonce を付与したページが生成されます
+- 静的最適化と Incremental Static Regeneration (ISR) は無効になります
+- 追加の設定を行わない限り、CDN によるページのキャッシュは行えません
+- 静的なシェル（アプリシェル）のスクリプトは nonce にアクセスできないため、**Partial Prerendering (PPR) は nonce ベースの CSP と両立しません**
+
+### パフォーマンスへの影響
+
+静的レンダリングから動的レンダリングへの移行は、パフォーマンスに影響します:
+
+- **初回ページロードの低速化**: 各リクエストごとにページを生成する必要がある
+- **サーバー負荷の増加**: すべてのリクエストでサーバーサイドレンダリングが必要になる
+- **CDN でのキャッシュなし**: 動的ページはデフォルトではエッジでキャッシュされない
+- **ホスティングコストの増加**: 動的レンダリングにはより多くのサーバーリソースが必要になる
+
+### nonce を使用するタイミング
+
+次のような場合は nonce の使用を検討してください:
+
+- `'unsafe-inline'` を禁止する厳格なセキュリティ要件がある
+- アプリケーションで機密データを扱っている
+- 一部のインラインスクリプトのみを許可し、それ以外をブロックする必要がある
+- コンプライアンス要件によって厳格な CSP が求められている
+
+## Nonce を使用しない場合
+
+Nonce が不要なアプリケーションでは、[`next.config.js`](/docs/app/api-reference/config/next-config-js) ファイルで CSP ヘッダーを直接設定できます。
+
+```js filename="next.config.js"
+const isDev = process.env.NODE_ENV === 'development'
+
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''};
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+<AppOnly>
+  ## サブリソースインテグリティ（Subresource Integrity、実験的）
+
+nonce の代替手段として、Next.js は Subresource Integrity (SRI) を使用したハッシュベースの CSP の実験的サポートを提供しています。このアプローチにより、厳格な CSP を維持しながら、静的生成を継続できます。
+
+> **補足**: この機能は実験的であり、App Router を使用するアプリケーションで webpack バンドラーを使っている場合にのみ利用できます。
+
+### SRI の仕組み
+
+nonce を使用する代わりに、SRI はビルド時に JavaScript ファイルの暗号学的ハッシュ値を生成します。これらのハッシュ値は script タグに `integrity` 属性として追加され、ブラウザは転送中にファイルが改ざんされていないことを検証できます。
+
+### SRI の有効化
+
+`next.config.js` に実験的な SRI 設定を追加します:
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256', // もしくは 'sha384' または 'sha512'
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+### SRI を使った CSP の設定
+
+SRI を有効にしても、既存の CSP ポリシーをそのまま使用できます。SRI はアセットに `integrity` 属性を付与することで、独立して動作します:
+
+> **補足**: 動的レンダリングのシナリオでは、必要に応じてプロキシを使って nonce を生成し、SRI の integrity 属性と nonce ベースの CSP の両方のアプローチを組み合わせることもできます。
+
+```js filename="next.config.js"
+const isDev = process.env.NODE_ENV === 'development'
+
+const cspHeader = `
+    default-src 'self';
+    script-src 'self'${isDev ? " 'unsafe-eval'" : ''};
+    style-src 'self';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256',
+    },
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### nonce に対する SRI の利点
+
+- **静的生成**: ページを静的に生成してキャッシュできる
+- **CDN 互換性**: 静的ページを CDN キャッシュと併用できる
+- **パフォーマンス向上**: リクエストごとにサーバーサイドレンダリングを行う必要がない
+- **ビルド時のセキュリティ**: ビルド時にハッシュが生成され、完全性が保証される
+
+### SRI の制限事項
+
+- **実験的**: 機能は変更または削除される可能性がある
+- **Webpack のみ**: Turbopack では利用できない
+- **App Router のみ**: Pages Router ではサポートされない
+- **ビルド時のみ**: 動的に生成されるスクリプトには対応できない
+
+</AppOnly>
+
+## 開発環境と本番環境における考慮事項
+
+CSP の実装は、開発環境と本番環境で異なります。
+
+### 開発環境
+
+開発環境では、React が `eval` を使用して、ブラウザ上でサーバー側のエラースタックを再構築し、サーバーでエラーが発生した箇所を特定できるようにするなど、より高度なデバッグ情報を提供するため、`'unsafe-eval'` を有効にする必要があります。
+
+```ts filename="proxy.ts" switcher
+export function proxy(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+  // プロキシ実装の残り
+}
+```
+
+```js filename="proxy.js" switcher
+export function proxy(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+  // プロキシ実装の残り
+}
+```
+
+### 本番環境へのデプロイ
+
+本番環境でよく発生する問題:
+
+- **Nonce が適用されない**: プロキシが、必要なすべてのルートで動作していることを確認してください
+- **静的アセットがブロックされる**: CSP が Next.js の静的アセットを許可しているか確認してください
+- **サードパーティスクリプト**: 必要なドメインを CSP 設定に追加してください
+
+## トラブルシューティング
+
+### サードパーティ製スクリプト
+
+<AppOnly>
+  CSP と併用してサードパーティ製スクリプトを使用する場合は、次のようにします:
+
+```tsx filename="app/layout.tsx" switcher
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.jsx" switcher
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({ children }) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+  CSP と併用してサードパーティ製スクリプトを使用する場合は、必要なドメインを追加し、nonce を渡してください:
+
+```tsx filename="pages/_app.tsx" switcher
+import type { AppProps } from 'next/app'
+import Script from 'next/script'
+
+export default function App({ Component, pageProps }: AppProps) {
+  const nonce = pageProps.nonce
+
+  return (
+    <>
+      <Component {...pageProps} />
+      <Script
+        src="https://www.googletagmanager.com/gtag/js"
+        strategy="afterInteractive"
+        nonce={nonce}
+      />
+    </>
+  )
+}
+```
+
+```jsx filename="pages/_app.jsx" switcher
+import Script from 'next/script'
+
+export default function App({ Component, pageProps }) {
+  const nonce = pageProps.nonce
+
+  return (
+    <>
+      <Component {...pageProps} />
+      <Script
+        src="https://www.googletagmanager.com/gtag/js"
+        strategy="afterInteractive"
+        nonce={nonce}
+      />
+    </>
+  )
+}
+```
+
+</PagesOnly>
+
+CSP を更新してサードパーティドメインを許可してください:
+
+```ts filename="proxy.ts" switcher
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+```js filename="proxy.js" switcher
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+### よくある CSP 違反
+
+1. **インラインスタイル**: nonce をサポートする CSS-in-JS ライブラリを使用するか、スタイルを外部ファイルに切り出す
+2. **動的インポート**: `script-src` ポリシーで動的インポートが許可されていることを確認する
+3. **WebAssembly**: WebAssembly を使用する場合は `wasm-unsafe-eval` を追加する
+4. **Service Worker**: Service Worker スクリプトに対する適切なポリシーを追加する
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                             |
+| ---------- | -------------------------------------------------------------------- |
+| `v14.0.0`  | ハッシュベースの CSP 向けの実験的な SRI サポートが追加された         |
+| `v13.4.20` | 適切な nonce 処理および CSP ヘッダー解析のために推奨されるバージョン |

@@ -1,0 +1,16 @@
+---
+title: メタデータファイル API リファレンス
+nav_title: メタデータファイル
+description: メタデータファイル規約の API ドキュメント。
+---
+
+このセクションでは **メタデータファイルの規約** について説明します。ファイルベースのメタデータは、ルートセグメントに専用のメタデータファイルを追加することで定義できます。
+
+各ファイル規約は、静的ファイル（例: `opengraph-image.jpg`）として、またはコードを使ってファイルを生成する動的なバリエーション（例: `opengraph-image.js`）として定義できます。
+
+ファイルが定義されると、Next.js は自動的にそのファイルを配信し（本番環境ではキャッシュのためにハッシュ付きで）、アセットの URL、ファイルタイプ、画像サイズなど、適切なメタデータを含む関連する head 要素を更新します。
+
+> **補足**:
+>
+> - [`sitemap.ts`](/docs/app/api-reference/file-conventions/metadata/sitemap)、[`opengraph-image.tsx`](/docs/app/api-reference/file-conventions/metadata/opengraph-image)、[`icon.tsx`](/docs/app/api-reference/file-conventions/metadata/app-icons) のような特別な Route Handler や、その他の [メタデータファイル](/docs/app/api-reference/file-conventions/metadata) は、デフォルトでキャッシュされます。
+> - [`proxy.ts`](/docs/app/api-reference/file-conventions/proxy) と併用する場合は、[matcher を設定して](/docs/app/api-reference/file-conventions/proxy#matcher)、メタデータファイルを除外してください。

@@ -1,0 +1,176 @@
+---
+title: 'use cache: private'
+description: '"use cache: private" ディレクティブを使用して、ランタイムのリクエスト API にアクセスする関数をキャッシュする方法を学びます。'
+version: experimental
+related:
+  title: 関連
+  description: 関連する API リファレンスを表示します。
+  links:
+    - app/api-reference/directives/use-cache
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/cacheTag
+---
+
+`'use cache: private'` ディレクティブを使用すると、キャッシュされたスコープ内で `cookies()`, `headers()`, `searchParams` などのランタイムのリクエスト API に関数がアクセスできるようになります。ただし、結果が **サーバーに保存されることは一切なく**、ブラウザのメモリ内だけでキャッシュされ、ページのリロードをまたいで永続化されることはありません。
+
+次のような場合に `'use cache: private'` を検討してください:
+
+- すでにランタイムデータへアクセスしている関数をキャッシュしたいが、[ランタイムアクセスを外に出し、値を引数として渡すようリファクタリングする](/docs/app/getting-started/cache-components#with-runtime-data) のが現実的ではない場合
+- コンプライアンス要件により、一時的であっても特定のデータをサーバーに保存することが禁止されている場合
+
+このディレクティブはランタイムデータにアクセスするため、関数はすべてのサーバーレンダリング時に実行され、[static shell](/docs/app/getting-started/cache-components#how-rendering-works-with-cache-components) 生成時には実行対象から除外されます。
+
+`'use cache: private'` に対してカスタムキャッシュハンドラーを設定することは **できません**。
+
+各種キャッシュディレクティブの比較については、[`use cache: remote` が `use cache` および `use cache: private` とどのように異なるか](/docs/app/api-reference/directives/use-cache-remote#how-use-cache-remote-differs-from-use-cache-and-use-cache-private) を参照してください。
+
+> **補足**: このディレクティブはランタイムプリフェッチに依存しているため `experimental` とマークされています。ランタイムプリフェッチはまだ安定していません。ランタイムプリフェッチは今後提供予定の機能であり、ルーターが [static shell](/docs/app/getting-started/cache-components#how-rendering-works-with-cache-components) を超えて、プライベートキャッシュだけでなく **任意の** キャッシュ済みスコープをプリフェッチできるようになります。
+
+## 使用方法
+
+`'use cache: private'` を使用するには、`next.config.ts` ファイルで [`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) フラグを有効にします。
+
+```tsx filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```jsx filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+次に、`cacheLife` 設定と併せて関数に `'use cache: private'` を追加します。
+
+> **補足**: このディレクティブは Route Handlers では利用できません。
+
+### 基本的な例
+
+この例では、`'use cache: private'` のスコープ内で Cookie にアクセスできることを示します。
+
+```tsx filename="app/product/[id]/page.tsx" switcher
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheLife, cacheTag } from 'next/cache'
+
+export async function generateStaticParams() {
+  return [{ id: '1' }]
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
+  return (
+    <div>
+      <ProductDetails id={id} />
+      <Suspense fallback={<div>Loading recommendations...</div>}>
+        <Recommendations productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function Recommendations({ productId }: { productId: string }) {
+  const recommendations = await getRecommendations(productId)
+
+  return (
+    <div>
+      {recommendations.map((rec) => (
+        <ProductCard key={rec.id} product={rec} />
+      ))}
+    </div>
+  )
+}
+
+async function getRecommendations(productId: string) {
+  'use cache: private'
+  cacheTag(`recommendations-${productId}`)
+  cacheLife({ stale: 60 })
+
+  // プライベートキャッシュ関数内でCookieにアクセスする
+  const sessionId = (await cookies()).get('session-id')?.value || 'guest'
+
+  return getPersonalizedRecommendations(productId, sessionId)
+}
+```
+
+```jsx filename="app/product/[id]/page.js" switcher
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheLife, cacheTag } from 'next/cache'
+
+export async function generateStaticParams() {
+  return [{ id: '1' }]
+}
+
+export default async function ProductPage({ params }) {
+  const { id } = await params
+
+  return (
+    <div>
+      <ProductDetails id={id} />
+      <Suspense fallback={<div>Loading recommendations...</div>}>
+        <Recommendations productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function Recommendations({ productId }) {
+  const recommendations = await getRecommendations(productId)
+
+  return (
+    <div>
+      {recommendations.map((rec) => (
+        <ProductCard key={rec.id} product={rec} />
+      ))}
+    </div>
+  )
+}
+
+async function getRecommendations(productId) {
+  'use cache: private'
+  cacheTag(`recommendations-${productId}`)
+  cacheLife({ stale: 60 })
+
+  // プライベートキャッシュ関数内でCookieにアクセスする
+  const sessionId = (await cookies()).get('session-id')?.value || 'guest'
+
+  return getPersonalizedRecommendations(productId, sessionId)
+}
+```
+
+> **補足**: ランタイムプリフェッチを有効にするには、`stale` の期間を少なくとも 30 秒に設定する必要があります。詳細は、[`cacheLife` におけるクライアントルーターのキャッシュ動作](/docs/app/api-reference/functions/cacheLife#client-router-cache-behavior)を参照してください。
+
+## プライベートキャッシュで許可されている Request API
+
+以下のリクエスト固有の API は、`'use cache: private'` 関数内で使用できます:
+
+| API            | `use cache` で許可 | `'use cache: private'` で許可 |
+| -------------- | ------------------ | ----------------------------- |
+| `cookies()`    | No                 | Yes                           |
+| `headers()`    | No                 | Yes                           |
+| `searchParams` | No                 | Yes                           |
+| `connection()` | No                 | No                            |
+
+> **補足:** [`connection()`](https://nextjs.org/docs/app/api-reference/functions/connection) API は、接続固有の情報を提供し、これを安全にキャッシュできないため、`use cache` と `'use cache: private'` の両方で使用が禁止されています。
+
+## バージョン履歴
+
+| バージョン | 変更点                                                                    |
+| ---------- | ------------------------------------------------------------------------- |
+| `v16.0.0`  | Cache Components 機能において `"use cache: private"` が有効になりました。 |

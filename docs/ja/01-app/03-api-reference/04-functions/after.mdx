@@ -1,0 +1,303 @@
+---
+title: after
+description: after 関数の API リファレンス。
+---
+
+`after` を使うと、レスポンス（またはプリレンダー）が完了した後に実行する処理をスケジュールできます。これは、ログ出力やアナリティクスなど、レスポンスをブロックすべきでないタスクやその他の副作用に有用です。
+
+`after` は [Server Components](/docs/app/getting-started/server-and-client-components)（[`generateMetadata`](/docs/app/api-reference/functions/generate-metadata) を含む）、[Server Functions](/docs/app/getting-started/updating-data)、[Route Handlers](/docs/app/api-reference/file-conventions/route)、および [Proxy](/docs/app/api-reference/file-conventions/proxy) で使用できます。
+
+この関数は、レスポンス（またはプリレンダー）が完了した後に実行されるコールバック関数を受け取ります。
+
+```tsx filename="app/layout.tsx" switcher
+import { after } from 'next/server'
+// カスタムロギング関数
+import { log } from '@/app/utils'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  after(() => {
+    // レイアウトがレンダリングされてユーザーに送信された後に実行
+    log()
+  })
+  return <>{children}</>
+}
+```
+
+```jsx filename="app/layout.jsx" switcher
+import { after } from 'next/server'
+// カスタムロギング関数
+import { log } from '@/app/utils'
+
+export default function Layout({ children }) {
+  after(() => {
+    // レイアウトがレンダリングされてユーザーに送信された後に実行
+    log()
+  })
+  return <>{children}</>
+}
+```
+
+> **補足:** `after` は [Dynamic API](/docs/app/guides/caching#dynamic-rendering) ではなく、これを呼び出してもそのルートが動的にはなりません。静的ページ内で使用された場合、コールバックはビルド時、またはページが再検証されるたびに実行されます。
+
+## リファレンス
+
+### パラメータ
+
+- レスポンス（またはプリレンダリング）の完了後に実行されるコールバック関数。
+
+### 実行時間
+
+`after` は、そのルートに対してプラットフォームのデフォルトまたは設定済みの最大実行時間まで実行されます。プラットフォームが対応している場合は、[`maxDuration`](/docs/app/api-reference/file-conventions/route-segment-config#maxduration) ルートセグメント設定を使ってタイムアウトの上限を設定できます。
+
+## 補足
+
+- レスポンスが正常に完了しなかった場合でも `after` は実行されます。エラーがスローされた場合や、`notFound` や `redirect` が呼び出された場合も含まれます。
+- React の `cache` を使用して、`after` 内で呼び出される関数の実行を重複しないようにできます。
+- `after` は他の `after` 呼び出しの中にネストできます。たとえば、`after` 呼び出しをラップして追加の機能を付与するユーティリティ関数を作成できます。
+
+## 使用例
+
+### リクエスト API を使用する場合
+
+`after` 内で [`cookies`](/docs/app/api-reference/functions/cookies) や [`headers`](/docs/app/api-reference/functions/headers) といったリクエスト API を使用できるかどうかは、`after` がどこから呼び出されているかによって異なります。
+
+#### Route Handlers とサーバー関数内で
+
+[Route Handlers](/docs/app/api-reference/file-conventions/route) と [サーバー関数](/docs/app/getting-started/updating-data) で `after` コールバックを使用している場合、そのコールバック内で `cookies` と `headers` を直接呼び出すことができます。これは、ミューテーションや API リクエストの後にアクティビティをログとして記録するのに便利です。例えば次のようになります。
+
+```ts filename="app/api/route.ts" highlight={2,10-16} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export async function POST(request: Request) {
+  // ミューテーションを実行
+  // ...
+
+  // 分析のためにユーザーアクティビティをログに記録
+  after(async () => {
+    const userAgent = (await headers()).get('user-agent') || 'unknown'
+    const sessionCookie =
+      (await cookies()).get('session-id')?.value || 'anonymous'
+
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return new Response(JSON.stringify({ status: 'success' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+```js filename="app/api/route.js" highlight={2,10-16} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export async function POST(request) {
+  // ミューテーションを実行
+  // ...
+
+  // 分析用にユーザーアクティビティをログに記録
+  after(async () => {
+    const userAgent = (await headers()).get('user-agent') || 'unknown'
+    const sessionCookie =
+      (await cookies()).get('session-id')?.value || 'anonymous'
+
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return new Response(JSON.stringify({ status: 'success' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+#### サーバーコンポーネント（pages と layouts）の場合
+
+[サーバーコンポーネント](/docs/app/getting-started/server-and-client-components)（pages、layouts、`generateMetadata` を含む）では、`after` の内部で `cookies`、`headers`、その他の [Dynamic APIs](/docs/app/guides/caching#dynamic-rendering) を使用することは**できません**。これは、Next.js が [Partial Prerendering](/docs/app/glossary#partial-prerendering-ppr) や [Cache Components](/docs/app/getting-started/cache-components) をサポートするために、コンポーネントツリーのどの部分がリクエストデータにアクセスしているかを把握する必要がある一方で、`after` は React のレンダリングライフサイクルの後に実行されるためです。
+
+サーバーコンポーネント内の `after` コールバックでリクエストデータが必要な場合は、事前にリクエストデータを読み取り、その値をコールバックに渡してください。
+
+```tsx filename="app/page.tsx" highlight={8-10,12} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default async function Page() {
+  // `after` の前にリクエストデータを読み取る — これは許可されている
+  // これらの呼び出しはコンポーネントのレンダリングライフサイクル中に読み取られる
+  const userAgent = (await headers()).get('user-agent') || 'unknown'
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  after(() => {
+    // 上で読み取った値を使用する
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return <h1>My Page</h1>
+}
+```
+
+```jsx filename="app/page.jsx" highlight={8-10,12} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default async function Page() {
+  // `after` の前にリクエストデータを読み取る — これは許可されている
+  // これらの呼び出しはコンポーネントのレンダリングライフサイクル中に読み取られる
+  const userAgent = (await headers()).get('user-agent') || 'unknown'
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  after(() => {
+    // 上で読み取った値を使用する
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return <h1>My Page</h1>
+}
+```
+
+Server Component で `after` コールバック内から `cookies()` または `headers()` を呼び出すと、実行時エラーが発生します。
+
+#### Cache Components を使用する場合
+
+[Cache Components](/docs/app/getting-started/cache-components) を使用する場合、`cookies` や `headers` のようなリクエストデータにアクセスするコンポーネントは、ページの残りの部分を静的シェルとしてプリレンダーできるように、[`<Suspense>`](https://react.dev/reference/react/Suspense) でラップする必要があります。
+
+このパターンは、動的コンポーネント内でリクエストデータを読み取り、その値を `after` に渡すことで、`after` と組み合わせて使用できます。
+
+```tsx filename="app/page.tsx" highlight={18-19,22-24} switcher
+import { Suspense } from 'react'
+import { after } from 'next/server'
+import { cookies } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Part of the static shell</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <DynamicContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function DynamicContent() {
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  // レスポンス送信後に処理をスケジュールする
+  after(() => {
+    logUserAction({ sessionCookie })
+  })
+
+  return <p>Your session: {sessionCookie}</p>
+}
+```
+
+```jsx filename="app/page.jsx" highlight={18-19,22-24} switcher
+import { Suspense } from 'react'
+import { after } from 'next/server'
+import { cookies } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Part of the static shell</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <DynamicContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function DynamicContent() {
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  // レスポンス送信後に処理をスケジュールする
+  after(() => {
+    logUserAction({ sessionCookie })
+  })
+
+  return <p>Your session: {sessionCookie}</p>
+}
+```
+
+この例では、`<h1>` と `<Suspense>` のフォールバックが static shell に含まれています。`DynamicContent` はレンダリング中に cookie を読み取り、クロージャを通じてそれを `after` に渡します。`cookies()` は `after` コールバックの _外側_（コンポーネントのレンダリング中）で呼び出されるため、正しく動作します。
+
+## プラットフォーム対応状況
+
+| デプロイオプション                                                  | 対応状況             |
+| ------------------------------------------------------------------- | -------------------- |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | はい                 |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | はい                 |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | いいえ               |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | プラットフォーム依存 |
+
+Next.js をセルフホスティングする際の [`after`](/docs/app/guides/self-hosting#after) の設定方法については、こちらを参照してください。
+
+<details id="after-serverless">
+  <summary>参考: サーバーレスプラットフォームでの `after` サポート</summary>
+
+サーバーレス環境で `after` を使用するには、レスポンス送信後に非同期タスクが完了するのを待つ必要があります。Next.js と Vercel では、`waitUntil(promise)` と呼ばれるプリミティブを使うことでこれを実現しています。これは、[`waitUntil`](https://vercel.com/docs/functions/functions-api-reference#waituntil) に渡されたすべての Promise が完了するまでサーバーレス関数呼び出しの有効期間を延長します。
+
+ユーザーに `after` を実行できるようにしたい場合は、同様の動作をする `waitUntil` の実装を提供する必要があります。
+
+`after` が呼び出されると、Next.js は次のようにして `waitUntil` にアクセスします:
+
+```jsx
+const RequestContext = globalThis[Symbol.for('@next/request-context')]
+const contextValue = RequestContext?.get()
+const waitUntil = contextValue?.waitUntil
+```
+
+つまり、`globalThis[Symbol.for('@next/request-context')]` には次のようなオブジェクトが含まれていることが期待されます:
+
+```tsx
+type NextRequestContext = {
+  get(): NextRequestContextValue | undefined
+}
+
+type NextRequestContextValue = {
+  waitUntil?: (promise: Promise<any>) => void
+}
+```
+
+以下はその実装例です。
+
+```tsx
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+const RequestContextStorage = new AsyncLocalStorage<NextRequestContextValue>()
+
+// Next.js が使用するアクセサーを定義して注入する
+const RequestContext: NextRequestContext = {
+  get() {
+    return RequestContextStorage.getStore()
+  },
+}
+globalThis[Symbol.for('@next/request-context')] = RequestContext
+
+const handler = (req, res) => {
+  const contextValue = { waitUntil: YOUR_WAITUNTIL }
+  // 値を渡す
+  return RequestContextStorage.run(contextValue, () => nextJsHandler(req, res))
+}
+```
+
+</details>
+
+## バージョン履歴
+
+| バージョン   | 変更内容                            |
+| ------------ | ----------------------------------- |
+| `v15.1.0`    | `after` が安定版となりました。      |
+| `v15.0.0-rc` | `unstable_after` が導入されました。 |

@@ -1,0 +1,38 @@
+---
+title: viewTransition
+description: App Router 内で React で View Transitions API を有効化する
+version: experimental
+---
+
+`viewTransition` は、React で新しい [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API) を有効化するための実験的なフラグです。この API を使用すると、ネイティブの View Transitions ブラウザー API を活用して、UI 状態間のシームレスなトランジションを作成できます。
+
+この機能を有効にするには、`next.config.js` ファイル内で `viewTransition` プロパティを `true` に設定します。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    viewTransition: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> 重要なお知らせ：`<ViewTransition>` コンポーネントは、すでに React の Canary リリース チャンネルで利用可能です。
+> `experimental.viewTransition` は、ナビゲーションにおいて自動的に
+> [Transition 型を追加](https://react.dev/reference/react/addTransitionType) するなど、Next.js 機能とのより深い統合を有効にするためにのみ必要です。Next.js 固有の Transition 型は、まだ実装されていません。
+
+## 使用方法
+
+アプリケーションで React から [`<ViewTransition>` コンポーネント](https://react.dev/reference/react/ViewTransition) をインポートできます。
+
+```jsx
+import { ViewTransition } from 'react'
+```
+
+### ライブデモ
+
+この機能が実際にどのように動作するかは、[Next.js View Transition Demo](https://view-transition-example.vercel.app) で確認できます。
+
+この API の変更に応じて、ドキュメントを更新し、サンプルも追加していきます。ただし現時点では、本機能を本番環境で使用しないことを強く推奨します。

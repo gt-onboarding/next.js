@@ -1,0 +1,584 @@
+---
+title: cacheLife
+description: '`cacheLife` 関数を使用して、キャッシュされた関数やコンポーネントのキャッシュ有効期限を設定する方法について説明します。'
+related:
+  title: 関連
+  description: 関連する API リファレンスを表示します。
+  links:
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/directives/use-cache
+    - app/api-reference/functions/revalidateTag
+    - app/api-reference/functions/cacheTag
+---
+
+`cacheLife` 関数は、関数やコンポーネントのキャッシュ有効期間を設定するために使用します。[`use cache`](/docs/app/api-reference/directives/use-cache) ディレクティブと組み合わせて使用し、対象の関数またはコンポーネントのスコープ内で呼び出す必要があります。
+
+## 使い方
+
+### 基本的なセットアップ
+
+`cacheLife` を使用するには、まず `next.config.js` ファイルで [`cacheComponents` フラグ](/docs/app/api-reference/config/next-config-js/cacheComponents) を有効にしてください。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+const nextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+`cacheLife` を使うには `use cache` ディレクティブが必要で、これはファイルレベル、または async 関数やコンポーネントの先頭に記述する必要があります。
+
+> **補足**:
+>
+> - `cacheLife` を使う場合は、`use cache` ディレクティブがファイルレベルにある場合でも、キャッシュ対象となる出力を生成する関数内に記述してください
+> - 1 回の関数呼び出しにつき、実行される `cacheLife` 呼び出しは 1 回だけである必要があります。異なる制御フロー分岐内で `cacheLife` を呼び出すことはできますが、1 回の実行につき 1 回だけが実行されるようにしてください。[条件付きのキャッシュ有効期間](#conditional-cache-lifetimes) の例を参照してください
+
+### プリセットプロファイルの使用
+
+Next.js では、一般的なキャッシュのニーズをカバーするプリセットのキャッシュプロファイルを提供しています。各プロファイルは次の 3 つの要素のバランスを取ります：
+
+- 更新を確認せずに、ユーザーがキャッシュされたコンテンツを見続ける時間（クライアントサイド）
+- サーバー上で新しいコンテンツが生成される頻度
+- 古いコンテンツの有効期限が完全に切れるタイミング
+
+コンテンツの変更頻度に応じてプロファイルを選択します：
+
+- **`seconds`** - リアルタイムデータ（株価、ライブスコア）
+- **`minutes`** - 頻繁に更新（ソーシャルフィード、ニュース）
+- **`hours`** - 1 日に複数回更新（商品在庫、天気）
+- **`days`** - 1 日単位で更新（ブログ投稿、記事）
+- **`weeks`** - 週単位で更新（ポッドキャスト、ニュースレター）
+- **`max`** - ほとんど変化しない（リーガルページ、アーカイブコンテンツ）
+
+`cacheLife` をインポートして、プロファイル名を渡します：
+
+```tsx filename="app/blog/page.tsx" highlight={1,5}
+'use cache'
+import { cacheLife } from 'next/cache'
+
+export default async function BlogPage() {
+  cacheLife('days') // ブログコンテンツは毎日更新される
+
+  const posts = await getBlogPosts()
+  return <div>{/* render posts */}</div>
+}
+```
+
+プロファイル名は、関数全体の出力を Next.js がどのようにキャッシュするかを指定します。`cacheLife` を呼び出さない場合は、`default` プロファイルが使用されます。キャッシュ期間の詳細については、[プリセットキャッシュプロファイル](#preset-cache-profiles) を参照してください。
+
+## リファレンス
+
+### キャッシュプロファイルのプロパティ
+
+キャッシュプロファイルは、次の 3 つのタイミング関連プロパティによってキャッシュ動作を制御します:
+
+- **[`stale`](#stale)**: クライアントがサーバーに確認せずにキャッシュ済みデータを使用できる期間
+- **[`revalidate`](#revalidate)**: この時間を過ぎると、次のリクエストでバックグラウンド更新がトリガーされる
+- **[`expire`](#expire)**: この時間内にリクエストが発生しなかった場合、次のリクエストは新しいコンテンツの取得完了まで待機する
+
+#### `stale`
+
+**クライアントサイド:** クライアントがサーバーに問い合わせることなくキャッシュ済みデータを使用できる時間。
+
+この期間中、クライアントサイドのルーターはネットワークリクエストなしで、即座にキャッシュされたコンテンツを表示します。この期間の有効期限が切れた後は、次のナビゲーションまたはリクエスト時にルーターはサーバーに問い合わせる必要があります。これによりクライアントキャッシュからページを即時に表示できますが、データが古くなっている可能性があります。
+
+- 省略した場合、`default` プロファイルの `stale` の値（5 分。[`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) を参照）がデフォルトになります
+
+```tsx
+cacheLife({ stale: 300 }) // 5分
+```
+
+#### `revalidate`
+
+サーバーがバックグラウンドでキャッシュ済みコンテンツを再生成する頻度です。
+
+- この期間が経過した後にリクエストが到着した場合、サーバーは次を行います:
+  1. （存在する場合）キャッシュされたバージョンを即座に返す
+  2. バックグラウンドでコンテンツを再生成する
+  3. 新しいコンテンツでキャッシュを更新する
+- [Incremental Static Regeneration (ISR)](/docs/app/guides/incremental-static-regeneration) と同様です
+- 省略した場合は、`default` プロファイルの `revalidate` の値（15 分）が使用されます
+
+```tsx
+cacheLife({ revalidate: 900 }) // 15分
+```
+
+#### `expire`
+
+サーバーがキャッシュされたコンテンツを再生成しなければならないまでの最大時間。
+
+- この期間中にトラフィックがまったくなかった場合、次のリクエスト時にサーバーは同期的にコンテンツを再生成します
+- `revalidate` と `expire` の両方を設定する場合、`expire` は `revalidate` より長くなければなりません。Next.js はこれを検証し、不正な設定にはエラーをスローします。
+- 省略した場合、`default` プロファイルの `expire` の値（有効期限なし）がデフォルトとして使用されます
+
+```tsx
+cacheLife({ expire: 3600 }) // 1時間
+```
+
+### プリセットキャッシュプロファイル
+
+プロファイルを指定しない場合は、Next.js により `default` プロファイルが使用されます。キャッシュ動作を明確にするため、プロファイルを明示的に設定することをおすすめします。
+
+| **プロファイル** | **ユースケース**                     | `stale` | `revalidate` | `expire` |
+| ---------------- | ------------------------------------ | ------- | ------------ | -------- |
+| `default`        | 標準的なコンテンツ                   | 5分     | 15分         | なし     |
+| `seconds`        | リアルタイムデータ                   | 30秒    | 1秒          | 1分      |
+| `minutes`        | 頻繁に更新されるコンテンツ           | 5分     | 1分          | 1時間    |
+| `hours`          | 1日に複数回更新されるコンテンツ      | 5分     | 1時間        | 1日      |
+| `days`           | 毎日更新されるコンテンツ             | 5分     | 1日          | 1週間    |
+| `weeks`          | 毎週更新されるコンテンツ             | 5分     | 1週間        | 30日     |
+| `max`            | ほとんど変化しない安定したコンテンツ | 5分     | 30日         | 1年      |
+
+### カスタムキャッシュプロファイル
+
+再利用可能なキャッシュプロファイルを `next.config.ts` ファイルで定義できます:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    biweekly: {
+      stale: 60 * 60 * 24 * 14, // 14日間
+      revalidate: 60 * 60 * 24, // 1日ごと
+      expire: 60 * 60 * 24 * 14, // 14日間
+    },
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+const nextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    biweekly: {
+      stale: 60 * 60 * 24 * 14, // 14日
+      revalidate: 60 * 60 * 24, // 1日
+      expire: 60 * 60 * 24 * 14, // 14日
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+上記の例では、14 日間キャッシュを保持し、1 日ごとに更新をチェックし、14 日後にキャッシュが失効します。その後、このプロファイルを名前でアプリケーション全体から参照できます:
+
+> **補足**: カスタムプロファイルで省略されたプロパティは、`default` プロファイルから継承されます。これは、`cacheLife()` に直接渡されるインラインのプロファイルオブジェクトにも適用されます。
+
+```tsx filename="app/page.tsx" highlight={5}
+'use cache'
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  cacheLife('biweekly')
+  return <div>Page</div>
+}
+```
+
+### デフォルトのキャッシュプロファイルの上書き
+
+デフォルトのキャッシュプロファイルは、キャッシュ可能な出力の各部分がどの程度「新鮮」か、あるいは「古い」かを考えるうえで有用ですが、アプリケーションのキャッシュ戦略により適合するように、別の名前付きプロファイルを使いたい場合もあるでしょう。
+
+デフォルトの名前付きキャッシュプロファイルと同じ名前で新しい設定を作成することで、デフォルトのキャッシュプロファイルを上書きできます。
+
+以下の例は、デフォルトの `"days"` キャッシュプロファイルを上書きする方法を示しています。
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    // 'days' プロファイルを上書き
+    days: {
+      stale: 3600, // 1時間
+      revalidate: 900, // 15分
+      expire: 86400, // 1日
+    },
+  },
+}
+
+export default nextConfig
+```
+
+### インラインキャッシュプロファイル
+
+単発のケースでは、プロファイルオブジェクトを `cacheLife` に直接渡します：
+
+```tsx filename="app/page.tsx"
+'use cache'
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  cacheLife({
+    stale: 3600,
+    revalidate: 900,
+    expire: 86400,
+  })
+
+  return <div>Page</div>
+}
+```
+
+インラインプロファイルは、その関数やコンポーネントにのみ適用されます。再利用可能な構成には、`next.config.ts` 内でカスタムプロファイルを定義してください。
+
+空のオブジェクトを渡した `cacheLife({})` を使用すると、`default` プロファイルの値が適用されます。
+
+### クライアントルーターのキャッシュ動作
+
+`stale` プロパティは `Cache-Control` ヘッダーではなく、クライアント側のルーターキャッシュを制御します:
+
+- サーバーは `x-nextjs-stale-time` レスポンスヘッダーを通じて stale 時間を送信します
+- クライアントルーターはこの値を使用して、いつ再検証するかを判断します
+- **プリフェッチされたリンクが使用可能な状態を保つため、最小 30 秒が強制されます**
+
+この 30 秒の下限は、ユーザーがリンクをクリックする前にプリフェッチされたデータが期限切れになるのを防ぎます。これは時間ベースの有効期限にのみ適用されます。
+
+Server Action から再検証関数（[`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)、[`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)、[`updateTag`](/docs/app/api-reference/functions/updateTag)、または [`refresh`](/docs/app/api-reference/functions/refresh)）を呼び出すと、stale 時間を無視してクライアントキャッシュ全体が即座にクリアされます。
+
+> **補足**: `cacheLife` の `stale` プロパティは、[`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) とは異なります。`staleTimes` はすべてのルートに影響するグローバル設定である一方、`cacheLife` では関数単位またはルート単位で設定できます。`staleTimes.static` を更新すると、`default` キャッシュプロファイルの `stale` 値も更新されます。
+
+### 事前レンダリング時の挙動
+
+ライフタイムが非常に短いキャッシュ — `revalidate` が 0 のもの、または `expire` が 5 分未満のもの — は自動的に事前レンダリングから除外され、代わりに「dynamic holes」になります。これには `seconds` プロファイルも含まれます。
+
+この挙動により、同一ページ内で静的コンテンツと動的コンテンツを混在させることができます。静的な部分は事前レンダリングされ、寿命の短いキャッシュは境界を作り、その部分のデータはビルド時ではなくリクエスト時にフェッチされます。コンテンツの読み込み中にフォールバックを提供するために、動的キャッシュの周囲を `<Suspense>` 境界で囲んでください。
+
+## 使用例
+
+### プリセットプロファイルの使用
+
+キャッシュを設定する最も簡単な方法は、プリセットプロファイルを使用することです。コンテンツの更新頻度に合うものを選択してください。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function BlogPost() {
+  'use cache'
+  cacheLife('days') // ブログ投稿は毎日更新される
+
+  const post = await fetchBlogPost()
+  return <article>{post.content}</article>
+}
+```
+
+```tsx filename="app/products/[id]/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function ProductPage() {
+  'use cache'
+  cacheLife('hours') // 製品データは1日に複数回更新される
+
+  const product = await fetchProduct()
+  return <div>{product.name}</div>
+}
+```
+
+### 特定のニーズに合わせたカスタムプロファイル
+
+プリセットのオプションが要件に合わない場合は、カスタムプロファイルを定義してください。
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    editorial: {
+      stale: 600, // 10 minutes
+      revalidate: 3600, // 1 hour
+      expire: 86400, // 1 day
+    },
+    marketing: {
+      stale: 300, // 5分
+      revalidate: 1800, // 30分
+      expire: 43200, // 12時間
+    },
+  },
+}
+
+export default nextConfig
+```
+
+次に、アプリケーション全体でこれらのプロファイルを使用します。
+
+```tsx filename="app/editorial/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function EditorialPage() {
+  'use cache'
+  cacheLife('editorial')
+  // ...
+}
+```
+
+### 個別のケース向けのインラインプロファイル
+
+特定の関数で一度限りのキャッシュ動作が必要な場合に、インラインプロファイルを使用します。
+
+```tsx filename="app/api/limited-offer/route.ts"
+import { cacheLife } from 'next/cache'
+import { getDb } from '@lib/db'
+
+async function getLimitedOffer() {
+  'use cache'
+
+  cacheLife({
+    stale: 60, // 1分
+    revalidate: 300, // 5分
+    expire: 3600, // 1時間
+  })
+
+  const offer = await getDb().offer.findFirst({
+    where: { type: 'limited' },
+    orderBy: { created_at: 'desc' },
+  })
+
+  return offer
+}
+
+export async function GET() {
+  const offer = await getLimitedOffer()
+
+  return Response.json(offer)
+}
+```
+
+### 関数ごとのキャッシュ
+
+ユーティリティ関数にキャッシュを適用して、より細かな制御を行います:
+
+```tsx filename="lib/api.ts"
+import { cacheLife } from 'next/cache'
+
+export async function getSettings() {
+  'use cache'
+  cacheLife('max') // 設定はほとんど変わらない
+
+  return await fetchSettings()
+}
+```
+
+```tsx filename="lib/stats.ts"
+import { cacheLife } from 'next/cache'
+
+export async function getRealtimeStats() {
+  'use cache'
+  cacheLife('seconds') // 統計は常に更新される
+
+  return await fetchStats()
+}
+```
+
+### ネストされたキャッシュ動作
+
+`use cache` ディレクティブを入れ子にした場合（キャッシュされた関数やコンポーネントが、別のキャッシュされた関数やコンポーネントを使用している場合）、外側のキャッシュの動作は、明示的な `cacheLife` が指定されているかどうかに依存します。
+
+#### 外側の cacheLife を明示的に指定した場合
+
+外側のキャッシュは、内側のキャッシュの有効期間に関係なく、自身の有効期間を使用します。外側のキャッシュがヒットすると、すべてのネストされたデータを含む完全な出力を返します。明示的に指定された `cacheLife` は、内側の有効期間より長くても短くても、常に優先されます。
+
+```tsx filename="app/dashboard/page.tsx"
+import { cacheLife } from 'next/cache'
+import { Widget } from './widget'
+
+export default async function Dashboard() {
+  'use cache'
+  cacheLife('hours') // 外側のスコープは独自のライフタイムを設定する
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <Widget /> {/* 内側のスコープは 'minutes' のライフタイムを持つ */}
+    </div>
+  )
+}
+```
+
+#### 外側キャッシュで `cacheLife` を明示的に指定しない場合
+
+外側のキャッシュで `cacheLife` を呼び出さない場合、`default` プロファイル（15 分ごとに再検証）が使用されます。より短い有効期限を持つ内側のキャッシュは、外側キャッシュの `default` の有効期限を短くすることができます。より長い有効期限を持つ内側のキャッシュは、`default` を超えて有効期限を延長することはできません。
+
+```tsx filename="app/dashboard/page.tsx"
+import { Widget } from './widget'
+
+export default async function Dashboard() {
+  'use cache'
+  // cacheLife の呼び出しなし - デフォルト（15分）を使用
+  // Widget が 5分の場合 → Dashboard は 5分になる
+  // Widget が 1時間の場合 → Dashboard は 15分のまま
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <Widget />
+    </div>
+  )
+}
+```
+
+**明示的な `cacheLife` を指定することを推奨します。** 明示的な有効期間の値を指定しておくと、キャッシュされた関数やコンポーネントを見ただけで、ネストされたキャッシュを追わなくてもその挙動を即座に把握できます。明示的な有効期間の値がない場合、挙動は内側のキャッシュの有効期間に依存するようになり、挙動を把握しづらくなります。
+
+#### ネストされた短期間キャッシュ
+
+[Prerendering behavior](#prerendering-behavior) で説明したように、短期間キャッシュ（`revalidate` が 0、または `expire` が 5 分未満）は、プリレンダーから除外される動的な領域になります。
+
+短期間キャッシュが、明示的な `cacheLife` を指定していない別の `use cache` の内部にネストされている場合、伝播によって外側のキャッシュの有効期間も暗黙的に短くなってしまいます。このような意図しない設定ミスを防ぐために、Next.js はプリレンダー時にエラーを発生させます。
+
+ネストされたキャッシュは一見して分からない場合があります。インポートしたモジュール内や、サードパーティ依存関係の中に含まれていることもあります。
+
+```tsx filename="components/short-lived-widget.tsx" highlight={5}
+import { cacheLife } from 'next/cache'
+
+export async function ShortLivedWidget() {
+  'use cache'
+  cacheLife('seconds')
+  const data = await fetchRealtimeData()
+  return <div>{data}</div>
+}
+```
+
+別の `use cache` からこのコンポーネントを、`cacheLife` を明示的に指定せずに使用すると、プリレンダリング中にエラーが発生します。
+
+```tsx filename="app/page.tsx"
+import { ShortLivedWidget } from '@/components/short-lived-widget'
+
+export default async function Page() {
+  'use cache'
+  // エラー: 外側のキャッシュに明示的な cacheLife がない
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Last updated: {new Date().toISOString()}</p>
+      <ShortLivedWidget />
+    </div>
+  )
+}
+```
+
+エラーを解消するには、外側の `use cache` に明示的に `cacheLife()` を追加します。
+
+**外側のキャッシュを静的（プリレンダリング済み）のままにしておきたい場合**は、キャッシュの有効期間を長めに設定してください。
+
+```tsx filename="app/page.tsx" highlight={6}
+import { cacheLife } from 'next/cache'
+import { ShortLivedWidget } from '@/components/short-lived-widget'
+
+export default async function Page() {
+  'use cache'
+  cacheLife('default') // 明示的にcacheLifeを指定することでエラーを防ぐ
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Last updated: {new Date().toISOString()}</p>
+      <ShortLivedWidget />
+    </div>
+  )
+}
+```
+
+**外側のキャッシュも短い期間にしたい場合**は、それが意図的であることを明確にするために、短いキャッシュ有効期間を明示的に設定してください。コンテンツの読み込み中にフォールバックを提供できるよう、コンポーネントを `<Suspense>` バウンダリでラップします：
+
+```tsx filename="app/page.tsx" highlight={7,17-19}
+import { Suspense } from 'react'
+import { cacheLife } from 'next/cache'
+import { ShortLivedWidget } from '@/components/short-lived-widget'
+
+async function Content() {
+  'use cache: remote'
+  cacheLife('seconds') // 明示的なcacheLifeにより、これが意図的に短命なキャッシュであることを示す
+  return (
+    <>
+      <p>Last updated: {new Date().toISOString()}</p>
+      <ShortLivedWidget />
+    </>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <Content />
+      </Suspense>
+    </div>
+  )
+}
+```
+
+> **注意:** この例では、サーバーレスデプロイ環境ではデフォルトのインメモリキャッシュだとリクエスト間でランタイムキャッシュが保持されないため、`"use cache: remote"` を使用しています。セルフホスト環境では、`"use cache"` だけで十分な場合もあります。詳細は、[ランタイムキャッシュに関する考慮事項](/docs/app/api-reference/directives/use-cache#runtime-caching-considerations)を参照してください。
+
+### 条件付きキャッシュ有効期間
+
+アプリケーションロジックに応じて異なるキャッシュ期間を設定するために、コードパスごとに条件付きで `cacheLife` を呼び出せます。
+
+```tsx filename="lib/posts.ts" highlight={14,19}
+import { cacheLife, cacheTag } from 'next/cache'
+
+async function getPostContent(slug: string) {
+  'use cache'
+
+  const post = await fetchPost(slug)
+
+  // ターゲットを絞った再検証のためにキャッシュエントリにタグを付ける
+  cacheTag(`post-${slug}`)
+
+  if (!post) {
+    // コンテンツがまだ公開されていないか、下書き状態の可能性がある
+    // データベース負荷を軽減するために短時間キャッシュする
+    cacheLife('minutes')
+    return null
+  }
+
+  // 公開済みコンテンツはより長くキャッシュできる
+  cacheLife('days')
+
+  // キャッシュサイズを最小限に抑えるために必要なデータのみを返す
+  return post.data
+}
+```
+
+このパターンは、結果に応じて異なるキャッシュ期間を設定する必要がある場合に有用です。たとえば、あるアイテムが現在は存在しないものの、後で利用可能になる可能性が高い場合などです。
+
+#### データから動的なキャッシュ有効期間を設定する
+
+実行時にキャッシュの有効期間を動的に決定したい場合、たとえば取得したデータからその値を読み取るようなケースでは、[インラインキャッシュプロファイル](#inline-cache-profiles)オブジェクトを使用します。
+
+```tsx filename="lib/posts.ts" highlight={15,16,17,18}
+import { cacheLife, cacheTag } from 'next/cache'
+
+async function getPostContent(slug: string) {
+  'use cache'
+
+  const post = await fetchPost(slug)
+  cacheTag(`post-${slug}`)
+
+  if (!post) {
+    cacheLife('minutes')
+    return null
+  }
+
+  // CMSデータのキャッシュタイミングをオブジェクトとして直接使用する
+  cacheLife({
+    // post.revalidateSeconds が秒単位の数値であることを確認する
+    // stale と expire は 'default' プロファイルを継承する
+    revalidate: post.revalidateSeconds ?? 3600,
+  })
+
+  return post.data
+}
+```

@@ -1,0 +1,23 @@
+---
+title: transpilePackages
+description: ローカルパッケージ（モノレポなど）や外部依存関係（`node_modules` 内）にある依存モジュールを自動的にトランスパイルしてバンドルします。
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router の両方で共通です。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共通コンテンツはコンポーネントでラップしないでください。 */}
+
+Next.js は、ローカルパッケージ（モノレポなど）や外部依存パッケージ（`node_modules`）を自動的にトランスパイルしてバンドルできます。これにより、`next-transpile-modules` パッケージは不要になります。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  transpilePackages: ['package-name'],
+}
+
+module.exports = nextConfig
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                               |
+| ---------- | -------------------------------------- |
+| `v13.0.0`  | `transpilePackages` が追加されました。 |

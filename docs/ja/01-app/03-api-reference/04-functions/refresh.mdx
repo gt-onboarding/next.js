@@ -1,0 +1,69 @@
+---
+title: refresh
+description: refresh 関数の API リファレンス。
+---
+
+`refresh` を使用すると、[Server Action](/docs/app/getting-started/updating-data) 内からクライアントルーターを更新できます。
+
+## 使用方法
+
+`refresh` は **Server Actions 内からのみ** 呼び出すことができます。Route Handlers、Client Components、その他のコンテキストでは使用できません。
+
+## 引数
+
+```tsx
+refresh(): void;
+```
+
+## 戻り値
+
+`refresh` 関数は値を返しません。
+
+## 例
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データベースに投稿を作成する
+  const post = await db.post.create({
+    data: { title, content },
+  })
+
+  refresh()
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function createPost(formData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データベースに投稿を作成する
+  const post = await db.post.create({
+    data: { title, content },
+  })
+
+  refresh()
+}
+```
+
+### Server Actions の外側で使用した場合のエラー
+
+```ts filename="app/api/posts/route.ts" switcher
+import { refresh } from 'next/cache'
+
+export async function POST() {
+  // これはエラーをスローします
+  refresh()
+}
+```

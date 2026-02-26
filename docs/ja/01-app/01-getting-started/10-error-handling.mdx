@@ -1,0 +1,372 @@
+---
+title: エラー処理
+description: 想定されるエラーを表示し、捕捉されない例外を処理する方法を学びます。
+related:
+  title: API リファレンス
+  description: このページで言及している機能の詳細は、API リファレンスを参照してください。
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/file-conventions/error
+    - app/api-reference/functions/not-found
+    - app/api-reference/file-conventions/not-found
+---
+
+エラーは、[想定されるエラー](#handling-expected-errors)と[捕捉されない例外](#handling-uncaught-exceptions)の 2 つに大別できます。このページでは、Next.js アプリケーションでこれらのエラーをどのように処理するかを説明します。
+
+## 予期されるエラーの処理
+
+予期されるエラーとは、[サーバーサイドのフォームバリデーション](/docs/app/guides/forms) や失敗したリクエストなど、アプリケーションの通常の動作中に発生し得るエラーを指します。これらのエラーは明示的に処理し、クライアントに返す必要があります。
+
+### サーバー関数
+
+[`useActionState`](https://react.dev/reference/react/useActionState) フックを使用して、[サーバー関数](https://react.dev/reference/rsc/server-functions) 内で予期されるエラーを処理できます。
+
+これらのエラーについては、`try`/`catch` ブロックで囲んだり、`throw` で送出したりすることは避けてください。代わりに、予期されるエラーは戻り値として扱ってください。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createPost(prevState: any, formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  const res = await fetch('https://api.vercel.app/posts', {
+    method: 'POST',
+    body: { title, content },
+  })
+  const json = await res.json()
+
+  if (!res.ok) {
+    return { message: '投稿の作成に失敗しました' }
+  }
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createPost(prevState, formData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  const res = await fetch('https://api.vercel.app/posts', {
+    method: 'POST',
+    body: { title, content },
+  })
+  const json = await res.json()
+
+  if (!res.ok) {
+    return { message: '投稿の作成に失敗しました' }
+  }
+}
+```
+
+`useActionState` フックに `action` を渡し、返される `state` を使ってエラーメッセージを表示できます。
+
+```tsx filename="app/ui/form.tsx" highlight={11,19} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createPost } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Form() {
+  const [state, formAction, pending] = useActionState(createPost, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="title">Title</label>
+      <input type="text" id="title" name="title" required />
+      <label htmlFor="content">Content</label>
+      <textarea id="content" name="content" required />
+      {state?.message && <p aria-live="polite">{state.message}</p>}
+      <button disabled={pending}>Create Post</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/form.js" highlight={11,19} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createPost } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Form() {
+  const [state, formAction, pending] = useActionState(createPost, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="title">Title</label>
+      <input type="text" id="title" name="title" required />
+      <label htmlFor="content">Content</label>
+      <textarea id="content" name="content" required />
+      {state?.message && <p aria-live="polite">{state.message}</p>}
+      <button disabled={pending}>Create Post</button>
+    </form>
+  )
+}
+```
+
+### サーバーコンポーネント
+
+サーバーコンポーネント内でデータをフェッチする場合、レスポンスに応じてエラーメッセージをレンダーしたり、[`redirect`](/docs/app/api-reference/functions/redirect) を呼び出したりできます。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch(`https://...`)
+  const data = await res.json()
+
+  if (!res.ok) {
+    return 'There was an error.'
+  }
+
+  return '...'
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch(`https://...`)
+  const data = await res.json()
+
+  if (!res.ok) {
+    return 'There was an error.'
+  }
+
+  return '...'
+}
+```
+
+### Not Found（404）
+
+ルートセグメント内で [`notFound`](/docs/app/api-reference/functions/not-found) 関数を呼び出し、[`not-found.js`](/docs/app/api-reference/file-conventions/not-found) ファイルを使用して 404 ページ用の UI を表示できます。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+import { getPostBySlug } from '@/lib/posts'
+
+export default async function Page({ params }: { params: { slug: string } }) {
+  const { slug } = await params
+  const post = getPostBySlug(slug)
+
+  if (!post) {
+    notFound()
+  }
+
+  return <div>{post.title}</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+import { getPostBySlug } from '@/lib/posts'
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  const post = getPostBySlug(slug)
+
+  if (!post) {
+    notFound()
+  }
+
+  return <div>{post.title}</div>
+}
+```
+
+```tsx filename="app/blog/[slug]/not-found.tsx" switcher
+export default function NotFound() {
+  return <div>404 - Page Not Found</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/not-found.js" switcher
+export default function NotFound() {
+  return <div>404 - Page Not Found</div>
+}
+```
+
+## キャッチされない例外の処理
+
+キャッチされない例外は、アプリケーションの通常の実行フロー中には発生すべきでないバグや問題を示す予期しないエラーです。これらはエラーとして `throw` し、その後エラーバウンダリによってキャッチされるようにします。
+
+### ネストされたエラーバウンダリ
+
+Next.js は捕捉されない例外を処理するためにエラーバウンダリを使用します。エラーバウンダリは、その子コンポーネント内で発生したエラーを捕捉し、クラッシュしたコンポーネントツリーの代わりにフォールバック UI を表示します。
+
+ルートセグメント内に [`error.js`](/docs/app/api-reference/file-conventions/error) ファイルを作成し、React コンポーネントをエクスポートすることで、エラーバウンダリを作成できます。
+
+```tsx filename="app/dashboard/error.tsx" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+import { useEffect } from 'react'
+
+export default function ErrorPage({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // エラーをエラーレポートサービスに記録する
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // セグメントを再レンダリングして回復を試みる
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/dashboard/error.js" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+import { useEffect } from 'react'
+
+export default function ErrorPage({ error, reset }) {
+  useEffect(() => {
+    // エラーをエラーレポートサービスに記録する
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // セグメントを再レンダリングして回復を試みる
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+エラーは最も近い親のエラーバウンダリまで伝播します。これにより、[ルート階層](/docs/app/getting-started/project-structure#component-hierarchy)の異なるレベルに `error.tsx` ファイルを配置することで、より細かなエラー処理が可能になります。
+
+<Image
+  alt="入れ子になった Error コンポーネント階層"
+  srcLight="/docs/light/nested-error-component-hierarchy.png"
+  srcDark="/docs/dark/nested-error-component-hierarchy.png"
+  width="1600"
+  height="687"
+/>
+
+エラーバウンダリはイベントハンドラ内のエラーを捕捉しません。アプリ全体がクラッシュする代わりに **フォールバック UI** を表示できるよう、[レンダー中](https://react.dev/reference/react/Component#static-getderivedstatefromerror)に発生したエラーを捕捉するよう設計されています。
+
+一般に、イベントハンドラや非同期コード内のエラーはレンダリング後に実行されるため、エラーバウンダリでは扱われません。
+
+これらのケースを扱うには、エラーを手動で捕捉して `useState` や `useReducer` を使って保持し、UI を更新してユーザーに通知してください。
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+
+export function Button() {
+  const [error, setError] = useState(null)
+
+  const handleClick = () => {
+    try {
+      // 失敗する可能性のある処理を行う
+      throw new Error('Exception')
+    } catch (reason) {
+      setError(reason)
+    }
+  }
+
+  if (error) {
+    /* フォールバックUIをレンダリングする */
+  }
+
+  return (
+    <button type="button" onClick={handleClick}>
+      Click me
+    </button>
+  )
+}
+```
+
+`useTransition` の `startTransition` 内で捕捉されないエラーは、最も近いエラーバウンダリまで伝播する点に注意してください。
+
+```tsx
+'use client'
+
+import { useTransition } from 'react'
+
+export function Button() {
+  const [pending, startTransition] = useTransition()
+
+  const handleClick = () =>
+    startTransition(() => {
+      throw new Error('Exception')
+    })
+
+  return (
+    <button type="button" onClick={handleClick}>
+      Click me
+    </button>
+  )
+}
+```
+
+### グローバルエラー
+
+あまり一般的ではありませんが、[`global-error.js`](/docs/app/api-reference/file-conventions/error#global-error) ファイルを使用すると、ルートの `app` ディレクトリでルートレイアウトのエラーを処理できます。[internationalization](/docs/app/guides/internationalization) を利用している場合でも同様です。グローバルエラーの UI は、有効になっている間はルートレイアウトまたはテンプレートを置き換えて動作するため、独自の `<html>` および `<body>` タグを定義する必要があります。
+
+```tsx filename="app/global-error.tsx" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    // global-error にはhtmlタグとbodyタグが必要です
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/global-error.js" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+export default function GlobalError({ error, reset }) {
+  return (
+    // global-error にはhtmlタグとbodyタグが必要です
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```

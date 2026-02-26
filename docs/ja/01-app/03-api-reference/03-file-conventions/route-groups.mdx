@@ -1,0 +1,32 @@
+---
+title: ルートグループ
+description: Route Groups を使うと、Next.js アプリケーションを異なるセクションに分割して構成できます。
+---
+
+Route Groups はフォルダー構成の規約であり、ルートをカテゴリやチームごとに整理できるようにします。
+
+## 記法
+
+ルートグループは、フォルダー名をかっこで囲むことで作成できます: `(folderName)`。
+
+この記法は、そのフォルダーがプロジェクト構造を整理するためだけのものであり、ルートの URL パスには**含めない**ことを示します。
+
+<Image
+  alt="ルートグループを使用したフォルダー構造の例"
+  srcLight="/docs/light/project-organization-route-groups.png"
+  srcDark="/docs/dark/project-organization-route-groups.png"
+  width="1600"
+  height="849"
+/>
+
+## ユースケース
+
+- ルートをチーム、関心ごと、または機能単位で整理する。
+- 複数の[ルートレイアウト](/docs/app/api-reference/file-conventions/layout#root-layout)を定義する。
+- 特定のルートセグメントのみをレイアウト共有の対象にし、それ以外は対象外にする。
+
+## 注意点
+
+- **フルページロード**: 異なるルートグループのルートレイアウト間で遷移すると、ページ全体の再読み込みが発生します。たとえば、`app/(shop)/layout.js` を使う `/cart` から、`app/(marketing)/layout.js` を使う `/blog` へ遷移する場合です。これは、複数のルートレイアウトを使用している場合に**のみ**当てはまります。
+- **パスの競合**: 異なるグループ間のルートが、同じ URL パスにマッピングされるようにしてはいけません。たとえば、`(marketing)/about/page.js` と `(shop)/about/page.js` はどちらも `/about` というパスになり、エラーの原因となります。
+- **トップレベルのルートレイアウト**: トップレベルの `layout.js` ファイルを持たずに複数のルートレイアウトを使用する場合、ホームルート (`/`) がいずれかのルートグループ内で定義されていることを確認してください（例: `app/(marketing)/page.js`）。

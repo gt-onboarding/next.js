@@ -1,0 +1,48 @@
+---
+title: Turbopack ファイルシステムキャッシュ
+nav_title: turbopackFileSystemCache
+description: Turbopack ビルドでファイルシステムキャッシュを有効化する方法について説明します
+---
+
+## 使用方法
+
+Turbopack FileSystem Cache によって、`next dev` や `next build` コマンド間で Turbopack の処理量を削減できます。有効化すると、Turbopack はビルド間で `.next` フォルダにデータを保存および復元し、これにより以降のビルドや開発セッションを大幅に高速化できます。
+
+> **補足:** FileSystem Cache 機能は開発用途では安定版とみなされますが、本番ビルドでは実験的な機能とみなされています。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    // `next dev` のファイルシステムキャッシュを有効にする
+    turbopackFileSystemCacheForDev: true,
+    // `next build` のファイルシステムキャッシュを有効にする
+    turbopackFileSystemCacheForBuild: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    // `next dev` のファイルシステムキャッシュを有効にする
+    turbopackFileSystemCacheForDev: true,
+    // `next build` のファイルシステムキャッシュを有効にする
+    turbopackFileSystemCacheForBuild: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                              |
+| ---------- | ----------------------------------------------------- |
+| `v16.1.0`  | 開発環境で File System キャッシュがデフォルト有効に   |
+| `v16.0.0`  | ビルドと開発で別々のフラグを持つベータ版をリリース    |
+| `v15.5.0`  | canary リリースで実験的機能として永続キャッシュを導入 |

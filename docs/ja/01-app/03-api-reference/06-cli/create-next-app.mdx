@@ -1,0 +1,159 @@
+---
+title: create-next-app
+description: create-next-app CLI により、1 回のコマンド実行で Next.js アプリを作成できます。
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router の両方で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+`create-next-app` CLIを使用すると、デフォルトのテンプレートまたは公開されている GitHub リポジトリの [example](https://github.com/vercel/next.js/tree/canary/examples) から、新しい Next.js アプリケーションを作成できます。これは Next.js を始める最も簡単な方法です。
+
+基本的な使い方:
+
+```bash package="pnpm"
+pnpm create next-app [project-name] [options]
+```
+
+```bash package="npm"
+npx create-next-app@latest [project-name] [options]
+```
+
+```bash package="yarn"
+yarn create next-app [project-name] [options]
+```
+
+```bash package="bun"
+bun create next-app [project-name] [options]
+```
+
+## リファレンス
+
+使用できるオプションは次のとおりです:
+
+| オプション                              | 説明                                                                           |
+| --------------------------------------- | ------------------------------------------------------------------------------ |
+| `-h` or `--help`                        | 利用可能なすべてのオプションを表示する                                         |
+| `-v` or `--version`                     | バージョン番号を出力する                                                       |
+| `--no-*`                                | デフォルトのオプションを無効にする（例: `--no-ts`）                            |
+| `--ts` or `--typescript`                | TypeScript プロジェクトとして初期化する（デフォルト）                          |
+| `--js` or `--javascript`                | JavaScript プロジェクトとして初期化する                                        |
+| `--tailwind`                            | Tailwind CSS 設定付きで初期化する（デフォルト）                                |
+| `--react-compiler`                      | React Compiler を有効にして初期化する                                          |
+| `--eslint`                              | ESLint 設定付きで初期化する                                                    |
+| `--biome`                               | Biome 設定付きで初期化する                                                     |
+| `--no-linter`                           | linter の設定をスキップする                                                    |
+| `--app`                                 | App Router プロジェクトとして初期化する                                        |
+| `--api`                                 | ルートハンドラーのみのプロジェクトを初期化する                                 |
+| `--src-dir`                             | `src/` ディレクトリ内に初期化する                                              |
+| `--turbopack`                           | 生成される package.json で Turbopack を強制的に有効化する（デフォルトで有効）  |
+| `--webpack`                             | 生成される package.json で Webpack を強制的に有効化する                        |
+| `--import-alias <alias-to-configure>`   | 使用するインポートエイリアスを指定する（デフォルト "@/\*"）                    |
+| `--empty`                               | 空のプロジェクトを初期化する                                                   |
+| `--use-npm`                             | CLI に npm を使ってアプリケーションをブートストラップするよう明示的に指定する  |
+| `--use-pnpm`                            | CLI に pnpm を使ってアプリケーションをブートストラップするよう明示的に指定する |
+| `--use-yarn`                            | CLI に Yarn を使ってアプリケーションをブートストラップするよう明示的に指定する |
+| `--use-bun`                             | CLI に Bun を使ってアプリケーションをブートストラップするよう明示的に指定する  |
+| `-e` or `--example [name] [github-url]` | アプリをブートストラップするためのサンプルを指定する                           |
+| `--example-path <path-to-example>`      | サンプルへのパスを個別に指定する                                               |
+| `--reset-preferences`                   | CLI に保存されている設定をリセットするよう明示的に指示する                     |
+| `--skip-install`                        | CLI にパッケージのインストールをスキップするよう明示的に指示する               |
+| `--disable-git`                         | CLI に git の初期化を無効化するよう明示的に指示する                            |
+| `--yes`                                 | すべてのオプションに対して、以前の設定またはデフォルトを使用する               |
+
+## 使用例
+
+### デフォルトテンプレートを使用する場合
+
+デフォルトテンプレートを使用して新しいアプリを作成するには、ターミナルで以下のコマンドを実行します。
+
+```bash package="pnpm"
+pnpm create next-app
+```
+
+```bash package="npm"
+npx create-next-app@latest
+```
+
+```bash package="yarn"
+yarn create next-app
+```
+
+```bash package="bun"
+bun create next-app
+```
+
+インストールを実行すると、次のプロンプトが表示されます。
+
+```txt filename="Terminal"
+What is your project named? my-app
+Would you like to use the recommended Next.js defaults?
+    Yes, use recommended defaults - TypeScript, ESLint, Tailwind CSS, App Router, Turbopack
+    No, reuse previous settings
+    No, customize settings - Choose your own preferences
+```
+
+`customize settings` を選択すると、次のようなプロンプトが表示されます。
+
+```txt filename="Terminal"
+TypeScript を使用しますか？ No / Yes
+どのリンターを使用しますか？ ESLint / Biome / None
+React Compiler を使用しますか？ No / Yes
+Tailwind CSS を使用しますか？ No / Yes
+コードを `src/` ディレクトリ内に配置しますか？ No / Yes
+App Router を使用しますか？（推奨） No / Yes
+インポートエイリアス（デフォルトは `@/*`）をカスタマイズしますか？ No / Yes
+設定するインポートエイリアスを入力してください。 @/*
+```
+
+プロンプトへの入力が終わると、`create-next-app` はプロジェクト名のフォルダーを作成し、必要な依存関係をインストールします。
+
+### Linter オプション
+
+**ESLint**: 従来からある、最も広く使われている JavaScript linter。`@next/eslint-plugin-next` による Next.js 固有のルールが含まれます。
+
+**Biome**: 高速でモダンな linter 兼 formatter で、ESLint と Prettier の機能を統合しています。最適なパフォーマンスを実現するために、Next.js と React 向けのサポートが組み込みで含まれています。
+
+**None**: linter の設定を完全にスキップします。linter は後からいつでも追加できます。
+
+プロンプトへの回答が完了すると、選択した構成で新しいプロジェクトが作成されます。
+
+### 公式の Next.js サンプルを使う場合
+
+公式の Next.js サンプルを使って新しいアプリを作成するには、`--example` フラグを指定します。例えば次のように実行します：
+
+```bash package="pnpm"
+pnpm create next-app --example [example-name] [your-project-name]
+```
+
+```bash package="npm"
+npx create-next-app@latest --example [example-name] [your-project-name]
+```
+
+```bash package="yarn"
+yarn create next-app --example [example-name] [your-project-name]
+```
+
+```bash package="bun"
+bun create next-app --example [example-name] [your-project-name]
+```
+
+利用可能なすべてのサンプルの一覧とセットアップ手順は、[Next.js リポジトリ](https://github.com/vercel/next.js/tree/canary/examples)で確認できます。
+
+### 任意の公開 GitHub サンプルを使う場合
+
+任意の公開 GitHub サンプルを使って新しいアプリを作成するには、GitHub リポジトリの URL を指定して `--example` オプションを使用します。例えば次のように実行します：
+
+```bash package="pnpm"
+pnpm create next-app --example "https://github.com/.../" [your-project-name]
+```
+
+```bash package="npm"
+npx create-next-app@latest --example "https://github.com/.../" [your-project-name]
+```
+
+```bash package="yarn"
+yarn create next-app --example "https://github.com/.../" [your-project-name]
+```
+
+```bash package="bun"
+bun create next-app --example "https://github.com/.../" [your-project-name]
+```

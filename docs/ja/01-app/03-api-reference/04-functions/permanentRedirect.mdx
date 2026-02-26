@@ -1,0 +1,72 @@
+---
+title: permanentRedirect
+description: permanentRedirect 関数の API リファレンス。
+related:
+  links:
+    - app/api-reference/functions/redirect
+---
+
+`permanentRedirect` 関数は、ユーザーを別の URL にリダイレクトするための関数です。`permanentRedirect` は、サーバーコンポーネント、クライアントコンポーネント、[Route Handlers](/docs/app/api-reference/file-conventions/route)、および [サーバー関数](/docs/app/getting-started/updating-data) で使用できます。
+
+ストリーミングコンテキストで使用する場合、この関数はクライアント側でリダイレクトを発生させるための `<meta>` タグを挿入します。サーバーアクション内で使用する場合は、呼び出し元に対して 303 HTTP リダイレクトレスポンスを返します。それ以外の場合は、呼び出し元に対して 308（Permanent）HTTP リダイレクトレスポンスを返します。
+
+リソースが存在しない場合は、代わりに [`notFound` 関数](/docs/app/api-reference/functions/not-found)を使用できます。
+
+> **補足**: 308（Permanent）の代わりに 307（Temporary）HTTP リダイレクトを返したい場合は、[`redirect` 関数](/docs/app/api-reference/functions/redirect)を使用できます。
+
+## パラメーター
+
+`permanentRedirect` 関数は 2 つの引数を取ります。
+
+```js
+permanentRedirect(path, type)
+```
+
+| パラメータ | 型                                                                        | 説明                                                         |
+| ---------- | ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `path`     | `string`                                                                  | リダイレクト先の URL。相対パスまたは絶対パスを指定できます。 |
+| `type`     | `'replace'`（デフォルト）または `'push'`（Server Actions ではデフォルト） | 実行するリダイレクトの種類。                                 |
+
+デフォルトでは、`permanentRedirect` は [Server Actions](/docs/app/getting-started/updating-data) では `push`（ブラウザの履歴スタックに新しいエントリを追加）を、それ以外では `replace`（ブラウザの履歴スタック内の現在の URL を置き換え）を使用します。`type` パラメータを指定することで、この動作を変更できます。
+
+`RedirectType` オブジェクトには、`type` パラメータで使用可能なオプションが定義されています。
+
+```ts
+import { permanentRedirect, RedirectType } from 'next/navigation'
+
+permanentRedirect('/redirect-to', RedirectType.replace)
+// または
+permanentRedirect('/redirect-to', RedirectType.push)
+```
+
+`type` パラメーターは、サーバーコンポーネントでは効果がありません。
+
+## 戻り値
+
+`permanentRedirect` は値を返しません。
+
+## 例
+
+`permanentRedirect()` 関数を呼び出すと、`NEXT_REDIRECT` エラーがスローされ、そのエラーがスローされたルートセグメントのレンダリングが終了します。
+
+```jsx filename="app/team/[id]/page.js"
+import { permanentRedirect } from 'next/navigation'
+
+async function fetchTeam(id) {
+  const res = await fetch('https://...')
+  if (!res.ok) return undefined
+  return res.json()
+}
+
+export default async function Profile({ params }) {
+  const { id } = await params
+  const team = await fetchTeam(id)
+  if (!team) {
+    permanentRedirect('/login')
+  }
+
+  // ...
+}
+```
+
+> **補足**: `permanentRedirect` は、TypeScript の [`never`](https://www.typescriptlang.org/docs/handbook/2/functions.html#never) 型を使用しているため、`return permanentRedirect()` のように `return` 文で呼び出す必要はありません。

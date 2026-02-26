@@ -1,0 +1,21 @@
+---
+title: expireTime
+description: ISR が有効なページにおける stale-while-revalidate の有効期限をカスタマイズします。
+---
+
+{/* このドキュメントの内容は app ルーターと pages ルーターで共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されるコンテンツはコンポーネントでラップしないでください。 */}
+
+ISR が有効なページに対して CDN で利用される `Cache-Control` ヘッダー内の `stale-while-revalidate` の有効期限を任意に指定できます。
+
+`next.config.js` を開き、`expireTime` 設定を追加します。
+
+```js filename="next.config.js"
+module.exports = {
+  // 1時間（秒単位）
+  expireTime: 3600,
+}
+```
+
+`Cache-Control` ヘッダーを送信する際、有効期限は指定された `revalidate` 期間に応じて計算されます。
+
+たとえば、あるパスに対して `revalidate` を 15 分に設定し、有効期限が 1 時間の場合、生成される `Cache-Control` ヘッダーは `s-maxage=900, stale-while-revalidate=2700` となり、設定された有効期限より 15 分短い時間だけ stale 状態で保持できるようになります。

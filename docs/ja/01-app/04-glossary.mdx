@@ -1,0 +1,278 @@
+---
+title: Next.js 用語集
+nav_title: 用語集
+description: Next.js でよく使用される一般的な用語をまとめています。
+---
+
+# A
+
+## App Router
+
+React サーバーコンポーネントの上に構築された、Next.js バージョン 13 で導入されたルーターです。ファイルシステムベースのルーティングを採用し、レイアウト、ネストされたルーティング、ローディング状態、エラー処理などをサポートします。詳しくは [App Router のドキュメント](/docs/app) を参照してください。
+
+# B
+
+## ビルド時
+
+アプリケーションがコンパイルされている段階のことです。ビルド時に、Next.js はコードを本番環境向けに最適化されたファイルに変換し、静的ページを生成し、デプロイ用のアセットを準備します。詳しくは、[`next build` CLI リファレンス](/docs/app/api-reference/cli/next#next-build-options)を参照してください。
+
+# C
+
+## Cache Components
+
+[`"use cache"` ディレクティブ](/docs/app/api-reference/directives/use-cache) を使用して、コンポーネントや関数ごとにキャッシュできる機能です。Cache Components を使うと、1 つのルート内で静的コンテンツ、キャッシュ済みコンテンツ、動的コンテンツを混在させることができます。これは、すぐに配信される静的な HTML シェルをプリレンダリングし、動的コンテンツを準備ができしだいストリーミングすることで実現されます。[`cacheLife()`](/docs/app/api-reference/functions/cacheLife) でキャッシュ期間を設定し、[`cacheTag()`](/docs/app/api-reference/functions/cacheTag) でキャッシュされたデータにタグを付与し、[`updateTag()`](/docs/app/api-reference/functions/updateTag) でオンデマンドに無効化できます。詳しくは [Cache Components ガイド](/docs/app/getting-started/cache-components) を参照してください。
+
+## キャッチオールセグメント
+
+`[...folder]/page.js` 構文を使用して、URL パスの複数の部分にマッチできる動的ルートセグメントです。これらのセグメントは、残りのすべての URL セグメントをまとめて取得し、ドキュメントサイトやファイルブラウザといった機能を実装する際に有用です。詳しくは [Dynamic Route Segments](/docs/app/api-reference/file-conventions/dynamic-routes#catch-all-segments) を参照してください。
+
+## クライアントバンドル
+
+ブラウザに配信される JavaScript バンドル。Next.js は初期ペイロードサイズを削減し、各ページに必要なコードだけを読み込むために、[モジュールグラフ](#module-graph) に基づいてバンドルを自動的に分割します。
+
+## クライアントコンポーネント
+
+ブラウザで実行される React コンポーネントです。Next.js では、クライアントコンポーネントは初回ページ生成時にサーバー上でレンダーされることもあります。状態、エフェクト、イベントハンドラ、ブラウザ API を使用でき、ファイルの先頭にある [`"use client"` ディレクティブ](#use-client-directive) でマークされます。詳しくは、[Server and Client Components](/docs/app/getting-started/server-and-client-components) を参照してください。
+
+## クライアントサイドナビゲーション
+
+ページ全体の再読み込みを行わずに、ページコンテンツを動的に更新するナビゲーション手法です。Next.js は [`<Link>` コンポーネント](/docs/app/api-reference/components/link) を使ってクライアントサイドナビゲーションを行い、共有レイアウトをインタラクティブな状態に保ちつつ、ブラウザの状態を維持します。詳しくは [Linking and Navigating](/docs/app/getting-started/linking-and-navigating#client-side-transitions) を参照してください。
+
+## コード分割
+
+ルートに基づいてアプリケーションをより小さな JavaScript チャンクに分割するプロセスです。すべてのコードを最初にまとめて読み込むのではなく、現在のルートに必要なコードだけを読み込むことで、初期読み込み時間を短縮します。Next.js はルートに基づいて自動的にコード分割を行います。詳しくは [パッケージのバンドルに関するガイド](/docs/app/guides/package-bundling) を参照してください。
+
+# D
+
+## 動的レンダリング
+
+[リクエスト時のレンダリング](#request-time-rendering)を参照してください。
+
+## 動的ルートセグメント
+
+リクエスト時のデータから生成される[ルートセグメント](#route-segment)です。フォルダ名を角かっこ（例: `[slug]`）で囲むことで作成され、ブログ投稿や商品ページなどの動的データからルートを定義できます。詳しくは [Dynamic Route Segments](/docs/app/api-reference/file-conventions/dynamic-routes) を参照してください。
+
+# E
+
+## 環境変数
+
+ビルド時またはリクエスト時に参照できる設定値です。Next.js では、`NEXT_PUBLIC_` で始まる変数はクライアント側（ブラウザ）から参照可能になり、それ以外はサーバーサイドでのみ利用できます。詳しくは [環境変数](/docs/app/guides/environment-variables) を参照してください。
+
+## エラーバウンダリ
+
+子コンポーネントツリー内で発生した JavaScript エラーを捕捉し、フォールバック UI を表示する React コンポーネントです。Next.js では、[`error.js` file](/docs/app/api-reference/file-conventions/error) を作成すると、ルートセグメントが自動的にエラーバウンダリでラップされます。詳しくは [Error Handling](/docs/app/getting-started/error-handling) を参照してください。
+
+# F
+
+## フォント最適化
+
+[`next/font`](/docs/app/api-reference/components/font) を使用すると、フォントを自動的に最適化できます。Next.js はフォントをセルフホストし、レイアウトシフトを防ぎ、パフォーマンス向上のためのベストプラクティスを適用します。Google Fonts とローカルフォントファイルの両方に対応しています。詳しくは [Fonts](/docs/app/getting-started/fonts) を参照してください。
+
+## ファイルシステムキャッシング
+
+`next dev` や `next build` コマンドの実行間でコンパイラの成果物をディスクに保存し、処理量を削減してコンパイル時間を大幅に短縮する Turbopack の機能です。詳細は [Turbopack FileSystem Caching](/docs/app/api-reference/config/next-config-js/turbopackFileSystemCache) を参照してください。
+
+# H
+
+## Hydration
+
+サーバーでレンダリングされた静的な HTML をインタラクティブにするために、React が DOM にイベントハンドラーをアタッチする処理のことです。Hydration の過程では、React はサーバーでレンダリングされたマークアップとクライアント側の JavaScript を突き合わせて整合させます。詳しくは、[Server and Client Components](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) を参照してください。
+
+# I
+
+## インポートエイリアス
+
+よく使うディレクトリへの参照を簡略化するためのカスタムパスマッピングです。インポートエイリアスを使うことで、相対パスインポートの複雑さを軽減し、コードをより読みやすく、保守しやすくできます。詳しくは、[Absolute Imports and Module Path Aliases](/docs/app/getting-started/installation#set-up-absolute-imports-and-module-path-aliases) を参照してください。
+
+## インクリメンタル静的再生成 (ISR)
+
+サイト全体を再ビルドせずに静的コンテンツを更新できる手法です。ISR を使用すると、ページ単位で静的生成を行いつつ、トラフィックが発生するたびにバックグラウンドでページを再検証できます。詳しくは [ISR ガイド](/docs/app/guides/incremental-static-regeneration) を参照してください。
+
+> **補足**: Next.js では、ISR は [Revalidation](#revalidation) とも呼ばれます。
+
+## Intercepting Routes
+
+現在のレイアウトを維持したまま、アプリケーション内の別の場所にあるルートを読み込めるルーティングパターンです。ユーザーにコンテキストを切り替えさせずに（モーダルなどの）コンテンツを表示しつつ、URL を共有可能な状態に保ちたい場合に便利です。詳しくは [Intercepting Routes](/docs/app/api-reference/file-conventions/intercepting-routes) を参照してください。
+
+## 画像最適化
+
+[`<Image>` コンポーネント](/docs/app/api-reference/components/image) を使用した自動画像最適化が利用できます。Next.js は画像をオンデマンドで最適化し、WebP などのモダンなフォーマットで配信し、lazy loading やレスポンシブなサイズ調整を自動的に処理します。詳しくは [Images](/docs/app/getting-started/images) を参照してください。
+
+# L
+
+## レイアウト
+
+複数のページで共有される UI です。レイアウトは状態を保持し、インタラクティブなまま維持され、ページ遷移時に再レンダーされません。[`layout.js` ファイル](/docs/app/api-reference/file-conventions/layout)から React コンポーネントを export することで定義します。詳しくは [Layouts and Pages](/docs/app/getting-started/layouts-and-pages) を参照してください。
+
+## ローディング UI
+
+[ルートセグメント](#route-segment)の読み込み中に表示されるフォールバック UI です。フォルダに[`loading.js` ファイル](/docs/app/api-reference/file-conventions/loading)を追加すると自動的に作成され、ページは自動的に [Suspense バウンダリ](#suspense-boundary)でラップされます。詳しくは、[ローディング UI](/docs/app/api-reference/file-conventions/loading)を参照してください。
+
+# M
+
+## モジュールグラフ
+
+アプリ内のファイルの依存関係を表すグラフです。各ファイル（モジュール）がノードとなり、import/export の関係がエッジを形成します。Next.js はこのグラフを分析し、最適なバンドルおよびコード分割の戦略を決定します。詳しくは [Server and Client Components](/docs/app/getting-started/server-and-client-components#reducing-js-bundle-size) を参照してください。
+
+## メタデータ
+
+ブラウザや検索エンジンによって使用されるページに関する情報で、`title`、`description`、Open Graph 画像などが含まれます。Next.js では、レイアウトまたはページファイル内で [`metadata` エクスポート](/docs/app/api-reference/functions/generate-metadata) または [`generateMetadata` 関数](/docs/app/api-reference/functions/generate-metadata) を使ってメタデータを定義します。詳しくは [Metadata and OG Images](/docs/app/getting-started/metadata-and-og-images) を参照してください。
+
+## メモ化
+
+関数の戻り値をキャッシュして、同じレンダー処理（リクエスト）中に同じ関数を複数回呼び出しても、実際には 1 回だけ実行されるようにすることを指します。Next.js では、同じ URL とオプションを持つ fetch によるリクエストは自動的にメモ化されます。詳しくは [React Cache](https://react.dev/reference/react/cache) を参照してください。
+
+## Middleware
+
+[Proxy](#proxy) を参照してください。
+
+# N
+
+## Not Found
+
+存在しないルートにアクセスした場合、または [`notFound()` 関数](/docs/app/api-reference/functions/not-found) が呼び出された場合に表示される特別なコンポーネントです。アプリのディレクトリに [`not-found.js` ファイル](/docs/app/api-reference/file-conventions/not-found) を追加することで作成されます。詳しくは [Error Handling](/docs/app/getting-started/error-handling#not-found) を参照してください。
+
+# P
+
+## 非公開フォルダー
+
+先頭にアンダースコアが付いたフォルダー（例: `_components`）で、ルーティングシステムの対象から除外されるものです。これらのフォルダーは、アクセス可能なルートを作成することなく、コードの整理や共通のユーティリティのために使用されます。詳しくは、[非公開フォルダー](/docs/app/getting-started/project-structure#private-folders) を参照してください。
+
+## Page
+
+特定のルートに固有の UI です。`app` ディレクトリ内の [`page.js` ファイル](/docs/app/api-reference/file-conventions/page) から React コンポーネントをエクスポートすることで定義します。詳しくは [Layouts and Pages](/docs/app/getting-started/layouts-and-pages) を参照してください。
+
+## Parallel Routes
+
+同一レイアウト内で複数のページを同時に、または条件付きでレンダーできるパターンです。`@folder` 規約を使った名前付きスロットによって構成されており、ダッシュボードやモーダル、複雑なレイアウトなどに適しています。詳しくは [Parallel Routes](/docs/app/api-reference/file-conventions/parallel-routes) を参照してください。
+
+## Partial Prerendering (PPR)
+
+単一のルート内で静的レンダリングと動的レンダリングを組み合わせるレンダリング最適化手法です。静的シェルは即座に配信され、動的コンテンツは準備ができ次第ストリーミングされるため、両方のレンダリング戦略の長所を活かせます。詳しくは [Cache Components](/docs/app/getting-started/cache-components) を参照してください。
+
+## プリフェッチ
+
+ユーザーがそのルートへ遷移する前に、そのルートをあらかじめバックグラウンドで読み込むことです。Next.js は、ビューポートに入った [`<Link>` コンポーネント](/docs/app/api-reference/components/link) でリンクされたルートを自動的にプリフェッチし、ナビゲーションがほぼ瞬時に行われているように感じられます。詳しくは [プリフェッチガイド](/docs/app/guides/prefetching) を参照してください。
+
+## 事前レンダリング
+
+コンポーネントが[ビルド時](#build-time)や、[再検証](#revalidation)時のバックグラウンド処理でレンダリングされることを指します。結果として生成されるのは HTML と [RSC Payload](#rsc-payload) であり、CDN にキャッシュして CDN から配信できます。[リクエスト時の API](#request-time-apis) を使用しないコンポーネントでは、事前レンダリングがデフォルトの動作です。
+
+## Proxy
+
+リクエストが完了する前にサーバー上でコードを実行するファイル（[`proxy.js`](/docs/app/api-reference/file-conventions/proxy)）。ログ出力、リダイレクト、リライトなどのサーバーサイドロジックを実装するために使用されます。以前は Middleware と呼ばれていました。詳しくは [Proxy ガイド](/docs/app/getting-started/proxy) を参照してください。
+
+# R
+
+## Redirect
+
+ユーザーをある URL から別の URL へ転送します。Next.js では、リダイレクトは [`next.config.js`](/docs/app/api-reference/config/next-config-js/redirects) で設定したり、[Proxy](/docs/app/api-reference/file-conventions/proxy) から返したり、[`redirect()` 関数](/docs/app/api-reference/functions/redirect) を使ってプログラム的にトリガーしたりできます。詳しくは [Redirecting](/docs/app/guides/redirecting) を参照してください。
+
+## リクエスト時
+
+ユーザーがアプリケーションにリクエストを送信するタイミングを指します。リクエスト時には、動的ルートがレンダリングされ、`cookies` と `headers` にアクセスでき、リクエスト固有のデータを利用できます。
+
+## リクエスト時 API
+
+リクエスト固有のデータにアクセスする関数で、コンポーネントを[リクエスト時レンダリング](#request-time-rendering)にオプトインさせます。これには次のものが含まれます。
+
+- [`cookies()`](/docs/app/api-reference/functions/cookies) - リクエスト Cookie へのアクセス
+- [`headers()`](/docs/app/api-reference/functions/headers) - リクエストヘッダーへのアクセス
+- [`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) - URL のクエリパラメーターへのアクセス
+- [`draftMode()`](/docs/app/api-reference/functions/draft-mode) - draft mode の有効化または確認
+
+## リクエスト時レンダリング
+
+コンポーネントが [ビルド時](#build-time) ではなく [リクエスト時](#request-time) にレンダリングされることを指します。コンポーネントは、[リクエスト時 API](#request-time-apis) を使用すると動的になります。
+
+## 再検証 (Revalidation)
+
+キャッシュされたデータを更新する処理。時間ベース（[`cacheLife()`](/docs/app/api-reference/functions/cacheLife) を使ってキャッシュの有効期限を設定）またはオンデマンド（[`cacheTag()`](/docs/app/api-reference/functions/cacheTag) でデータにタグ付けし、その後 [`updateTag()`](/docs/app/api-reference/functions/updateTag) でキャッシュを無効化）で行うことができます。詳細は [Caching and Revalidating](/docs/app/getting-started/caching-and-revalidating) を参照してください。
+
+## Rewrite
+
+ブラウザの URL を変更せずに、受信したリクエストパスを別の宛先パスにマッピングします。[`next.config.js`](/docs/app/api-reference/config/next-config-js/rewrites) で設定するか、[Proxy](/docs/app/api-reference/file-conventions/proxy) から返すことができます。外部サービスやレガシー URL へのプロキシとして利用できます。
+
+## Route Groups
+
+URL 構造に影響させずにルートを整理するための方法です。フォルダー名を丸かっこで囲む（例：`(marketing)`）ことで作成します。Route Group を使うと、関連するルートを整理し、グループごとに[レイアウト](#layout)を定義できます。詳しくは、[Route Groups](/docs/app/api-reference/file-conventions/route-groups)を参照してください。
+
+## Route Handler
+
+特定のルートに対する HTTP リクエストを処理する関数で、[`route.js` ファイル](/docs/app/api-reference/file-conventions/route)内で定義されます。Route Handler は Web の Request / Response API を使用し、`GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD`、`OPTIONS` メソッドを処理できます。詳しくは [Route Handlers](/docs/app/getting-started/route-handlers) を参照してください。
+
+## ルートセグメント
+
+`app` ディレクトリ内のフォルダによって定義される、URL パスの一部（2つのスラッシュの間にある部分）のことです。各フォルダは、URL 構造における1つのセグメントを表します。詳しくは [プロジェクト構造](/docs/app/getting-started/project-structure) を参照してください。
+
+## RSC ペイロード
+
+React Server Component Payload — レンダリングされた React サーバーコンポーネントツリーをコンパクトなバイナリ表現として表したものです。サーバーコンポーネントのレンダリング結果、クライアントコンポーネントのプレースホルダー、およびそれらの間で受け渡される props を含みます。詳しくは、[Server and Client Components](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) を参照してください。
+
+# S
+
+## サーバーコンポーネント
+
+App Router におけるデフォルトのコンポーネントの種類です。サーバーコンポーネントはサーバー上でレンダリングされ、データを直接取得でき、クライアント側の JavaScript バンドルのサイズを増やしません。状態（state）やブラウザー API は利用できません。詳しくは [Server and Client Components](/docs/app/getting-started/server-and-client-components) を参照してください。
+
+## Server Action
+
+クライアントコンポーネントに props として渡されるか、form の action にバインドされる[サーバー関数](#server-function)。サーバーアクションはフォーム送信やデータの更新に一般的に使用されます。詳しくは [Server Actions and Mutations](/docs/app/getting-started/updating-data) を参照してください。
+
+## サーバー関数
+
+サーバー上で実行される非同期関数で、[`"use server"` ディレクティブ](/docs/app/api-reference/directives/use-server)によってマークされます。サーバー関数は、クライアントコンポーネントから呼び出せます。クライアントコンポーネントに props として渡すか、フォームの action にバインドすると、[サーバーアクション](#server-action) と呼ばれます。詳細は [React Server Functions](https://react.dev/reference/rsc/server-functions) を参照してください。
+
+## Static Export
+
+HTML、CSS、JavaScript ファイルで構成された完全な静的サイトを生成するデプロイモードです。`next.config.js` で `output: 'export'` を設定すると有効になります。この静的エクスポートで生成されたサイトは、Node.js サーバーを必要とせず、任意の静的ファイルサーバーでホストできます。詳しくは [Static Exports](/docs/app/guides/static-exports) を参照してください。
+
+## 静的レンダリング
+
+[プリレンダリング](#prerendering)を参照してください。
+
+## 静的アセット
+
+画像、フォント、動画など、処理を行わずにそのまま配信されるファイルです。静的アセットは通常 `public` ディレクトリに配置され、相対パスで参照されます。詳しくは [Static Assets](/docs/app/api-reference/file-conventions/public-folder) を参照してください。
+
+## 静的シェル
+
+ブラウザに即座に配信される、ページの事前にレンダリングされた HTML 構造のこと。[Partial Prerendering](#partial-prerendering-ppr) では、静的シェルには、静的にレンダリング可能なすべてのコンテンツに加えて、後からストリーミングされる動的コンテンツ用の [Suspense boundary](#suspense-boundary) のフォールバックが含まれます。
+
+## ストリーミング
+
+ページ全体のレンダリング完了を待つのではなく、準備ができた部分から順にサーバーがクライアントへ送信できるようにする手法です。[`loading.js`](/docs/app/api-reference/file-conventions/loading) を使うと自動的に有効になり、手動で `<Suspense>` バウンダリを配置して有効化することもできます。詳しくは [Linking and Navigating - Streaming](/docs/app/getting-started/linking-and-navigating#streaming) を参照してください。
+
+## Suspense バウンダリ
+
+非同期コンテンツをラップし、読み込み中はフォールバック UI を表示する React の [`<Suspense>`](https://react.dev/reference/react/Suspense) コンポーネントです。Next.js では、Suspense バウンダリは [static shell](#static-shell) が終わる地点と [streaming](#streaming) が始まる地点の境界を定義し、[Partial Prerendering](#partial-prerendering-ppr) を可能にします。
+
+# T
+
+## Turbopack
+
+Next.js のために構築された、高速な Rust 製バンドラーです。Turbopack は `next dev` のデフォルトバンドラーであり、`next build` でも利用できます。Webpack と比較して、コンパイル時間が大幅に短縮されます。詳しくは [Turbopack](/docs/app/api-reference/turbopack) を参照してください。
+
+## ツリーシェイキング
+
+ビルドプロセス中に、JavaScript バンドルから未使用のコードを削除する処理のことです。Next.js はバンドルサイズを削減するために、コードを自動的にツリーシェイキングします。詳しくは、[Package Bundling ガイド](/docs/app/guides/package-bundling)を参照してください。
+
+# U
+
+## `"use cache"` ディレクティブ
+
+コンポーネントまたは関数をキャッシュ可能としてマークするためのディレクティブです。ファイル内のすべてのエクスポートがキャッシュ可能であることを示すにはファイルの先頭に配置し、特定のスコープのみをキャッシュ可能としてマークするには関数またはコンポーネントの先頭にインラインで配置します。詳細は [`"use cache"` リファレンス](/docs/app/api-reference/directives/use-cache)を参照してください。
+
+## `"use client"` ディレクティブ
+
+サーバー側コードとクライアント側コードの境界を示す特別な React ディレクティブです。ファイルの先頭、すべての `import` 文やその他のコードより前に記述する必要があります。これによって、そのファイル内の React コンポーネント、ヘルパー関数、変数宣言、そしてインポートされるすべての依存関係を [クライアントバンドル](#client-bundles) に含める必要があることを示します。詳しくは [`"use client"` リファレンス](/docs/app/api-reference/directives/use-client)を参照してください。
+
+## `"use server"` ディレクティブ
+
+関数をクライアント側のコードから呼び出せる[サーバー関数](#server-function)としてマークするためのディレクティブです。ファイルの先頭に記述して、そのファイル内のすべての export がサーバー関数であることを示すことも、特定の関数をマークするために、その関数の先頭にインラインで記述することもできます。詳しくは[`"use server"` リファレンス](/docs/app/api-reference/directives/use-server)を参照してください。
+
+# V
+
+## バージョンスキュー
+
+アプリケーションの新しいバージョンをデプロイした後も、まだアクティブなクライアントが、古いビルドの JavaScript、CSS、またはデータを参照している場合があります。クライアントとサーバーのバージョンがこのように食い違っている状態をバージョンスキューと呼び、これによりアセットの欠落、サーバーアクションのエラー、ナビゲーションの失敗などの問題が発生する可能性があります。Next.js は [`deploymentId`](/docs/app/api-reference/config/next-config-js/deploymentId) を使用してバージョンスキューを検出し、対処します。詳細は [Self-Hosting - Version Skew](/docs/app/guides/self-hosting#version-skew) を参照してください。

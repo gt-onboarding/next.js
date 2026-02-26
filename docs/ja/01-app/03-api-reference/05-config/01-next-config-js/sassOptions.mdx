@@ -1,0 +1,49 @@
+---
+title: sassOptions
+description: Sass のオプションを設定します。
+---
+
+`sassOptions` を使用すると、Sass コンパイラのオプションを設定できます。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const sassOptions = {
+  additionalData: `
+    $var: red;
+  `,
+}
+
+const nextConfig: NextConfig = {
+  sassOptions: {
+    ...sassOptions,
+    implementation: 'sass-embedded',
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+
+const sassOptions = {
+  additionalData: `
+    $var: red;
+  `,
+}
+
+const nextConfig = {
+  sassOptions: {
+    ...sassOptions,
+    implementation: 'sass-embedded',
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **補足:**
+>
+> - Next.js はその他の利用可能なプロパティを保持していないため、`implementation` 以外では `sassOptions` に型定義はされていません。
+> - カスタム Sass 関数を定義するための `functions` プロパティは、webpack 使用時にのみサポートされます。Turbopack を使用する場合、Turbopack の Rust ベースのアーキテクチャではこのオプション経由で渡された JavaScript 関数を直接実行できないため、カスタム Sass 関数は利用できません。

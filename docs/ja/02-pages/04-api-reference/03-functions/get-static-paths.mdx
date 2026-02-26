@@ -1,0 +1,258 @@
+---
+title: getStaticPaths
+description: ' `getStaticPaths` の API リファレンス。`getStaticPaths` を使ってデータを取得し、静的ページを生成する方法を解説します。'
+---
+
+[動的ルート](/docs/pages/building-your-application/routing/dynamic-routes) を使用するページから `getStaticPaths` 関数をエクスポートすると、Next.js は `getStaticPaths` で指定されたすべてのパスを静的に事前レンダーします。
+
+```tsx filename="pages/repo/[name].tsx" switcher
+import type {
+  InferGetStaticPropsType,
+  GetStaticProps,
+  GetStaticPaths,
+} from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getStaticPaths = (async () => {
+  return {
+    paths: [
+      {
+        params: {
+          name: 'next.js',
+        },
+      }, // 以下の「paths」セクションを参照
+    ],
+    fallback: true, // false または "blocking"
+  }
+}) satisfies GetStaticPaths
+
+export const getStaticProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetStaticProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/repo/[name].js" switcher
+export async function getStaticPaths() {
+  return {
+    paths: [
+      {
+        params: {
+          name: 'next.js',
+        },
+      }, // 以下の「paths」セクションを参照
+    ],
+    fallback: true, // false または "blocking"
+  }
+}
+
+export async function getStaticProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+## getStaticPaths の戻り値
+
+`getStaticPaths` 関数は、以下の**必須**プロパティを持つオブジェクトを返す必要があります。
+
+### `paths`
+
+`paths` キーは、どのパスを事前レンダリングするかを指定します。例えば、`pages/posts/[id].js` という名前の[動的ルート](/docs/pages/building-your-application/routing/dynamic-routes)を使用するページがあるとします。このページから `getStaticPaths` をエクスポートし、`paths` に対して次のような値を返すとします：
+
+```js
+return {
+  paths: [
+    { params: { id: '1' }},
+    {
+      params: { id: '2' },
+      // i18nが設定されている場合、パスのロケールも返すことができます
+      locale: "en",
+    },
+  ],
+  fallback: ...
+}
+```
+
+その後、Next.js は `next build` の実行時に、`pages/posts/[id].js` 内のページコンポーネントを使って `/posts/1` と `/posts/2` を静的に生成します。
+
+それぞれの `params` オブジェクトの値は、ページ名で使用されているパラメータと一致している必要があります:
+
+- ページ名が `pages/posts/[postId]/[commentId]` の場合、`params` には `postId` と `commentId` を含める必要があります。
+- ページ名が `pages/[...slug]` のような[キャッチオールルート](/docs/pages/building-your-application/routing/dynamic-routes#catch-all-segments)を使用している場合、`params` には `slug`（配列）が含まれている必要があります。この配列が `['hello', 'world']` の場合、Next.js は `/hello/world` のページを静的に生成します。
+- ページが[オプショナルキャッチオールルート](/docs/pages/building-your-application/routing/dynamic-routes#optional-catch-all-segments)を使用している場合、ルート階層で最上位のルートをレンダーするために `null`、`[]`、`undefined`、または `false` を使用します。たとえば、`pages/[[...slug]]` に対して `slug: false` を指定すると、Next.js は `/` ページを静的に生成します。
+
+`params` の文字列は **大文字と小文字が区別され**、パスが正しく生成されるよう、可能であれば正規化しておくことが望ましいです。たとえば、パラメータとして `WoRLD` が返された場合、それは実際にアクセスされたパスが `WoRLD` のときにのみマッチし、`world` や `World` にはマッチしません。
+
+`params` オブジェクトとは別に、[i18n が設定されている](/docs/pages/guides/internationalization)場合は `locale` フィールドを返すことができ、生成されるパスのロケールを設定します。
+
+### `fallback: false`
+
+`fallback` が `false` の場合、`getStaticPaths` によって返されなかったパスはすべて **404 ページ** になります。
+
+`next build` が実行されると、Next.js は `getStaticPaths` が `fallback: false` を返したかどうかを確認し、その場合は `getStaticPaths` で返されたパス **のみ** をビルドします。このオプションは、生成するパスが少ない場合や、新しいページデータが頻繁には追加されない場合に便利です。もし、さらに多くのパスを追加する必要が出てきて、`fallback: false` を指定している場合は、新しいパスを生成するために再度 `next build` を実行する必要があります。
+
+次の例では、`pages/posts/[id].js` というファイルで、1 ページにつき 1 件のブログ投稿をプリレンダリングします。ブログ投稿の一覧は CMS から取得され、`getStaticPaths` によって返されます。その後、各ページでは、[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) を使用して CMS から投稿データを取得します。
+
+```jsx filename="pages/posts/[id].js"
+function Post({ post }) {
+  // 投稿をレンダリング...
+}
+
+// この関数はビルド時に呼び出される
+export async function getStaticPaths() {
+  // 投稿を取得するために外部 API エンドポイントを呼び出す
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // 投稿に基づいてプリレンダリングするパスを取得する
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // ビルド時にこれらのパスのみをプリレンダリングする。
+  // { fallback: false } を指定すると、他のルートは 404 になる。
+  return { paths, fallback: false }
+}
+
+// これもビルド時に呼び出される
+export async function getStaticProps({ params }) {
+  // params には投稿の `id` が含まれる。
+  // ルートが /posts/1 の場合、params.id は 1 になる
+  const res = await fetch(`https://.../posts/${params.id}`)
+  const post = await res.json()
+
+  // props を通じてページに投稿データを渡す
+  return { props: { post } }
+}
+
+export default Post
+```
+
+### `fallback: true`
+
+<details>
+  <summary>Examples</summary>
+
+- [大量のページの静的生成](https://react-tweet.vercel.app/)
+
+</details>
+
+`fallback` が `true` の場合、`getStaticProps` の挙動は次のように変化します:
+
+- `getStaticPaths` から返されたパスは、ビルド時に `getStaticProps` によって `HTML` にレンダリングされます。
+- ビルド時に生成されていないパスは、404 ページには**なりません**。代わりに、Next.js はそのようなパスへの最初のリクエスト時にページの [「フォールバック」](#fallback-pages) バージョンを返します。Google のような Web クローラーにはフォールバックは提供されず、代わりにそのパスは [`fallback: 'blocking'`](#fallback-blocking) と同様に動作します。
+- `fallback: true` を持つページに `next/link` または `next/router`（クライアントサイド）経由で遷移した場合、Next.js はフォールバックを返さず、代わりにそのページは [`fallback: 'blocking'`](#fallback-blocking) と同様に動作します。
+- バックグラウンドで、Next.js はリクエストされたパスの `HTML` と `JSON` を静的に生成します。これには `getStaticProps` の実行も含まれます。
+- 完了すると、ブラウザは生成されたパスの `JSON` を受け取ります。これは、必要な props を使って自動的にページをレンダリングするために使用されます。ユーザーから見ると、ページはフォールバックページから完全なページへと差し替えられます。
+- 同時に、Next.js はこのパスを事前レンダリングされたページのリストに追加します。同じパスへの後続のリクエストでは、他のビルド時に事前レンダリングされたページと同様に、生成済みのページが返されます。
+
+> **補足**: [`output: 'export'`](/docs/pages/guides/static-exports) を使用している場合、`fallback: true` はサポートされません。
+
+#### `fallback: true` はいつ有用ですか？
+
+`fallback: true` は、データに依存する静的ページが非常に多いアプリ（大規模な EC サイトなど）の場合に有用です。すべての商品ページを事前レンダリングしようとすると、ビルドに非常に長い時間がかかってしまいます。
+
+代わりに、一部のページだけを静的生成して、残りには `fallback: true` を使うことができます。まだ生成されていないページがリクエストされた場合、ユーザーにはローディングインジケーターやスケルトンコンポーネントを表示したページが表示されます。
+
+その後まもなく `getStaticProps` の処理が完了し、要求されたデータでページがレンダリングされます。その後は、同じページをリクエストするユーザーには、静的に事前レンダリングされたページが返されます。
+
+これにより、静的生成の利点を維持しつつ、ビルドを高速に保ちながら、ユーザーに常に高速な体験を提供できます。
+
+`fallback: true` は生成済みページを _更新_ しません。ページを更新したい場合は、[Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration) を参照してください。
+
+### `fallback: 'blocking'`
+
+`fallback` が `'blocking'` の場合、`getStaticPaths` によって返されていない新しいパスは、SSR と同様に（その名のとおり _blocking_）`HTML` が生成されるまで待機し、その後、今後のリクエストのためにキャッシュされるため、パスごとに一度だけ発生します。
+
+`getStaticProps` は次のように動作します:
+
+- `getStaticPaths` から返されたパスは、ビルド時に `getStaticProps` によって `HTML` にレンダリングされます。
+- ビルド時に生成されていないパスは 404 ページには**なりません**。代わりに、Next.js は最初のリクエスト時に SSR を行い、生成された `HTML` を返します。
+- 完了すると、ブラウザは生成されたパスの `HTML` を受け取ります。ユーザーの視点では、「ブラウザがページをリクエストしている状態」から「ページ全体が読み込まれた状態」へと遷移します。ローディングやフォールバック状態のチラつきは発生しません。
+- 同時に、Next.js はこのパスをプリレンダリング済みページのリストに追加します。同じパスへの以降のリクエストでは、他のビルド時にプリレンダリングされたページと同様に、生成済みページが返されます。
+
+`fallback: 'blocking'` はデフォルトでは生成済みページを _更新_ しません。生成済みページを更新するには、`fallback: 'blocking'` と併せて [Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration) を使用してください。
+
+> **補足**: `fallback: 'blocking'` は [`output: 'export'`](/docs/pages/guides/static-exports) を使用している場合はサポートされていません。
+
+### フォールバックページ
+
+ページの「フォールバック」バージョンでは：
+
+- ページの props は空になります。
+- [router](/docs/pages/api-reference/functions/use-router) を使用して、フォールバックがレンダリングされているかどうかを検出できます。`router.isFallback` は `true` になります。
+
+次の例は、`isFallback` の使用例です。
+
+```jsx filename="pages/posts/[id].js"
+import { useRouter } from 'next/router'
+
+function Post({ post }) {
+  const router = useRouter()
+
+  // ページがまだ生成されていない場合、getStaticProps() の実行が完了するまで
+  // 最初にこれが表示される
+  if (router.isFallback) {
+    return <div>Loading...</div>
+  }
+
+  // 投稿をレンダリング...
+}
+
+// この関数はビルド時に呼び出される
+export async function getStaticPaths() {
+  return {
+    // ビルド時に生成されるのは `/posts/1` と `/posts/2` のみ
+    paths: [{ params: { id: '1' } }, { params: { id: '2' } }],
+    // 追加ページの静的生成を有効にする
+    // 例: `/posts/3`
+    fallback: true,
+  }
+}
+
+// これもビルド時に呼び出される
+export async function getStaticProps({ params }) {
+  // params には投稿の `id` が含まれる。
+  // ルートが /posts/1 の場合、params.id は 1 になる
+  const res = await fetch(`https://.../posts/${params.id}`)
+  const post = await res.json()
+
+  // props 経由でページに投稿データを渡す
+  return {
+    props: { post },
+    // リクエストが来た場合、最大で1秒に1回投稿を再生成する
+    revalidate: 1,
+  }
+}
+
+export default Post
+```
+
+## バージョン履歴
+
+| Version   | 変更点                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.4.0` | [App Router](/docs/app/getting-started/fetching-data) が安定版となり、[`generateStaticParams()`](/docs/app/api-reference/functions/generate-static-params) を含むデータフェッチ処理が簡略化されました。 |
+| `v12.2.0` | [On-Demand Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) が安定版になりました。                                       |
+| `v12.1.0` | [On-Demand Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) が追加されました（ベータ版）。                               |
+| `v9.5.0`  | [Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration) が安定版になりました。                                                                                            |
+| `v9.3.0`  | `getStaticPaths` が導入されました。                                                                                                                                                                     |

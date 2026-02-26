@@ -1,0 +1,78 @@
+---
+title: プロキシ
+nav_title: プロキシ
+description: Proxy の使い方を学ぶ
+related:
+  title: API リファレンス
+  description: Proxy の詳細について学ぶ
+  links:
+    - app/api-reference/file-conventions/proxy
+    - app/guides/backend-for-frontend
+---
+
+## Proxy
+
+> **補足**: Next.js 16 から、Middleware はその目的をより正確に表すために Proxy と呼ばれるようになりました。機能自体はこれまでと同じです。
+
+Proxy では、リクエストが完了する前にコードを実行できます。その後、受信したリクエストの内容に基づいて、rewrite や redirect を行ったり、リクエストまたはレスポンスヘッダーを変更したり、あるいは直接レスポンスを返したりできます。
+
+### ユースケース
+
+Proxy が有効な一般的なシナリオには次のようなものがあります:
+
+- すべてのページ、または一部のページに対してヘッダーを変更する
+- A/B テストや実験の結果に基づいて異なるページにリライトする
+- 受信リクエストのプロパティに基づいてプログラムでリダイレクトする
+
+単純なリダイレクトについては、まず `next.config.ts` 内の [`redirects`](/docs/app/api-reference/config/next-config-js/redirects) 設定の使用を検討してください。リクエストデータへのアクセスや、より複雑なロジックが必要な場合に Proxy を使用します。
+
+Proxy は時間のかかるデータフェッチを目的としたものでは _ありません_。Proxy は、権限ベースのリダイレクトのような [optimistic checks](/docs/app/guides/authentication#optimistic-checks-with-proxy-optional) に役立ちますが、完全なセッション管理や認可のソリューションとして使用すべきではありません。
+
+`options.cache`、`options.next.revalidate`、`options.next.tags` を指定した fetch を使用しても、Proxy では効果はありません。
+
+### 慣例
+
+プロジェクトルート、または該当する場合は `src` ディレクトリ内に `proxy.ts`（または `.js`）ファイルを作成し、`pages` や `app` と同じ階層に配置します。
+
+> **注意:** プロジェクトごとにサポートされる `proxy.ts` ファイルは 1 つだけですが、プロキシのロジック自体はモジュールとして整理できます。プロキシ機能を個別の `.ts` や `.js` ファイルに分割し、それらをメインの `proxy.ts` にインポートしてください。これにより、ルートごとのプロキシを整理しつつ、`proxy.ts` に集約して一元管理できます。プロキシファイルを 1 つに統一することで、設定が簡潔になり、潜在的な競合を防ぎ、複数のプロキシレイヤーを避けることでパフォーマンスも最適化されます。
+
+### 例
+
+proxy 関数は、default export として、または `proxy` という名前の named export としてエクスポートできます：
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+// この関数は内部で `await` を使用する場合、`async` にできます
+export function proxy(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// または、デフォルトエクスポートを使用することもできます:
+// export default function proxy(request: NextRequest) { ... }
+
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+// この関数は内部で `await` を使用する場合、`async` にできます
+export function proxy(request) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// または、デフォルトエクスポートを使用することもできます:
+// export default function proxy(request) { ... }
+
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+`matcher` 設定を使用すると、Proxy が特定のパスでのみ動作するように絞り込めます。パスのマッチングの詳細については、[Matcher](/docs/app/api-reference/file-conventions/proxy#matcher) のドキュメントを参照してください。
+
+詳しくは、[`proxy` の使用](/docs/app/guides/backend-for-frontend#proxy)や `proxy` の [API リファレンス](/docs/app/api-reference/file-conventions/proxy)を参照してください。

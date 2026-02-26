@@ -1,0 +1,65 @@
+---
+title: unstable_rethrow
+description: unstable_rethrow 関数の API リファレンス。
+version: unstable
+---
+
+`unstable_rethrow` は、アプリケーションコード内で発生したエラーを処理しようとした際に、Next.js が内部的にスローするエラーを誤って捕捉してしまわないようにするために使用できます。
+
+例えば、`notFound` 関数を呼び出すと、Next.js の内部エラーがスローされ、[`not-found.js`](/docs/app/api-reference/file-conventions/not-found) コンポーネントがレンダーされます。 しかし、これを `try/catch` 文の `try` ブロック内で使用した場合、そのエラーは捕捉されてしまい、`not-found.js` がレンダーされなくなります。
+
+```tsx filename="@/app/ui/component.tsx"
+import { notFound } from 'next/navigation'
+
+export default async function Page() {
+  try {
+    const post = await fetch('https://.../posts/1').then((res) => {
+      if (res.status === 404) notFound()
+      if (!res.ok) throw new Error(res.statusText)
+      return res.json()
+    })
+  } catch (err) {
+    console.error(err)
+  }
+}
+```
+
+内部エラーを再スローして想定どおりの動作を続行するには、`unstable_rethrow` API を使用できます:
+
+```tsx filename="@/app/ui/component.tsx"
+import { notFound, unstable_rethrow } from 'next/navigation'
+
+export default async function Page() {
+  try {
+    const post = await fetch('https://.../posts/1').then((res) => {
+      if (res.status === 404) notFound()
+      if (!res.ok) throw new Error(res.statusText)
+      return res.json()
+    })
+  } catch (err) {
+    unstable_rethrow(err)
+    console.error(err)
+  }
+}
+```
+
+次の Next.js API は、エラーをスローし、そのエラーが Next.js 自身によって再スローされて処理されることを前提としています:
+
+- [`notFound()`](/docs/app/api-reference/functions/not-found)
+- [`redirect()`](/docs/app/guides/redirecting#redirect-function)
+- [`permanentRedirect()`](/docs/app/guides/redirecting#permanentredirect-function)
+
+ルートセグメントが「静的でない限りエラーをスローする」とマークされている場合、Dynamic API 呼び出しも同様に、開発者側でキャッチすべきではないエラーをスローします。Partial Prerendering (PPR) もこの挙動に影響することに注意してください。これらの API は次のとおりです:
+
+- [`cookies`](/docs/app/api-reference/functions/cookies)
+- [`headers`](/docs/app/api-reference/functions/headers)
+- [`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional)
+- `fetch(..., { cache: 'no-store' })`
+- `fetch(..., { next: { revalidate: 0 } })`
+
+> **補足**:
+>
+> - このメソッドは、catch ブロックの先頭で呼び出し、エラーオブジェクトを唯一の引数として渡す必要があります。Promise の `.catch` ハンドラー内でも使用できます。
+> - 例外をスローする API 呼び出しをカプセル化し、**呼び出し元** に例外処理を任せることで、`unstable_rethrow` の使用を回避できる場合があります。
+> - 捕捉した例外に、アプリケーションエラーとフレームワーク制御の例外 (`redirect()` や `notFound()` など) の両方が含まれる可能性がある場合にのみ、`unstable_rethrow` を使用してください。
+> - リソースのクリーンアップ処理 (インターバルやタイマーのクリアなど) は、`unstable_rethrow` の呼び出し前に行うか、`finally` ブロック内で行う必要があります。

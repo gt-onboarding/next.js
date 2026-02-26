@@ -1,0 +1,150 @@
+---
+title: Next.js で Playwright をセットアップする方法
+nav_title: Playwright
+description: End-to-End (E2E) テストのために Next.js で Playwright をセットアップする方法を学びます。
+---
+
+Playwright は、1 つの API で Chromium、Firefox、WebKit を自動化できるテストフレームワークです。これを使って **End-to-End (E2E)** テストを記述できます。このガイドでは、Next.js で Playwright をセットアップし、最初のテストを記述する方法を説明します。
+
+## クイックスタート
+
+最も手早く始めるには、`create-next-app` と [with-playwright サンプル](https://github.com/vercel/next.js/tree/canary/examples/with-playwright) を使用します。これにより、Playwright があらかじめ設定された Next.js プロジェクトが作成されます。
+
+```bash package="pnpm"
+pnpm create next-app --example with-playwright with-playwright-app
+```
+
+```bash package="npm"
+npx create-next-app@latest --example with-playwright with-playwright-app
+```
+
+```bash package="yarn"
+yarn create next-app --example with-playwright with-playwright-app
+```
+
+```bash package="bun"
+bun create next-app --example with-playwright with-playwright-app
+```
+
+## 手動セットアップ
+
+Playwright をインストールするには、次のコマンドを実行します：
+
+```bash package="pnpm"
+pnpm create playwright
+```
+
+```bash package="npm"
+npm init playwright
+```
+
+```bash package="yarn"
+yarn create playwright
+```
+
+```bash package="bun"
+bun create playwright
+```
+
+これにより、プロジェクトで Playwright をセットアップして構成するための一連のプロンプトが実行され、`playwright.config.ts` ファイルの追加も行われます。手順の詳細については、[Playwright インストールガイド](https://playwright.dev/docs/intro#installation)を参照してください。
+
+## 最初の Playwright E2E テストを作成する
+
+2 つの新しい Next.js ページを作成します。
+
+<AppOnly>
+  ```tsx filename="app/page.tsx"
+  import Link from 'next/link'
+
+export default function Page() {
+return (
+<div>
+<h1>Home</h1>
+<Link href="/about">About</Link>
+</div>
+)
+}
+
+````
+
+```tsx filename="app/about/page.tsx"
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>About</h1>
+      <Link href="/">Home</Link>
+    </div>
+  )
+}
+````
+
+</AppOnly>
+
+<PagesOnly>
+  ```tsx filename="pages/index.ts"
+  import Link from 'next/link'
+
+export default function Home() {
+return (
+<div>
+<h1>Home</h1>
+<Link href="/about">About</Link>
+</div>
+)
+}
+
+````
+
+```tsx filename="pages/about.ts"
+import Link from 'next/link'
+
+export default function About() {
+  return (
+    <div>
+      <h1>About</h1>
+      <Link href="/">Home</Link>
+    </div>
+  )
+}
+````
+
+</PagesOnly>
+
+次に、ナビゲーションが正しく動作していることを確認するテストを追加します。
+
+```ts filename="tests/example.spec.ts"
+import { test, expect } from '@playwright/test'
+
+test('should navigate to the about page', async ({ page }) => {
+  // インデックスページから開始する（baseURL は playwright.config.ts の webServer で設定される）
+  await page.goto('http://localhost:3000/')
+  // 'About' というテキストを持つ要素を見つけてクリックする
+  await page.click('text=About')
+  // 新しい URL は "/about" になるはず（baseURL はここで使用される）
+  await expect(page).toHaveURL('http://localhost:3000/about')
+  // 新しいページには "About" を含む h1 が存在するはず
+  await expect(page.locator('h1')).toContainText('About')
+})
+```
+
+> **補足**: `playwright.config.ts` の[設定](https://playwright.dev/docs/test-configuration)に [`"baseURL": "http://localhost:3000"`](https://playwright.dev/docs/api/class-testoptions#test-options-base-url) を追加しておくと、`page.goto("http://localhost:3000/")` の代わりに `page.goto("/")` を使用できます。
+
+### Playwright テストを実行する
+
+Playwright は、Chromium、Firefox、Webkit の 3 種類のブラウザを使って、ユーザーがアプリケーションを操作する様子をシミュレートします。そのためには Next.js サーバーが起動している必要があります。アプリケーションが本番環境でどのように動作するかに近づけるため、テストは本番用にビルドしたコードに対して実行することを推奨します。
+
+`npm run build` と `npm run start` を実行し、その後別のターミナルウィンドウで `npx playwright test` を実行して Playwright テストを動かします。
+
+> **補足**: 代わりに、[`webServer`](https://playwright.dev/docs/test-webserver/) 機能を使って、Playwright に開発サーバーの起動と、完全に利用可能になるまで待機させることもできます。
+
+### 継続的インテグレーション（CI）での Playwright の実行
+
+Playwright はデフォルトでテストを[ヘッドレスモード](https://playwright.dev/docs/ci#running-headed)で実行します。Playwright が必要とするすべての依存関係をインストールするには、`npx playwright install-deps` を実行します。
+
+Playwright と CI の連携については、次のリソースから詳しく学ぶことができます。
+
+- [Next.js with Playwright の例](https://github.com/vercel/next.js/tree/canary/examples/with-playwright)
+- [CI プロバイダーでの Playwright の実行](https://playwright.dev/docs/ci)
+- [Playwright Discord](https://discord.com/invite/playwright-807756831384403968)

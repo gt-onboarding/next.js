@@ -1,0 +1,73 @@
+---
+title: useParams
+description: useParams フックの API リファレンス。
+---
+
+`useParams` は **Client Component** で使用するフックで、現在の URL から解決されたルートの[動的パラメーター](/docs/app/api-reference/file-conventions/dynamic-routes)を取得できます。
+
+```tsx filename="app/example-client-component.tsx" switcher
+'use client'
+
+import { useParams } from 'next/navigation'
+
+export default function ExampleClientComponent() {
+  const params = useParams<{ tag: string; item: string }>()
+
+  // Route -> /shop/[tag]/[item]
+  // URL -> /shop/shoes/nike-air-max-97
+  // `params` -> { tag: 'shoes', item: 'nike-air-max-97' }
+  console.log(params)
+
+  return '...'
+}
+```
+
+```jsx filename="app/example-client-component.js" switcher
+'use client'
+
+import { useParams } from 'next/navigation'
+
+export default function ExampleClientComponent() {
+  const params = useParams()
+
+  // ルート -> /shop/[tag]/[item]
+  // URL -> /shop/shoes/nike-air-max-97
+  // `params` -> { tag: 'shoes', item: 'nike-air-max-97' }
+  console.log(params)
+
+  return '...'
+}
+```
+
+## 引数
+
+```tsx
+const params = useParams()
+```
+
+`useParams` は引数を取りません。
+
+## 戻り値
+
+`useParams` は、現在のルートで補完されている[動的パラメータ](/docs/app/api-reference/file-conventions/dynamic-routes)を含むオブジェクトを返します。
+
+- オブジェクト内の各プロパティは、アクティブな動的セグメントです。
+- プロパティ名はセグメント名で、プロパティの値はそのセグメントに実際に入っている値です。
+- プロパティの値は、[動的セグメントの種類](/docs/app/api-reference/file-conventions/dynamic-routes)に応じて、`string` または `string` の配列になります。
+- ルートに動的パラメータが含まれない場合、`useParams` は空のオブジェクトを返します。
+- Pages Router で使用される場合、`useParams` は初回のレンダー時には `null` を返し、ルーターの準備ができると上記のルールに従ったプロパティを持つ値に更新されます。
+
+例:
+
+| Route                           | URL         | `useParams()`             |
+| ------------------------------- | ----------- | ------------------------- |
+| `app/shop/page.js`              | `/shop`     | `{}`                      |
+| `app/shop/[slug]/page.js`       | `/shop/1`   | `{ slug: '1' }`           |
+| `app/shop/[tag]/[item]/page.js` | `/shop/1/2` | `{ tag: '1', item: '2' }` |
+| `app/shop/[...slug]/page.js`    | `/shop/1/2` | `{ slug: ['1', '2'] }`    |
+
+## バージョン履歴
+
+| バージョン | 変更内容                       |
+| ---------- | ------------------------------ |
+| `v13.3.0`  | `useParams` が追加されました。 |

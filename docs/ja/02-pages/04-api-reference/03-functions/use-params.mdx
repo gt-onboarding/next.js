@@ -1,0 +1,240 @@
+---
+title: useParams
+description: Pages Router における useParams フックの API リファレンス。
+---
+
+`useParams` は、現在の URL によって決定されるルートの [動的パラメータ](/docs/pages/building-your-application/routing/dynamic-routes) を読み取るためのフックです。
+
+```tsx filename="pages/shop/[slug].tsx" switcher
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const params = useParams<{ slug: string }>()
+
+  if (!params) {
+    // params がまだ利用可能でない間はフォールバック UI をレンダリングする
+    return null
+  }
+
+  // Route -> /shop/[slug]
+  // URL -> /shop/shoes
+  // `params` -> { slug: 'shoes' }
+  return <>Shop: {params.slug}</>
+}
+```
+
+```jsx filename="pages/shop/[slug].js" switcher
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const params = useParams()
+
+  if (!params) {
+    // params がまだ利用できない間はフォールバック UI をレンダリングする
+    return null
+  }
+
+  // Route -> /shop/[slug]
+  // URL -> /shop/shoes
+  // `params` -> { slug: 'shoes' }
+  return <>Shop: {params.slug}</>
+}
+```
+
+## パラメータ
+
+```tsx
+const params = useParams()
+```
+
+`useParams` は引数を取りません。
+
+## 戻り値
+
+`useParams` は、現在のルートの埋め込まれた[動的パラメータ](/docs/pages/building-your-application/routing/dynamic-routes)を含むオブジェクト、または [プリレンダリング](#behavior-during-pre-rendering)中であれば `null` を返します。
+
+- オブジェクト内の各プロパティはアクティブな動的セグメントです。
+- プロパティ名はセグメント名で、プロパティ値はそのセグメントに実際に入っている値です。
+- プロパティ値は、[動的セグメントの種類](/docs/pages/building-your-application/routing/dynamic-routes)に応じて `string` または `string` の配列のいずれかになります。
+- ルートに動的パラメータが含まれない場合、`useParams` は空のオブジェクトを返します。
+
+例:
+
+| Route                        | URL         | `useParams()`             |
+| ---------------------------- | ----------- | ------------------------- |
+| `pages/shop/page.js`         | `/shop`     | `{}`                      |
+| `pages/shop/[slug].js`       | `/shop/1`   | `{ slug: '1' }`           |
+| `pages/shop/[tag]/[item].js` | `/shop/1/2` | `{ tag: '1', item: '2' }` |
+| `pages/shop/[...slug].js`    | `/shop/1/2` | `{ slug: ['1', '2'] }`    |
+
+> **補足**: `useParams` は [React Hook](https://react.dev/learn#using-hooks) であり、クラスコンポーネントでは使用できません。
+
+## 挙動
+
+### プレレンダリング時の挙動
+
+[静的に最適化された](/docs/pages/building-your-application/rendering/automatic-static-optimization)ページでは、初回レンダー時に `useParams` は `null` を返します。ハイドレーション後、ルーターの準備が整うと、値は実際のパラメーターに更新されます。
+
+これは、動的ルートでは静的生成の段階でパラメーターを特定できないためです。
+
+```tsx filename="pages/shop/[slug].tsx" switcher
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const params = useParams<{ slug: string }>()
+
+  if (!params) {
+    // paramsの読み込み中にフォールバックUIを返す
+    // ハイドレーションの不一致を防ぐため
+    return <ShopPageSkeleton />
+  }
+
+  return <>Shop: {params.slug}</>
+}
+```
+
+```jsx filename="pages/shop/[slug].js" switcher
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const params = useParams()
+
+  if (!params) {
+    // paramsの読み込み中にフォールバックUIを返す
+    // これによりハイドレーションの不一致を防ぐ
+    return <ShopPageSkeleton />
+  }
+
+  return <>Shop: {params.slug}</>
+}
+```
+
+### `getServerSideProps` と併用する場合
+
+[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) を使用する場合、ページはリクエストのたびにサーバー側でレンダリングされ、`useParams` はパラメータをすぐに返します。
+
+```tsx filename="pages/shop/[slug].tsx" switcher
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const params = useParams<{ slug: string }>()
+
+  // getServerSideProps を使用する場合、params は常にサーバー上で利用可能なため、
+  // このフォールバックがレンダリングされることはありません。ただし、フォールバックを残しておくことで、
+  // getServerSideProps を使用しない他のページでもこのコンポーネントを再利用できます。
+  if (!params) {
+    return null
+  }
+
+  return <>Shop: {params.slug}</>
+}
+
+export async function getServerSideProps() {
+  return { props: {} }
+}
+```
+
+```jsx filename="pages/shop/[slug].js" switcher
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const params = useParams()
+
+  // getServerSidePropsを使用する場合、paramsは常にサーバー上で利用可能なため、
+  // このフォールバックはレンダリングされません。ただし、フォールバックを残しておくことで、
+  // getServerSidePropsを使用しない他のページでもこのコンポーネントを再利用できます。
+  if (!params) {
+    return null
+  }
+
+  return <>Shop: {params.slug}</>
+}
+
+export async function getServerSideProps() {
+  return { props: {} }
+}
+```
+
+### `router.query` との比較
+
+`useParams` は動的ルートのパラメータのみを返しますが、`useRouter` の [`router.query`](/docs/pages/api-reference/functions/use-router#router-object) には、動的パラメータとクエリ文字列パラメータの両方が含まれます。
+
+```tsx filename="pages/shop/[slug].tsx" switcher
+import { useRouter } from 'next/router'
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const router = useRouter()
+  const params = useParams()
+
+  // URL -> /shop/shoes?color=red
+
+  // router.query -> { slug: 'shoes', color: 'red' }
+  // params -> { slug: 'shoes' }
+
+  // ...
+}
+```
+
+```jsx filename="pages/shop/[slug].js" switcher
+import { useRouter } from 'next/router'
+import { useParams } from 'next/navigation'
+
+export default function ShopPage() {
+  const router = useRouter()
+  const params = useParams()
+
+  // URL -> /shop/shoes?color=red
+
+  // router.query -> { slug: 'shoes', color: 'red' }
+  // params -> { slug: 'shoes' }
+
+  // ...
+}
+```
+
+## 例
+
+### App Router でコンポーネントを共有する
+
+`next/navigation` の `useParams` は、Pages Router と App Router の両方で動作します。これにより、どちらのコンテキストでも利用できる共通コンポーネントを作成できます。
+
+```tsx filename="components/breadcrumb.tsx" switcher
+import { useParams } from 'next/navigation'
+
+// このコンポーネントは pages/ と app/ の両方で動作します
+export function Breadcrumb() {
+  const params = useParams<{ slug: string }>()
+
+  if (!params) {
+    // プリレンダリング中の Pages Router 用フォールバック
+    return <nav>Home / ...</nav>
+  }
+
+  return <nav>Home / {params.slug}</nav>
+}
+```
+
+```jsx filename="components/breadcrumb.js" switcher
+import { useParams } from 'next/navigation'
+
+// このコンポーネントは pages/ と app/ の両方で動作します
+export function Breadcrumb() {
+  const params = useParams()
+
+  if (!params) {
+    // プリレンダリング中の Pages Router 用フォールバック
+    return <nav>Home / ...</nav>
+  }
+
+  return <nav>Home / {params.slug}</nav>
+}
+```
+
+> **補足**: App Router でこのコンポーネントを使用する場合、`useParams` が `null` を返すことはないため、フォールバック用のブランチはレンダリングされません。
+
+## バージョン履歴
+
+| バージョン | 変更内容             |
+| ---------- | -------------------- |
+| `v13.3.0`  | `useParams` を追加。 |

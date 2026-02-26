@@ -1,0 +1,185 @@
+---
+title: loading.js
+description: loading.js ファイルの API リファレンス。
+---
+
+特別なファイル `loading.js` は、[React Suspense](https://react.dev/reference/react/Suspense) を使って意味のある Loading UI を作成するのに役立ちます。この規約を使うと、ルートセグメントのコンテンツがストリーミングされるあいだ、サーバーから[即時のローディング状態](#instant-loading-states)を表示できます。新しいコンテンツは、取得が完了し次第、自動的に差し替えられます。
+
+<Image
+  alt="Loading UI"
+  srcLight="/docs/light/loading-ui.png"
+  srcDark="/docs/dark/loading-ui.png"
+  width="1600"
+  height="691"
+/>
+
+```tsx filename="app/feed/loading.tsx" switcher
+export default function Loading() {
+  // またはカスタムのローディングスケルトンコンポーネント
+  return <p>Loading...</p>
+}
+```
+
+```jsx filename="app/feed/loading.js" switcher
+export default function Loading() {
+  // またはカスタムのローディングスケルトンコンポーネント
+  return <p>Loading...</p>
+}
+```
+
+`loading.js` ファイルには、軽量なローディング用 UI を追加できます。[React Developer Tools](https://react.dev/learn/react-developer-tools) を使って Suspense 境界を手動で切り替えると便利な場合があります。
+
+デフォルトでは、このファイルは [Server Component](/docs/app/getting-started/server-and-client-components) として扱われますが、`"use client"` ディレクティブを追加することで Client Component としても使用できます。
+
+## リファレンス
+
+### パラメータ
+
+Loading UI コンポーネントはパラメータを一切受け取りません。
+
+## 動作
+
+### ナビゲーション
+
+- Fallback UI は [prefetched](/docs/app/getting-started/linking-and-navigating#prefetching) されるため、プリフェッチが完了していない場合を除き、ナビゲーションは即座に行われます。
+- ナビゲーションは割り込み可能であり、別のルートに移動する際に、そのルートのコンテンツが完全にロードされるのを待つ必要はありません。
+- 共有レイアウトは、新しいルートセグメントをロードしている間もインタラクティブな状態を維持します。
+
+### 即時ローディング状態
+
+即時ローディング状態とは、ナビゲーション時に直ちに表示されるフォールバック UI のことです。スケルトンやスピナーといったローディングインジケーターや、カバーフォトやタイトルなど今後表示される画面の小さいながらも意味のある一部を、あらかじめプリレンダーできます。これにより、ユーザーはアプリがきちんと応答していることを理解しやすくなり、より良いユーザー体験を提供できます。
+
+フォルダ内に `loading.js` ファイルを追加してローディング状態を作成します。
+
+<Image
+  alt="loading.js special file"
+  srcLight="/docs/light/loading-special-file.png"
+  srcDark="/docs/dark/loading-special-file.png"
+  width="1600"
+  height="606"
+/>
+
+```tsx filename="app/dashboard/loading.tsx" switcher
+export default function Loading() {
+  // Loading内にはSkeletonを含む任意のUIを追加できます。
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/dashboard/loading.js" switcher
+export default function Loading() {
+  // Loading内には、Skeletonを含む任意のUIを追加できます。
+  return <LoadingSkeleton />
+}
+```
+
+同じフォルダー内では、`loading.js` は `layout.js` の内側にネストされます。また、`page.js` ファイルとその配下のすべての子を自動的に `<Suspense>` の境界でラップします。
+
+<Image
+  alt="loading.js の概要"
+  srcLight="/docs/light/loading-overview.png"
+  srcDark="/docs/dark/loading-overview.png"
+  width="1600"
+  height="768"
+/>
+
+### SEO
+
+- Twitterbot のように、通常のブラウザのように JavaScript を実行できず、静的な HTML だけをスクレイピングするボットに対しては、Next.js は UI のストリーミングを開始する前に [`generateMetadata`](/docs/app/api-reference/functions/generate-metadata) を評価し、そのメタデータを初期 HTML の `<head>` に配置します。
+- それ以外の場合は、[ストリーミングメタデータ](/docs/app/api-reference/functions/generate-metadata#streaming-metadata) を使用できます。Next.js はユーザーエージェントを自動的に検出し、ブロッキングとストリーミングのどちらの挙動にするかを選択します。
+- ストリーミングはサーバーサイドレンダリングされるため、SEO には影響しません。Google の [Rich Results Test](https://search.google.com/test/rich-results) ツールを使用して、ページが Google のウェブクローラーにどのように表示されるかを確認し、シリアライズされた HTML を確認できます（[出典](https://web.dev/rendering-on-the-web/#seo-considerations)）。
+
+### ステータスコード
+
+ストリーミング時には、リクエストが成功したことを示すために `200` ステータスコードが返されます。
+
+サーバーは、たとえば [`redirect`](/docs/app/api-reference/functions/redirect) や [`notFound`](/docs/app/api-reference/functions/not-found) を使用する場合など、ストリーミングされたコンテンツ内でクライアントにエラーや問題を伝えることができます。レスポンスヘッダーはすでにクライアントへ送信されているため、レスポンスのステータスコードを更新することはできません。
+
+たとえば、404 ページがクライアントにストリーミングされる場合、Next.js はストリーミングされた HTML に `<meta name="robots" content="noindex">` タグを含めます。これにより、たとえ HTTP ステータスが 200 であっても、その URL が検索エンジンにインデックスされることを防ぎます。[`robots` メタタグ](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag) に関する Google のガイダンスを参照してください。
+
+一部のクローラーは、これらのレスポンスを「ソフト 404」としてラベル付けする場合があります。ストリーミングの場合、ページが HTML 内で明示的に `noindex` とマークされているため、これによってインデックス作成が行われることはありません。
+
+コンプライアンスやアナリティクスのために 404 ステータスが必要な場合は、レスポンスボディがストリーミングされる前にリソースが存在することを確認し、サーバーが HTTP ステータスコードを設定できるようにしてください。
+
+このチェックは [`proxy`](/docs/app/api-reference/file-conventions/proxy) で実行し、存在しないスラッグを not-found ルートに書き換えたり、[404 レスポンスを生成](/docs/app/api-reference/file-conventions/proxy#producing-a-response)したりできます。proxy によるチェックは高速に保ち、そこでページ全体のコンテンツをフェッチすることは避けてください。
+
+<details>
+<summary>レスポンスボディはいつストリーミングされますか？</summary>
+
+レスポンスボディのストリーミングは、Suspense のフォールバック（たとえば `loading.tsx`）がレンダーされたとき、または Server Component が `Suspense` の境界内でサスペンドしたときに開始されます。`notFound()` は、これらの境界より前、およびサスペンドする可能性のある `await` の前に配置してください。
+
+ストリーミングを開始するには、レスポンスヘッダーが設定されている必要があります。このため、ストリーミング開始後にステータスコードを変更することはできません。
+
+</details>
+
+### ブラウザの制限
+
+[一部のブラウザ](https://bugs.webkit.org/show_bug.cgi?id=252413)はストリーミングレスポンスをバッファリングします。レスポンスが 1024 バイトを超えるまで、ストリーミングされたレスポンスが表示されない場合があります。これは通常、「hello world」のようなごく簡単なアプリケーションにのみ影響し、実際のアプリケーションには影響しません。
+
+## プラットフォーム対応
+
+| デプロイオプション                                                  | サポート状況         |
+| ------------------------------------------------------------------- | -------------------- |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | サポートあり         |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | サポートあり         |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | サポートなし         |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | プラットフォーム依存 |
+
+Next.js をセルフホストする場合の[ストリーミングの設定方法](/docs/app/guides/self-hosting#streaming-and-suspense)については、こちらを参照してください。
+
+## 使用例
+
+### Suspense を使ったストリーミング
+
+`loading.js` に加えて、独自の UI コンポーネント向けに Suspense バウンダリを手動で作成することもできます。App Router は [Suspense](https://react.dev/reference/react/Suspense) を利用したストリーミングをサポートします。
+
+`<Suspense>` は、非同期処理（例: データの取得）を行うコンポーネントをラップし、その処理の間はフォールバック UI（例: スケルトン、スピナー）を表示し、処理が完了したらコンポーネントを差し替えることで動作します。
+
+```tsx filename="app/dashboard/page.tsx" switcher
+import { Suspense } from 'react'
+import { PostFeed, Weather } from './Components'
+
+export default function Posts() {
+  return (
+    <section>
+      <Suspense fallback={<p>Loading feed...</p>}>
+        <PostFeed />
+      </Suspense>
+      <Suspense fallback={<p>Loading weather...</p>}>
+        <Weather />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+```jsx filename="app/dashboard/page.js" switcher
+import { Suspense } from 'react'
+import { PostFeed, Weather } from './Components'
+
+export default function Posts() {
+  return (
+    <section>
+      <Suspense fallback={<p>Loading feed...</p>}>
+        <PostFeed />
+      </Suspense>
+      <Suspense fallback={<p>Loading weather...</p>}>
+        <Weather />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+Suspense を使用すると、次のような利点があります。
+
+1. **ストリーミングサーバーサイドレンダリング** - サーバーからクライアントへ HTML を段階的にストリーミングしながらレンダリングできます。
+2. **選択的ハイドレーション** - React はユーザー操作に基づいて、どのコンポーネントを最初にインタラクティブにするかを優先的に処理します。
+
+Suspense のさらなる例やユースケースについては、[React のドキュメント](https://react.dev/reference/react/Suspense) を参照してください。
+
+## バージョン履歴
+
+| バージョン | 変更内容                     |
+| ---------- | ---------------------------- |
+| `v13.0.0`  | `loading` が導入されました。 |

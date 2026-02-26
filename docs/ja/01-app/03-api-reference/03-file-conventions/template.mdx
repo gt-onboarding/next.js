@@ -1,0 +1,160 @@
+---
+title: template.js
+description: template.js ファイルの API リファレンス。
+---
+
+**template** ファイルは、レイアウトやページをラップするという点で [layout](/docs/app/getting-started/layouts-and-pages#creating-a-layout) に似ています。ただし、ルート間で永続し状態を維持する layouts とは異なり、template には一意のキーが与えられるため、子の Client Components はナビゲーション時に状態がリセットされます。
+
+template は次のような場合に有用です:
+
+- ナビゲーション時に `useEffect` を再同期したいとき。
+- ナビゲーション時に子の Client Components の状態をリセットしたいとき（例: 入力フィールド）。
+- フレームワークのデフォルトの挙動を変更したいとき。たとえば、レイアウト内の Suspense バウンダリは最初のロード時にのみフォールバックを表示しますが、template ではすべてのナビゲーションでフォールバックを表示します。
+
+## 規則
+
+テンプレートは、`template.js` ファイルからデフォルトの React コンポーネントをエクスポートすることで定義できます。コンポーネントは `children` プロップを受け取る必要があります。
+
+<Image
+  alt="template.js 特別なファイル"
+  srcLight="/docs/light/template-special-file.png"
+  srcDark="/docs/dark/template-special-file.png"
+  width="1600"
+  height="444"
+/>
+
+```tsx filename="app/template.tsx" switcher
+export default function Template({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/template.js" switcher
+export default function Template({ children }) {
+  return <div>{children}</div>
+}
+```
+
+ネスト構造としては、`template.js` はレイアウトとその子要素の間にレンダリングされます。以下はその出力を簡略化したものです。
+
+```jsx filename="Output"
+<Layout>
+  {/* テンプレートには一意のキーが与えられることに注意してください。 */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+```
+
+## Props
+
+### `children` (必須)
+
+Template は `children` プロパティを受け取ります。
+
+```jsx filename="Output"
+<Layout>
+  {/* テンプレートには自動的に一意のキーが付与されることに注意してください。 */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+```
+
+## 挙動
+
+- **サーバーコンポーネント**: デフォルトでは、テンプレートはサーバーコンポーネントです。
+- **ナビゲーション時**: テンプレートは自身のセグメントレベルに対して一意の key を受け取ります。そのセグメント（そのセグメントの動的パラメーターを含む）が変化したときに再マウントされます。より深いセグメント内でのナビゲーションでは、より上位レベルのテンプレートは再マウントされません。検索パラメーターでは再マウントは発生しません。
+- **state のリセット**: テンプレート内の任意のクライアントコンポーネントは、ナビゲーション時に state がリセットされます。
+- **effect の再実行**: `useEffect` のような effect は、コンポーネントが再マウントされるときに再同期されます。
+- **DOM のリセット**: テンプレート内の DOM 要素は完全に再作成されます。
+
+### ナビゲーション時のテンプレートと再マウント
+
+このセクションでは、ナビゲーション時にテンプレートがどのように振る舞うかを説明します。各ルート遷移ごとに、どのテンプレートが再マウントされるのかとその理由を、ステップごとに示します。
+
+次のプロジェクトツリーを例に説明します。
+
+```
+app
+├── about
+│   ├── page.tsx
+├── blog
+│   ├── [slug]
+│   │   └── page.tsx
+│   ├── page.tsx
+│   └── template.tsx
+├── layout.tsx
+├── page.tsx
+└── template.tsx
+```
+
+`/` から始めると、React ツリーはおおよそ次のようになります。
+
+> 補足: 例で示している `key` の値は説明用であり、実際のアプリケーションでは異なる場合があります。
+
+```jsx filename="Output"
+<RootLayout>
+  {/* app/template.tsx */}
+  <Template key="/">
+    <Page />
+  </Template>
+</RootLayout>
+```
+
+`/about` へ遷移すると（最初のセグメントが変わるため）、root テンプレートのキーが変わり、テンプレートが再マウントされます：
+
+```jsx filename="Output"
+<RootLayout>
+  {/* app/template.tsx */}
+  <Template key="/about">
+    <AboutPage />
+  </Template>
+</RootLayout>
+```
+
+`/blog` に移動すると（最初のセグメントが変化するため）、ルートの template キーが変わり、それが再マウントされて、ブログレベルの template がマウントされます。
+
+```jsx filename="Output"
+<RootLayout>
+  {/* app/template.tsx (root) */}
+  <Template key="/blog">
+    {/* app/blog/template.tsx */}
+    <Template key="/blog">
+      <BlogIndexPage />
+    </Template>
+  </Template>
+</RootLayout>
+```
+
+同じ第一セグメント内で `/blog/first-post` に遷移する場合（子セグメントが変わる場合）、ルートレベルの template key は変わりませんが、blog レベルの template key が変わるため、再マウントされます。
+
+```jsx filename="Output"
+<RootLayout>
+  {/* app/template.tsx (root) */}
+  <Template key="/blog">
+    {/* app/blog/template.tsx */}
+    {/* このレベルの子セグメントが変更されたため再マウントされる */}
+    <Template key="/blog/first-post">
+      <BlogPostPage slug="first-post" />
+    </Template>
+  </Template>
+</RootLayout>
+```
+
+`/blog/second-post` に移動すると（最初のセグメントは同じで子セグメントだけが異なる場合）、ルートレベルの template キーは変わりませんが、blog レベルの template キーは変わるため、再マウントされます:
+
+```jsx filename="Output"
+<RootLayout>
+  {/* app/template.tsx (ルート) */}
+  <Template key="/blog">
+    {/* app/blog/template.tsx */}
+    {/* 子セグメントが変更されたため、再度マウントされる */}
+    <Template key="/blog/second-post">
+      <BlogPostPage slug="second-post" />
+    </Template>
+  </Template>
+</RootLayout>
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                      |
+| ---------- | ----------------------------- |
+| `v13.0.0`  | `template` が導入されました。 |

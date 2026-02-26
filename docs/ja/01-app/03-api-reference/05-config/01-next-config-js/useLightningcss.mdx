@@ -1,0 +1,41 @@
+---
+title: useLightningcss
+description: Lightning CSS の実験的サポートを有効にします。
+version: experimental
+---
+
+webpack で [Lightning CSS](https://lightningcss.dev) を使用するための実験的サポートです。Lightning CSS は Rust で実装された、高速な CSS トランスフォーマー兼ミニファイアです。
+
+このオプションを設定しない場合、Next.js の webpack ビルドではデフォルトで [PostCSS](https://postcss.org/) と [`postcss-preset-env`](https://www.npmjs.com/package/postcss-preset-env) が使用されます。
+
+Next 14.2 以降、Turbopack はデフォルトで Lightning CSS を使用します。この設定オプションは Turbopack には影響しません。Turbopack は常に Lightning CSS を使用します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    useLightningcss: false, // デフォルト、Turbopackでは無視される
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    useLightningcss: true, // webpackでPostCSSを無効化する
+  },
+}
+
+module.exports = nextConfig
+```
+
+## バージョン履歴
+
+| バージョン | 変更点                                                                                                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `15.1.0`   | Turbopack での `useSwcCss` のサポートが削除されました。                                                                                                                                                                 |
+| `14.2.0`   | Turbopack のデフォルト CSS プロセッサが `@swc/css` から Lightning CSS に変更されました。`useLightningcss` は Turbopack では無視されるようになり、レガシーなオプション `experimental.turbo.useSwcCss` が追加されました。 |

@@ -1,0 +1,123 @@
+---
+title: NextRequest
+description: NextRequest の API リファレンス。
+---
+
+{/* このドキュメントの内容は App Router と Pages Router の間で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有部分はコンポーネントでラップしないでください。 */}
+
+NextRequest は、[Web Request API](https://developer.mozilla.org/docs/Web/API/Request) を拡張し、追加の便利なメソッドを提供します。
+
+## `cookies`
+
+リクエストの [`Set-Cookie`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie) ヘッダーの読み取りや変更を行います。
+
+### `set(name, value)`
+
+指定された name に対して、指定された value を持つ Cookie をリクエストに設定します。
+
+```ts
+// 受信リクエスト /home に対して
+// バナーを非表示にするクッキーを設定する
+// request には `Set-Cookie:show-banner=false;path=/home` ヘッダーが付与される
+request.cookies.set('show-banner', 'false')
+```
+
+### `get(name)`
+
+クッキー名を指定して、そのクッキーの値を返します。クッキーが見つからない場合は `undefined` が返されます。複数のクッキーが見つかった場合は、最初のものが返されます。
+
+```ts
+// 受信リクエスト /home の場合
+// { name: 'show-banner', value: 'false', Path: '/home' }
+request.cookies.get('show-banner')
+```
+
+### `getAll()`
+
+Cookie 名を指定した場合は、その Cookie の値を返します。名前を指定しない場合は、リクエストに含まれるすべての Cookie を返します。
+
+```ts
+// 受信リクエスト /home の場合
+// [
+//   { name: 'experiments', value: 'new-pricing-page', Path: '/home' },
+//   { name: 'experiments', value: 'winter-launch', Path: '/home' },
+// ]
+request.cookies.getAll('experiments')
+// または、リクエストのすべてのCookieを取得する
+request.cookies.getAll()
+```
+
+### `delete(name)`
+
+指定されたクッキー名のクッキーをリクエストから削除します。
+
+```ts
+// 削除された場合はtrue、何も削除されなかった場合はfalseを返す
+request.cookies.delete('experiments')
+```
+
+### `has(name)`
+
+指定したクッキー名のクッキーがリクエストに存在する場合は `true` を返します。
+
+```ts
+// クッキーが存在する場合はtrue、存在しない場合はfalseを返す
+request.cookies.has('experiments')
+```
+
+### `clear()`
+
+リクエストからすべての Cookie を削除します。
+
+```ts
+request.cookies.clear()
+```
+
+## `nextUrl`
+
+ネイティブの [`URL`](https://developer.mozilla.org/docs/Web/API/URL) API を拡張し、Next.js 固有のプロパティを含む便利なメソッドを追加で提供します。
+
+```ts
+// /home へのリクエストの場合、pathname は /home
+request.nextUrl.pathname
+// /home?name=lee へのリクエストの場合、searchParams は { 'name': 'lee' }
+request.nextUrl.searchParams
+```
+
+利用できるオプションは次のとおりです:
+
+<PagesOnly>
+
+| プロパティ        | 型                        | 説明                                                                                                                              |
+| ----------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `basePath`        | `string`                  | URL の [base path](/docs/pages/api-reference/config/next-config-js/basePath)。                                                    |
+| `buildId`         | `string` \| `undefined`   | Next.js アプリケーションのビルド識別子。[カスタマイズ](/docs/pages/api-reference/config/next-config-js/generateBuildId)できます。 |
+| `defaultLocale`   | `string` \| `undefined`   | [国際化](/docs/pages/guides/internationalization) のデフォルトロケール。                                                          |
+| `domainLocale`    |                           |                                                                                                                                   |
+| - `defaultLocale` | `string`                  | ドメイン内でのデフォルトロケール。                                                                                                |
+| - `domain`        | `string`                  | 特定のロケールに関連付けられたドメイン。                                                                                          |
+| - `http`          | `boolean` \| `undefined`  | ドメインが HTTP を使用しているかどうかを示します。                                                                                |
+| `locales`         | `string[]` \| `undefined` | 利用可能なロケールの配列。                                                                                                        |
+| `locale`          | `string` \| `undefined`   | 現在アクティブなロケール。                                                                                                        |
+| `url`             | `URL`                     | URL オブジェクト。                                                                                                                |
+
+</PagesOnly>
+
+<AppOnly>
+
+| プロパティ     | 型                      | 説明                                                                                                                            |
+| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `basePath`     | `string`                | URL の [base path](/docs/app/api-reference/config/next-config-js/basePath)。                                                    |
+| `buildId`      | `string` \| `undefined` | Next.js アプリケーションのビルド識別子。[カスタマイズ](/docs/app/api-reference/config/next-config-js/generateBuildId)できます。 |
+| `pathname`     | `string`                | URL のパス名。                                                                                                                  |
+| `searchParams` | `Object`                | URL の検索パラメータ。                                                                                                          |
+
+> **注意:** Pages Router の国際化プロパティは App Router では利用できません。詳しくは、[App Router による国際化](/docs/app/guides/internationalization)を参照してください。
+
+</AppOnly>
+
+## バージョン履歴
+
+| バージョン | 変更内容             |
+| ---------- | -------------------- |
+| `v15.0.0`  | `ip` と `geo` を削除 |

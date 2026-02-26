@@ -1,0 +1,87 @@
+---
+title: アップグレード
+description: Next.js アプリケーションを最新バージョンまたは canary 版にアップグレードする方法について説明します。
+related:
+  title: バージョンガイド
+  description: 詳細なアップグレード手順については、バージョンガイドを参照してください。
+  links:
+    - app/guides/upgrading/version-16
+    - app/guides/upgrading/version-15
+    - app/guides/upgrading/version-14
+---
+
+## 最新バージョン
+
+Next.js を最新バージョンに更新するには、`upgrade` コマンドを使用できます。
+
+```bash package="pnpm"
+pnpm next upgrade
+```
+
+```bash package="npm"
+npx next upgrade
+```
+
+```bash package="yarn"
+yarn next upgrade
+```
+
+```bash package="bun"
+bunx next upgrade
+```
+
+Next.js 16.1.0 より前のバージョンは `upgrade` コマンドをサポートしていないため、代わりに別のパッケージを使用する必要があります。
+
+```bash filename="Terminal"
+npx @next/codemod@canary upgrade latest
+```
+
+手動でアップグレードする場合は、最新の Next.js と React のバージョンをインストールしてください。
+
+```bash package="pnpm"
+pnpm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+```bash package="npm"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+```bash package="yarn"
+yarn add next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+```bash package="bun"
+bun add next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+## カナリア版
+
+最新のカナリア版に更新するには、まず Next.js を最新バージョンにアップデートし、アプリケーションが問題なく動作していることを確認してください。そのうえで、次のコマンドを実行します。
+
+```bash package="pnpm"
+pnpm add next@canary
+```
+
+```bash package="npm"
+npm i next@canary
+```
+
+```bash package="yarn"
+yarn add next@canary
+```
+
+```bash package="bun"
+bun add next@canary
+```
+
+### Canary 版で利用可能な機能
+
+次の機能は現在、Canary 版で利用可能です。
+
+**Authentication（認証）**:
+
+- [`forbidden`](/docs/app/api-reference/functions/forbidden)
+- [`unauthorized`](/docs/app/api-reference/functions/unauthorized)
+- [`forbidden.js`](/docs/app/api-reference/file-conventions/forbidden)
+- [`unauthorized.js`](/docs/app/api-reference/file-conventions/unauthorized)
+- [`authInterrupts`](/docs/app/api-reference/config/next-config-js/authInterrupts)

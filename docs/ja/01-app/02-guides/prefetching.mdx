@@ -1,0 +1,368 @@
+---
+title: プレフェッチ
+description: Next.js でのプレフェッチの設定方法について学びます
+---
+
+プレフェッチによって、アプリケーション内の異なるルート間の画面遷移がほぼ即時に行われているように感じられるようになります。Next.js は、アプリケーションコード内で使用されているリンクに基づいて、デフォルトで自動的かつ賢くプレフェッチを行います。
+
+このガイドでは、プレフェッチの仕組みと、よくある実装パターンについて説明します：
+
+- [自動プレフェッチ](#automatic-prefetch)
+- [手動プレフェッチ](#manual-prefetch)
+- [ホバーによるプレフェッチ](#hover-triggered-prefetch)
+- [Link の拡張または使用をやめる](#extending-or-ejecting-link)
+- [プレフェッチの無効化](#disabled-prefetch)
+
+## プリフェッチはどのように動作しますか？
+
+ルート間を移動する際、ブラウザはページの HTML や JavaScript ファイルなどのアセットをリクエストします。プリフェッチは、新しいルートへ遷移する**前に**、これらのリソースをあらかじめ取得しておく処理です。
+
+Next.js は、アプリケーションをルート単位で自動的に小さな JavaScript チャンクに分割します。従来の SPA のように最初にすべてのコードを読み込むのではなく、現在のルートに必要なコードだけが読み込まれます。これにより初回の読み込み時間が短縮される一方、アプリの他の部分はバックグラウンドで読み込まれます。リンクをクリックする頃には、新しいルート用のリソースはすでにブラウザキャッシュに読み込まれています。
+
+新しいページへ移動するとき、ページ全体のリロードやブラウザのローディングスピナーは発生しません。代わりに、Next.js は[クライアントサイドのトランジション](/docs/app/getting-started/linking-and-navigating#client-side-transitions)を実行し、ページ遷移がほぼ瞬時に行われるように感じられます。
+
+## 静的ルートと動的ルートのプリフェッチ
+
+|                                                                             | **静的ページ**     | **動的ページ**                                                                                   |
+| --------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------ |
+| **プリフェッチされるか**                                                    | はい（ルート全体） | いいえ、ただし [`loading.js`](/docs/app/api-reference/file-conventions/loading) がある場合を除く |
+| [**クライアントキャッシュ TTL**](/docs/app/guides/caching#full-route-cache) | 5 分（デフォルト） | オフ（[有効化](/docs/app/api-reference/config/next-config-js/staleTimes)されている場合を除く）   |
+| **クリック時のサーバー往復**                                                | なし               | あり、[シェル](/docs/app/getting-started/cache-components)の後にストリーミングされる             |
+
+> **補足:** 初回のナビゲーションでは、ブラウザは HTML、JavaScript、および React サーバーコンポーネント (RSC) のペイロードをフェッチします。2 回目以降のナビゲーションでは、ブラウザはサーバーコンポーネント用の RSC ペイロードと、クライアントコンポーネント用の JS バンドルをフェッチします。
+
+## 自動プリフェッチ
+
+```tsx filename="app/ui/nav-link.tsx" switcher
+import Link from 'next/link'
+
+export default function NavLink() {
+  return <Link href="/about">About</Link>
+}
+```
+
+```jsx filename="app/ui/nav-link.js" switcher
+import Link from 'next/link'
+
+export default function NavLink() {
+  return <Link href="/about">About</Link>
+}
+```
+
+| **コンテキスト** | **プリフェッチされるペイロード**         | **クライアントキャッシュ TTL**                                               |
+| ---------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `loading.js`なし | ページ全体                               | アプリをリロードするまで                                                     |
+| `loading.js`あり | レイアウトから最初のローディング境界まで | 30秒（[設定可能](/docs/app/api-reference/config/next-config-js/staleTimes)） |
+
+自動プリフェッチは本番環境でのみ行われます。`prefetch={false}` で無効化するか、[Disabled Prefetch](#disabled-prefetch) のラッパーを使用してください。
+
+## 手動プリフェッチ
+
+手動でプリフェッチを行うには、`next/navigation` から `useRouter` フックをインポートし、ビューポート外のルートや、アナリティクス、ホバー、スクロールなどに応じてルートをウォームアップするために `router.prefetch()` を呼び出します。
+
+```tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { CustomLink } from '@components/link'
+
+export function PricingCard() {
+  const router = useRouter()
+
+  return (
+    <div onMouseEnter={() => router.prefetch('/pricing')}>
+      {/* その他のUI要素 */}
+      <CustomLink href="/pricing">View Pricing</CustomLink>
+    </div>
+  )
+}
+```
+
+コンポーネントの読み込み時に URL をプリフェッチしたい場合は、リンクの拡張や拒否に関する[例]を参照してください。
+
+## ホバーによるプリフェッチのトリガー
+
+> **注意して進めてください:** `Link` を拡張すると、プリフェッチやキャッシュの無効化、アクセシビリティ対応を自前で管理する必要があります。デフォルトの挙動で十分でない場合にのみ行ってください。
+
+Next.js はデフォルトで適切なプリフェッチを行おうとしますが、上級ユーザーは必要に応じてデフォルトの挙動を外して変更できます。パフォーマンスとリソース消費とのトレードオフを、あなたが制御できます。
+
+たとえば、デフォルトの挙動であるビューポートへの進入時ではなく、ホバー時にのみプリフェッチをトリガーする必要があるかもしれません:
+
+```tsx
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+export function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+`prefetch={null}` は、ユーザーが遷移の意図を示したタイミングで、デフォルト（静的）のプリフェッチに戻します。
+
+## Link の拡張またはイジェクト
+
+`<Link>` コンポーネントを拡張して、独自のカスタムのプレフェッチ戦略を作成できます。たとえば、ユーザーのカーソルの向きを予測してリンクをプレフェッチする [ForesightJS](https://foresightjs.com/docs/integrations/nextjs) ライブラリを使用する方法があります。
+
+あるいは、[`useRouter`](/docs/app/api-reference/functions/use-router) を使用して、ネイティブの `<Link>` の挙動の一部を再現することもできます。ただし、その場合はプレフェッチとキャッシュの無効化を自分で管理する必要がある点に注意してください。
+
+```tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+
+function ManualPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      if (!cancelled) router.prefetch(href, { onInvalidate: poll })
+    }
+    poll()
+    return () => {
+      cancelled = true
+    }
+  }, [href, router])
+
+  return (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault()
+        router.push(href)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+```
+
+Next.js がキャッシュ済みデータが古くなっている可能性があると判断したときに [`onInvalidate`](/docs/app/api-reference/functions/use-router#userouter) が呼び出され、プリフェッチを更新できるようにします。
+
+> **覚えておくと良いこと:** `a` タグを使用すると、遷移先ルートへのフルページナビゲーションが発生します。`onClick` を使ってフルページナビゲーションを防ぎ、その後 `router.push` を呼び出して遷移先ルートへナビゲートできます。
+
+## プリフェッチの無効化
+
+特定のルートに対してプリフェッチを完全に無効化し、リソース消費をよりきめ細かく制御できます。
+
+```tsx
+'use client'
+
+import Link, { LinkProps } from 'next/link'
+
+function NoPrefetchLink({
+  prefetch,
+  ...rest
+}: LinkProps & { children: React.ReactNode }) {
+  return <Link {...rest} prefetch={false} />
+}
+```
+
+たとえば、アプリケーション全体で `<Link>` を統一して使いたい場合でも、フッター内のリンクはビューポートに入ったときにプリフェッチする必要はないかもしれません。
+
+## プレフェッチの最適化
+
+### クライアントキャッシュ
+
+Next.js はプリフェッチされた React Server Component のペイロードを、ルートセグメントをキーにしてメモリ上に保存します。兄弟ルート間を遷移する場合（例: `/dashboard/settings` → `/dashboard/analytics`）、親レイアウトを再利用し、更新された末端のページのみをフェッチします。これによりネットワークトラフィックが削減され、ナビゲーション速度が向上します。
+
+### プリフェッチのスケジューリング
+
+Next.js は小さなタスクキューを保持しており、次の順序でプリフェッチを行います。
+
+1. ビューポート内のリンク
+2. ユーザーの操作意図が示されたリンク（ホバーまたはタッチ）
+3. 新しいリンクが古いリンクを置き換える
+4. 画面外にスクロールされたリンクは破棄される
+
+スケジューラは、起こり得るページ遷移を優先しつつ、無駄なダウンロードを最小限に抑えます。
+
+### Partial Prerendering (PPR)
+
+PPR を有効にすると、ページは静的なシェルとストリーミングされる動的セクションに分割されます:
+
+- プリフェッチ可能なシェルは、即座にストリーミングされる
+- 動的データは、準備ができたタイミングでストリーミングされる
+- データの無効化（`revalidateTag`、`revalidatePath`）により、関連するプリフェッチが透過的に更新される
+
+## トラブルシューティング
+
+### プリフェッチ時に不要な副作用が発生する
+
+レイアウトやページが[純粋](https://react.dev/learn/keeping-components-pure#purity-components-as-formulas)ではなく、副作用（例: アナリティクスのトラッキングなど）を持っている場合、これらの副作用はユーザーがページにアクセスしたときではなく、ルートがプリフェッチされたときに発火する可能性があります。
+
+これを避けるには、副作用を `useEffect` フック内、または Client Component からトリガーされる Server Action に移す必要があります。
+
+**変更前**:
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+import { trackPageView } from '@/lib/analytics'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  // これはプリフェッチ中に実行される
+  trackPageView()
+
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+import { trackPageView } from '@/lib/analytics'
+
+export default function Layout({ children }) {
+  // これはプリフェッチ中に実行される
+  trackPageView()
+
+  return <div>{children}</div>
+}
+```
+
+**修正後**:
+
+```tsx filename="app/ui/analytics-tracker.tsx" switcher
+'use client'
+
+import { useEffect } from 'react'
+import { trackPageView } from '@/lib/analytics'
+
+export function AnalyticsTracker() {
+  useEffect(() => {
+    trackPageView()
+  }, [])
+
+  return null
+}
+```
+
+```jsx filename="app/ui/analytics-tracker.js" switcher
+'use client'
+
+import { useEffect } from 'react'
+import { trackPageView } from '@/lib/analytics'
+
+export function AnalyticsTracker() {
+  useEffect(() => {
+    trackPageView()
+  }, [])
+
+  return null
+}
+```
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+import { AnalyticsTracker } from '@/app/ui/analytics-tracker'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div>
+      <AnalyticsTracker />
+      {children}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+import { AnalyticsTracker } from '@/app/ui/analytics-tracker'
+
+export default function Layout({ children }) {
+  return (
+    <div>
+      <AnalyticsTracker />
+      {children}
+    </div>
+  )
+}
+```
+
+### 過剰なプリフェッチの防止
+
+Next.js は、`<Link>` コンポーネントを使用している場合、ビューポート内にあるリンクを自動的にプリフェッチします。
+
+大量のリンク一覧をレンダリングする場合（例: 無限スクロールのテーブルなど）、不要なリソース使用を避けるために、この動作を無効にしたいケースがあります。
+
+`<Link>` コンポーネントの `prefetch` プロップを `false` に設定することで、プリフェッチを無効にできます。
+
+```tsx filename="app/ui/no-prefetch-link.tsx" switcher
+<Link prefetch={false} href={`/blog/${post.id}`}>
+  {post.title}
+</Link>
+```
+
+しかし、これは静的ルートはクリックされたときにのみ取得され、動的ルートは遷移の前にサーバーでのレンダー完了を待つことになることを意味します。
+
+プリフェッチを完全に無効化せずにリソース使用量を減らすには、ユーザーがリンクにホバーするまでプリフェッチを遅らせることができます。これにより、ユーザーが実際にアクセスしそうなリンクだけを対象にできます。
+
+```tsx filename="app/ui/hover-prefetch-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+export function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/ui/hover-prefetch-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+export function HoverPrefetchLink({ href, children }) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```

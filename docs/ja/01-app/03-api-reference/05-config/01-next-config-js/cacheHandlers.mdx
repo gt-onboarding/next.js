@@ -1,0 +1,429 @@
+---
+title: cacheHandlers
+description: Next.js で `use cache` ディレクティブ用のカスタムキャッシュハンドラーを設定します。
+related:
+  title: 関連
+  description: 関連する API リファレンスを表示します。
+  links:
+    - app/api-reference/directives/use-cache
+    - app/api-reference/directives/use-cache-remote
+    - app/api-reference/directives/use-cache-private
+    - app/api-reference/config/next-config-js/cacheLife
+---
+
+`cacheHandlers` 設定を使用すると、[`'use cache'`](/docs/app/api-reference/directives/use-cache) および [`'use cache: remote'`](/docs/app/api-reference/directives/use-cache-remote) 向けのカスタムキャッシュストレージ実装を定義できます。これにより、キャッシュされたコンポーネントや関数を外部サービスに保存したり、キャッシュの挙動をカスタマイズしたりできます。[`'use cache: private'`](/docs/app/api-reference/directives/use-cache-private) は設定できません。
+
+## カスタムキャッシュハンドラーを使うタイミング
+
+**ほとんどのアプリケーションではカスタムキャッシュハンドラーは不要です。** デフォルトのインメモリキャッシュは、一般的なユースケースでは十分に機能します。
+
+カスタムキャッシュハンドラーは、複数インスタンス間でキャッシュを共有する必要がある場合や、キャッシュの保存先を変更したい場合などの高度なシナリオ向けです。たとえば、外部ストレージ（キーバリューストアなど）向けにカスタムの `remote` ハンドラーを設定し、コード内ではインメモリキャッシュ用に `'use cache'` を、外部ストレージ用に `'use cache: remote'` を使うことで、同一アプリケーション内で異なるキャッシュ戦略を使い分けることができます。
+
+**インスタンス間でキャッシュを共有する**
+
+デフォルトのインメモリキャッシュは各 Next.js プロセスごとに分離されています。複数のサーバーやコンテナを実行している場合、それぞれのインスタンスは独自のキャッシュを持ち、他のインスタンスとは共有されず、再起動時に失われます。
+
+カスタムハンドラーを使用すると、すべての Next.js インスタンスからアクセスできる共有ストレージシステム（Redis、Memcached、DynamoDB など）と統合できます。
+
+**ストレージの種類を変更する**
+
+デフォルトのインメモリ方式とは異なる方法でキャッシュを保存したい場合があります。ディスク上やデータベース内、外部のキャッシングサービスにキャッシュを保存するカスタムハンドラーを実装できます。理由としては、再起動をまたいだ永続性の確保、メモリ使用量の削減、既存インフラとの統合などが挙げられます。
+
+## 使用方法
+
+カスタムキャッシュハンドラーを設定するには：
+
+1. 別ファイルにキャッシュハンドラーを定義します。実装の詳細は[例](#examples)を参照してください。
+2. Next.js の設定ファイルで、そのファイルパスを参照します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheHandlers: {
+    default: require.resolve('./cache-handlers/default-handler.js'),
+    remote: require.resolve('./cache-handlers/remote-handler.js'),
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  cacheHandlers: {
+    default: require.resolve('./cache-handlers/default-handler.js'),
+    remote: require.resolve('./cache-handlers/remote-handler.js'),
+  },
+}
+```
+
+### ハンドラーの種類
+
+- **`default`**: `'use cache'` ディレクティブで使用されます
+- **`remote`**: `'use cache: remote'` ディレクティブで使用されます
+
+`cacheHandlers` を構成しない場合、Next.js は `default` と `remote` の両方に対してインメモリの LRU（Least Recently Used）キャッシュを使用します。参考として、[デフォルト実装](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/cache-handlers/default.ts)を参照できます。
+
+また、`sessions` や `analytics` などの追加の名前付きハンドラーを定義し、`'use cache: <name>'` で参照することもできます。
+
+`'use cache: private'` はキャッシュハンドラーを使用せず、カスタマイズもできないことに注意してください。
+
+## API リファレンス
+
+キャッシュハンドラは、次のメソッドを備えた [`CacheHandler`](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/cache-handlers/types.ts) インターフェースを実装する必要があります。
+
+### `get()`
+
+指定されたキャッシュキーに対応するキャッシュエントリを取得します。
+
+```ts
+get(cacheKey: string, softTags: string[]): Promise<CacheEntry | undefined>
+```
+
+| パラメータ | 型         | 説明                                                                             |
+| ---------- | ---------- | -------------------------------------------------------------------------------- |
+| `cacheKey` | `string`   | キャッシュエントリを一意に識別するキー。                                         |
+| `softTags` | `string[]` | ステールかどうかを判定するためにチェックするタグ（特定のキャッシュ戦略で使用）。 |
+
+見つかった場合は `CacheEntry` オブジェクトを返し、見つからない場合や有効期限切れの場合は `undefined` を返します。
+
+`get` メソッドは、ストレージからキャッシュエントリを取得し、`revalidate` 時間に基づいて有効期限切れかどうかを確認し、存在しないか有効期限切れのエントリに対しては `undefined` を返す必要があります。
+
+```js
+const cacheHandler = {
+  async get(cacheKey, softTags) {
+    const entry = cache.get(cacheKey)
+    if (!entry) return undefined
+
+    // 期限切れかどうかを確認
+    const now = Date.now()
+    if (now > entry.timestamp + entry.revalidate * 1000) {
+      return undefined
+    }
+
+    return entry
+  },
+}
+```
+
+### `set()`
+
+指定されたキャッシュキーに対応するキャッシュエントリを保存します。
+
+```ts
+set(cacheKey: string, pendingEntry: Promise<CacheEntry>): Promise<void>
+```
+
+| パラメータ     | 型                    | 説明                                     |
+| -------------- | --------------------- | ---------------------------------------- |
+| `cacheKey`     | `string`              | エントリを保存するための一意のキー。     |
+| `pendingEntry` | `Promise<CacheEntry>` | キャッシュエントリに解決される Promise。 |
+
+これが呼び出された時点で、エントリはまだ保留状態の場合があります（つまり、その値のストリームがまだ書き込み中かもしれません）。ハンドラーでは、エントリを処理する前に Promise を `await` する必要があります。
+
+`Promise<void>` を返します。
+
+`set` メソッドでは、呼び出し時点でキャッシュエントリがまだ生成中である可能性があるため、保存する前に必ず `pendingEntry` の Promise を `await` してください。解決されたら、そのエントリをキャッシュシステムに保存します。
+
+```js
+const cacheHandler = {
+  async set(cacheKey, pendingEntry) {
+    // エントリの準備が完了するまで待機
+    const entry = await pendingEntry
+
+    // キャッシュシステムに保存
+    cache.set(cacheKey, entry)
+  },
+}
+```
+
+### `refreshTags()`
+
+新しいリクエストを開始する前に、外部のタグサービスと同期するために定期的に呼び出されます。
+
+```ts
+refreshTags(): Promise<void>
+```
+
+これは、複数のインスタンスやサービス間でキャッシュの無効化を調整する場合に役立ちます。インメモリキャッシュの場合、実質的に何も処理を行わない（no-op）場合があります。
+
+`Promise<void>` を返します。
+
+インメモリキャッシュの場合、実質的に何も処理を行わない（no-op）場合があります。分散キャッシュの場合、リクエストを処理する前に、外部サービスやデータベースからタグの状態を同期するために使用します。
+
+```js
+const cacheHandler = {
+  async refreshTags() {
+    // インメモリキャッシュの場合、操作不要
+    // 分散キャッシュの場合、外部サービスからタグの状態を同期する
+  },
+}
+```
+
+### `getExpiration()`
+
+指定されたタグ群に対する最大の再検証時刻を取得します。
+
+```ts
+getExpiration(tags: string[]): Promise<number>
+```
+
+| パラメータ | 型         | 説明                               |
+| ---------- | ---------- | ---------------------------------- |
+| `tags`     | `string[]` | 有効期限をチェックするタグの配列。 |
+
+戻り値:
+
+- どのタグも一度も再検証されていない場合は `0`
+- 最新の再検証を表すタイムスタンプ（ミリ秒単位）
+- ソフトタグは代わりに `get` メソッド内でチェックすべきであることを示す `Infinity`
+
+タグの再検証タイムスタンプを追跡していない場合は、`0` を返してください。追跡している場合は、指定されたすべてのタグの中で最も新しい再検証タイムスタンプを取得してください。ソフトタグのチェックを `get` メソッド内で処理したい場合は、`Infinity` を返してください。
+
+```js
+const cacheHandler = {
+  async getExpiration(tags) {
+    // タグの再検証を追跡していない場合は 0 を返す
+    return 0
+
+    // または最新の再検証タイムスタンプを返す
+    // return Math.max(...tags.map(tag => tagTimestamps.get(tag) || 0));
+  },
+}
+```
+
+### `updateTags()`
+
+タグが再検証されたとき、または有効期限が切れたときに呼び出されます。
+
+```ts
+updateTags(tags: string[], durations?: { expire?: number }): Promise<void>
+```
+
+| パラメータ  | 型                    | 説明                         |
+| ----------- | --------------------- | ---------------------------- |
+| `tags`      | `string[]`            | 更新するタグの配列。         |
+| `durations` | `{ expire?: number }` | オプションの有効期限（秒）。 |
+
+ハンドラーは内部状態を更新し、これらのタグが無効化されたことをマークする必要があります。
+
+`Promise<void>` を返します。
+
+タグが再検証されたとき、ハンドラーはそれらのタグのいずれかを持つすべてのキャッシュエントリを無効化する必要があります。キャッシュ全体を走査し、タグが指定されたリストのいずれかに一致するエントリを削除してください。
+
+```js
+const cacheHandler = {
+  async updateTags(tags, durations) {
+    // 一致するタグを持つすべてのキャッシュエントリを無効化する
+    for (const [key, entry] of cache.entries()) {
+      if (entry.tags.some((tag) => tags.includes(tag))) {
+        cache.delete(key)
+      }
+    }
+  },
+}
+```
+
+## CacheEntry 型
+
+[`CacheEntry`](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/cache-handlers/types.ts) オブジェクトは次の構造です。
+
+```ts
+interface CacheEntry {
+  value: ReadableStream<Uint8Array>
+  tags: string[]
+  stale: number
+  timestamp: number
+  expire: number
+  revalidate: number
+}
+```
+
+| プロパティ   | 型                           | 説明                                                     |
+| ------------ | ---------------------------- | -------------------------------------------------------- |
+| `value`      | `ReadableStream<Uint8Array>` | キャッシュ済みデータのストリーム。                       |
+| `tags`       | `string[]`                   | キャッシュタグ（ソフトタグを除く）。                     |
+| `stale`      | `number`                     | クライアント側でステールとみなされるまでの秒数。         |
+| `timestamp`  | `number`                     | エントリが作成された時刻（ミリ秒単位のタイムスタンプ）。 |
+| `expire`     | `number`                     | エントリが使用可能とみなされる期間（秒単位）。           |
+| `revalidate` | `number`                     | エントリを再検証するまでの時間（秒単位）。               |
+
+> **補足**:
+>
+> - `value` は [`ReadableStream`](https://developer.mozilla.org/docs/Web/API/ReadableStream) です。ストリームデータを読み取りつつ保存する必要がある場合は [`.tee()`](https://developer.mozilla.org/docs/Web/API/ReadableStream/tee) を使用してください。
+> - ストリームが一部のデータを出力した状態でエラーになった場合、その部分的なキャッシュを保持するか破棄するかはハンドラー側で判断する必要があります。
+
+## 例
+
+### 基本的なインメモリキャッシュハンドラー
+
+ストレージとして `Map` を使った最小限の実装は次のとおりです。この例は基本的な概念を示すものですが、LRU 方式の削除、エラーハンドリング、タグ管理を備えた本番運用向けの実装については、[デフォルトのキャッシュハンドラー](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/cache-handlers/default.ts) を参照してください。
+
+```js filename="cache-handlers/memory-handler.js"
+const cache = new Map()
+const pendingSets = new Map()
+
+module.exports = {
+  async get(cacheKey, softTags) {
+    // 保留中のset操作が完了するまで待機する
+    const pendingPromise = pendingSets.get(cacheKey)
+    if (pendingPromise) {
+      await pendingPromise
+    }
+
+    const entry = cache.get(cacheKey)
+    if (!entry) {
+      return undefined
+    }
+
+    // エントリが期限切れかどうかを確認する
+    const now = Date.now()
+    if (now > entry.timestamp + entry.revalidate * 1000) {
+      return undefined
+    }
+
+    return entry
+  },
+
+  async set(cacheKey, pendingEntry) {
+    // このset操作を追跡するPromiseを作成する
+    let resolvePending
+    const pendingPromise = new Promise((resolve) => {
+      resolvePending = resolve
+    })
+    pendingSets.set(cacheKey, pendingPromise)
+
+    try {
+      // エントリの準備が完了するまで待機する
+      const entry = await pendingEntry
+
+      // エントリをキャッシュに保存する
+      cache.set(cacheKey, entry)
+    } finally {
+      resolvePending()
+      pendingSets.delete(cacheKey)
+    }
+  },
+
+  async refreshTags() {
+    // インメモリキャッシュでは何もしない
+  },
+
+  async getExpiration(tags) {
+    // 再検証済みのタグがないことを示すために0を返す
+    return 0
+  },
+
+  async updateTags(tags, durations) {
+    // タグベースの無効化を実装する
+    for (const [key, entry] of cache.entries()) {
+      if (entry.tags.some((tag) => tags.includes(tag))) {
+        cache.delete(key)
+      }
+    }
+  },
+}
+```
+
+### 外部ストレージパターン
+
+Redis やデータベースのような永続的なストレージを使う場合は、キャッシュエントリーをシリアライズする必要があります。以下は Redis を使ったシンプルな例です。
+
+```js filename="cache-handlers/redis-handler.js"
+const { createClient } = require('redis')
+
+const client = createClient({ url: process.env.REDIS_URL })
+client.connect()
+
+module.exports = {
+  async get(cacheKey, softTags) {
+    // Redisから取得
+    const stored = await client.get(cacheKey)
+    if (!stored) return undefined
+
+    // エントリをデシリアライズ
+    const data = JSON.parse(stored)
+
+    // 保存されたデータからReadableStreamを再構築
+    return {
+      value: new ReadableStream({
+        start(controller) {
+          controller.enqueue(Buffer.from(data.value, 'base64'))
+          controller.close()
+        },
+      }),
+      tags: data.tags,
+      stale: data.stale,
+      timestamp: data.timestamp,
+      expire: data.expire,
+      revalidate: data.revalidate,
+    }
+  },
+
+  async set(cacheKey, pendingEntry) {
+    const entry = await pendingEntry
+
+    // ストリームを読み取ってデータを取得
+    const reader = entry.value.getReader()
+    const chunks = []
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    // チャンクを結合してRedisストレージ用にシリアライズ
+    const data = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
+
+    await client.set(
+      cacheKey,
+      JSON.stringify({
+        value: data.toString('base64'),
+        tags: entry.tags,
+        stale: entry.stale,
+        timestamp: entry.timestamp,
+        expire: entry.expire,
+        revalidate: entry.revalidate,
+      }),
+      { EX: entry.expire } // RedisのTTLを使用して自動的に期限切れにする
+    )
+  },
+
+  async refreshTags() {
+    // 基本的なRedis実装では何もしない
+    // 必要に応じて外部タグサービスと同期可能
+  },
+
+  async getExpiration(tags) {
+    // タグが再検証されていないことを示すために0を返す
+    // タグを追跡している場合はRedisでタグの有効期限タイムスタンプを照会することも可能
+    return 0
+  },
+
+  async updateTags(tags, durations) {
+    // 必要に応じてタグベースの無効化を実装
+    // 一致するタグを持つキーを反復処理して削除することも可能
+  },
+}
+```
+
+## プラットフォーム対応
+
+| デプロイオプション                                                  | サポート状況         |
+| ------------------------------------------------------------------- | -------------------- |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | 対応                 |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | 対応                 |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | 非対応               |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | プラットフォーム依存 |
+
+## バージョン履歴
+
+| バージョン | 変更内容                           |
+| ---------- | ---------------------------------- |
+| `v16.0.0`  | `cacheHandlers` が導入されました。 |

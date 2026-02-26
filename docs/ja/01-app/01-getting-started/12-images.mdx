@@ -1,0 +1,192 @@
+---
+title: 画像最適化
+description: Next.js で画像を最適化する方法を学びます
+related:
+  title: API リファレンス
+  description: Next.js Image のすべての機能については API リファレンスを参照してください。
+  links:
+    - app/api-reference/components/image
+---
+
+Next.js の [`<Image>`](/docs/app/api-reference/components/image) コンポーネントは、HTML の `<img>` 要素を拡張して次の機能を提供します。
+
+- **サイズ最適化:** WebP などの最新の画像フォーマットを使用して、各デバイスに対して適切なサイズの画像を自動的に配信します。
+- **視覚的な安定性:** 画像の読み込み時に [レイアウトシフト](https://web.dev/articles/cls) が自動的に発生しないようにします。
+- **ページロードの高速化:** ブラウザのネイティブな遅延読み込み機能を使用して、ビューポートに入ったときにのみ画像を読み込み、必要に応じてぼかしプレースホルダーを表示します。
+- **アセットの柔軟性:** リモートサーバーに保存されている画像も含め、画像をオンデマンドでリサイズできます。
+
+`<Image>` を使い始めるには、`next/image` からインポートし、コンポーネント内でレンダリングします。
+
+```tsx filename="app/page.tsx" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image src="" alt="" />
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image src="" alt="" />
+}
+```
+
+`src` プロパティには、[ローカル](#local-images) または [リモート](#remote-images) の画像を指定できます。
+
+> **🎥 動画を見る:** `next/image` の使い方について詳しく知る → [YouTube（9 分）](https://youtu.be/IU_qq_c_lKA)。
+
+## ローカル画像
+
+画像やフォントなどの静的ファイルは、ルートディレクトリにある [`public`](/docs/app/api-reference/file-conventions/public-folder) フォルダー内に配置できます。`public` 内のファイルは、ルートパス（`/`）を基準とした URL でコードから参照できます。
+
+<Image
+  alt="app フォルダーと public フォルダーを示すフォルダー構成"
+  srcLight="/docs/light/public-folder.png"
+  srcDark="/docs/dark/public-folder.png"
+  width="1600"
+  height="282"
+/>
+
+```tsx filename="app/page.tsx" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+画像を静的にインポートしている場合、Next.js は自動的に本来の [`width`](/docs/app/api-reference/components/image#width-and-height) と [`height`](/docs/app/api-reference/components/image#width-and-height) を特定します。これらの値は画像の縦横比を決定し、画像の読み込み中に [Cumulative Layout Shift](https://web.dev/articles/cls) が発生するのを防ぐために使用されます。
+
+```tsx filename="app/page.tsx" switcher
+import Image from 'next/image'
+import ProfileImage from './profile.png'
+
+export default function Page() {
+  return (
+    <Image
+      src={ProfileImage}
+      alt="Picture of the author"
+      // width={500} 自動的に設定される
+      // height={500} 自動的に設定される
+      // blurDataURL="data:..." 自動的に設定される
+      // placeholder="blur" // 読み込み中にぼかしを表示するオプション
+    />
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Image from 'next/image'
+import ProfileImage from './profile.png'
+
+export default function Page() {
+  return (
+    <Image
+      src={ProfileImage}
+      alt="Picture of the author"
+      // width={500} 自動的に設定される
+      // height={500} 自動的に設定される
+      // blurDataURL="data:..." 自動的に設定される
+      // placeholder="blur" // 読み込み中にぼかしを表示するオプション
+    />
+  )
+}
+```
+
+## リモート画像
+
+リモート画像を使用するには、`src` プロパティに URL 文字列を指定できます。
+
+```tsx filename="app/page.tsx" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="https://s3.amazonaws.com/my-bucket/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="https://s3.amazonaws.com/my-bucket/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+Next.js はビルドプロセス中にリモートファイルへアクセスできないため、[`width`](/docs/app/api-reference/components/image#width-and-height)、[`height`](/docs/app/api-reference/components/image#width-and-height)、および任意で [`blurDataURL`](/docs/app/api-reference/components/image#blurdataurl) の props を手動で指定する必要があります。`width` と `height` は画像の正しいアスペクト比を推定し、画像の読み込み時に発生するレイアウトシフトを防ぐために使用されます。あるいは、[`fill` property](/docs/app/api-reference/components/image#fill) を使って、画像を親要素のサイズいっぱいに広げることもできます。
+
+リモートサーバーからの画像を安全に許可するには、[`next.config.js`](/docs/app/api-reference/config/next-config-js) でサポートする URL パターンのリストを定義する必要があります。悪意のある利用を防ぐため、できるだけ具体的に指定してください。たとえば、次の設定は特定の AWS S3 バケットからの画像のみを許可します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
+        port: '',
+        pathname: '/my-bucket/**',
+        search: '',
+      },
+    ],
+  },
+}
+
+export default config
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
+        port: '',
+        pathname: '/my-bucket/**',
+        search: '',
+      },
+    ],
+  },
+}
+```

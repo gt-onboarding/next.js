@@ -1,0 +1,22 @@
+---
+title: reactStrictMode
+description: Next.js ランタイム全体が Strict Mode に準拠するようになりました。オプトインする方法を学びましょう
+---
+
+{/* このドキュメントの内容は app ルーターと pages ルーターで共有されています。Pages Router 固有の内容を追加するには `<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+> **補足**: Next.js 13.5.1 以降では、`app` router では Strict Mode がデフォルトで `true` になっているため、上記の設定が必要なのは `pages` の場合のみです。`reactStrictMode: false` を設定することで、Strict Mode を無効にすることもできます。
+
+> **推奨**: 今後の React に備えるため、Next.js アプリケーションでは Strict Mode を有効にすることを強く推奨します。
+
+React の [Strict Mode](https://react.dev/reference/react/StrictMode) は、アプリケーション内の潜在的な問題を検出しやすくするための、開発モード専用の機能です。安全でないライフサイクルやレガシー API の使用、その他のさまざまな問題を特定するのに役立ちます。
+
+Next.js のランタイムは Strict Mode に準拠しています。Strict Mode を有効にするには、`next.config.js` で次のオプションを設定します:
+
+```js filename="next.config.js"
+module.exports = {
+  reactStrictMode: true,
+}
+```
+
+アプリケーション全体で Strict Mode を有効にする準備がまだできていなくても構いません。`<React.StrictMode>` を使えば、ページごとに段階的に移行できます。

@@ -1,0 +1,134 @@
+---
+title: Sass の使用方法
+nav_title: Sass
+description: Sass を使って Next.js アプリケーションにスタイルを適用します。
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共有されています。Pages Router 固有の内容を追加する場合は、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+Next.js は、パッケージをインストールした後であれば、`.scss` と `.sass` の両方の拡張子を使う Sass との統合を標準でサポートしています。コンポーネントレベルの Sass は、CSS Modules と `.module.scss` または `.module.sass` の拡張子を使って利用できます。
+
+まず、[`sass`](https://github.com/sass/sass) をインストールします:
+
+```bash package="pnpm"
+pnpm add -D sass
+```
+
+```bash package="npm"
+npm install --save-dev sass
+```
+
+```bash package="yarn"
+yarn add -D sass
+```
+
+```bash package="bun"
+bun add -D sass
+```
+
+> **補足**:
+>
+> Sass には、それぞれ異なる拡張子を持つ[2 つの構文](https://sass-lang.com/documentation/syntax)が用意されています。
+> `.scss` 拡張子では [SCSS 構文](https://sass-lang.com/documentation/syntax#scss)を使用する必要があり、
+> `.sass` 拡張子では [インデント構文（「Sass」）](https://sass-lang.com/documentation/syntax#the-indented-syntax)を使用する必要があります。
+>
+> どちらを選べばよいか分からない場合は、CSS のスーパーセットであり、
+> インデント構文（「Sass」）を新たに学ぶ必要のない `.scss` 拡張子から始めるとよいでしょう。
+
+### Sass オプションのカスタマイズ
+
+Sass のオプションを設定する場合は、`next.config` で `sassOptions` を使用します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  sassOptions: {
+    additionalData: `$var: red;`,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+
+const nextConfig = {
+  sassOptions: {
+    additionalData: `$var: red;`,
+  },
+}
+
+module.exports = nextConfig
+```
+
+#### 実装
+
+どの Sass 実装を使用するかを指定するには、`implementation` プロパティを使用できます。デフォルトでは、Next.js は [`sass`](https://www.npmjs.com/package/sass) パッケージを使用します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  sassOptions: {
+    implementation: 'sass-embedded',
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+
+const nextConfig = {
+  sassOptions: {
+    implementation: 'sass-embedded',
+  },
+}
+
+module.exports = nextConfig
+```
+
+### Sass 変数
+
+Next.js は、CSS Modules ファイルからエクスポートされた Sass 変数をサポートしています。
+
+たとえば、エクスポートされた `primaryColor` Sass 変数は次のように使用できます。
+
+```scss filename="app/variables.module.scss"
+$primary-color: #64ff00;
+
+:export {
+  primaryColor: $primary-color;
+}
+```
+
+<AppOnly>
+  ```jsx filename="app/page.js"
+  // ルート `/` の URL に対応します
+
+import variables from './variables.module.scss'
+
+export default function Page() {
+return <h1 style={{ color: variables.primaryColor }}>Hello, Next.js!</h1>
+}
+
+````
+</AppOnly>
+
+<PagesOnly>
+```jsx filename="pages/_app.js"
+import variables from '../styles/variables.module.scss'
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <Layout color={variables.primaryColor}>
+      <Component {...pageProps} />
+    </Layout>
+  )
+}
+````
+
+</PagesOnly>

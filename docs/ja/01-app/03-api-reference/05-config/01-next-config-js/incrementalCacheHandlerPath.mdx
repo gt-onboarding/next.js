@@ -1,0 +1,103 @@
+---
+title: カスタム Next.js キャッシュハンドラー
+nav_title: cacheHandler
+description: Redis や Memcached などの外部サービスを使用するように、データの保存と再検証に使われる Next.js のキャッシュを設定できます。
+---
+
+キャッシュされたページやデータを永続ストレージに保存したい場合や、Next.js アプリケーションの複数コンテナやインスタンス間でキャッシュを共有したい場合は、Next.js のキャッシュの保存場所を設定できます。
+
+> **補足**: `cacheHandler`（単数形）の設定は、ISR の保存と再検証、ルートハンドラーのレスポンス、最適化された画像といったサーバーキャッシュ処理のために Next.js が使用する専用の設定です。`'use cache'` ディレクティブには **使用されません**。`'use cache'` ディレクティブには、代わりに [`cacheHandlers`](/docs/app/api-reference/config/next-config-js/cacheHandlers)（複数形）を使用してください。
+
+```js filename="next.config.js"
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  cacheMaxMemorySize: 0, // デフォルトのインメモリキャッシュを無効化
+}
+```
+
+[カスタムキャッシュハンドラー](/docs/app/guides/self-hosting#configuring-caching) の例を参照し、実装についてさらに学んでください。
+
+## API リファレンス
+
+キャッシュハンドラーは、`get`、`set`、`revalidateTag`、`resetRequestCache` の各メソッドを実装できます。
+
+### `get()`
+
+| パラメータ | 型       | 説明                                         |
+| ---------- | -------- | -------------------------------------------- |
+| `key`      | `string` | キャッシュされた値のキー。                   |
+| `ctx`      | `object` | キャッシュエントリの種類を含むコンテキスト。 |
+
+`ctx` パラメータには、取得するキャッシュエントリの種類を示す `kind` プロパティが含まれます。取り得る値としては `'APP_PAGE'`、`'APP_ROUTE'`、`'PAGES'`、`'FETCH'`、`'IMAGE'` などがあります。
+
+キャッシュされた値が存在すればそれを、存在しなければ `null` を返します。
+
+### `set()`
+
+| パラメータ | 型             | 説明                       |
+| ---------- | -------------- | -------------------------- |
+| `key`      | `string`       | データを格納するキー。     |
+| `data`     | Data or `null` | キャッシュするデータ。     |
+| `ctx`      | `{ tags: [] }` | 与えられたキャッシュタグ。 |
+
+`data` オブジェクトには、キャッシュエントリの種類を示す `kind` プロパティが含まれます。画像最適化の場合、`kind` は `'IMAGE'` となり、`buffer`、`etag`、`extension`、`revalidate` といったプロパティがデータに含まれます。
+
+`Promise<void>` を返します。
+
+### `revalidateTag()`
+
+| パラメータ | 型                     | 説明                       |
+| ---------- | ---------------------- | -------------------------- |
+| `tag`      | `string` or `string[]` | 再検証するキャッシュタグ。 |
+
+`Promise<void>` を返します。[データの再検証](/docs/app/guides/incremental-static-regeneration)や [`revalidateTag()`](/docs/app/api-reference/functions/revalidateTag) 関数の詳細については、それぞれのドキュメントを参照してください。
+
+### `resetRequestCache()`
+
+このメソッドは、次のリクエストの前に、単一のリクエスト専用の一時的なインメモリキャッシュをリセットします。
+
+`void` 型を返します。
+
+**補足:**
+
+- `revalidatePath` はキャッシュタグの上にある便利なレイヤーです。`revalidatePath` を呼び出すと `revalidateTag` 関数が呼ばれ、そこでパスに基づいてキャッシュキーにタグ付けするかどうかを判断できます。
+
+## 画像最適化キャッシュ
+
+`cacheHandler` は、`next/image` によって最適化された画像をキャッシュするためにも使用できます。これを有効化するには、`next.config.js` 内で `images.customCacheHandler` を `true` に設定します。
+
+```js filename="next.config.js"
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  images: {
+    customCacheHandler: true,
+  },
+}
+```
+
+> **補足**: このオプトインフラグは、次のメジャーバージョンではデフォルトの動作になります。今のうちに有効化しておくことで、画像最適化エントリに対応できるようキャッシュハンドラーを準備できます。
+
+`kind` プロパティを使用してキャッシュエントリの種類を判別し、必要に応じて画像を個別に処理できます。たとえば、エビクションポリシー（eviction policy）を実装したり、画像を別の場所に保存したりする場合などです。
+
+画像キャッシュエントリを処理する場合、`kind` は `'IMAGE'` となり、データには `buffer`、`etag`、`extension`、`revalidate` プロパティが含まれます。
+
+## プラットフォームサポート
+
+| デプロイオプション                                                  | サポート状況         |
+| ------------------------------------------------------------------- | -------------------- |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | 対応                 |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | 対応                 |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | 非対応               |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | プラットフォーム固有 |
+
+Next.js をセルフホストする場合の [ISR の設定方法](/docs/app/guides/self-hosting#caching-and-isr) を参照してください。
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                              |
+| ---------- | --------------------------------------------------------------------- |
+| `v16.2.0`  | 画像最適化キャッシュ用の `cacheHandler` サポートを追加。              |
+| `v14.1.0`  | `cacheHandler` に名称変更され、安定版となった。                       |
+| `v13.4.0`  | `revalidateTag` 用の `incrementalCacheHandlerPath` サポートを追加。   |
+| `v13.4.0`  | スタンドアロン出力用の `incrementalCacheHandlerPath` サポートを追加。 |
+| `v12.2.0`  | 実験的な `incrementalCacheHandlerPath` を追加。                       |

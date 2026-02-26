@@ -1,0 +1,32 @@
+---
+title: サーバーサイドレンダリング (SSR)
+description: 各リクエストごとにページをレンダリングするためにサーバーサイドレンダリングを使用します。
+---
+
+> 「SSR」または「動的レンダリング」とも呼ばれます。
+
+ページが**サーバーサイドレンダリング**を使用する場合、ページの HTML は**各リクエストごとに**生成されます。
+
+ページでサーバーサイドレンダリングを使用するには、`getServerSideProps` という名前の `async` 関数を `export` する必要があります。この関数は、リクエストのたびにサーバー側で呼び出されます。
+
+たとえば、ページで頻繁に更新されるデータ（外部 API からフェッチされる）を事前レンダリングする必要があるとします。次のように、このデータをフェッチして `Page` に渡す `getServerSideProps` を記述できます。
+
+```jsx
+export default function Page({ data }) {
+  // データをレンダリングする...
+}
+
+// リクエストごとに呼び出される
+export async function getServerSideProps() {
+  // 外部APIからデータをフェッチする
+  const res = await fetch(`https://.../data`)
+  const data = await res.json()
+
+  // プロップを通じてページにデータを渡す
+  return { props: { data } }
+}
+```
+
+ご覧のとおり、`getServerSideProps` は `getStaticProps` に似ていますが、`getServerSideProps` はビルド時ではなくリクエストごとに実行される点が異なります。
+
+`getServerSideProps` の動作についてさらに知りたい場合は、[データ取得に関するドキュメント](/docs/pages/building-your-application/data-fetching/get-server-side-props)を参照してください。

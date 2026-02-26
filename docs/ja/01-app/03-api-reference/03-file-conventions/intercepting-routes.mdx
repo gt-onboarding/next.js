@@ -1,0 +1,83 @@
+---
+title: インターセプトルート
+description: インターセプトルートを使用すると、ブラウザの URL をマスクしたまま現在のレイアウト内に新しいルートを読み込めます。モーダルなどの高度なルーティングパターンに役立ちます。
+related:
+  title: 次のステップ
+  description: インターセプトルートとパラレルルートを使ってモーダルを作成する方法を学びましょう。
+  links:
+    - app/api-reference/file-conventions/parallel-routes
+---
+
+インターセプトルートを使うと、アプリケーション内の別の場所にあるルートを現在のレイアウト内に読み込むことができます。ユーザーを別のコンテキストに切り替えさせずに、あるルートのコンテンツを表示したい場合に便利なルーティングパターンです。
+
+たとえば、フィード内の写真をクリックしたときに、フィードの上にモーダルとして写真を表示できます。この場合、Next.js は `/photo/123` ルートをインターセプトし、URL をマスクしつつ、それを `/feed` の上にオーバーレイします。
+
+<Image
+  alt="インターセプトルートのソフトナビゲーション"
+  srcLight="/docs/light/intercepting-routes-soft-navigate.png"
+  srcDark="/docs/dark/intercepting-routes-soft-navigate.png"
+  width="1600"
+  height="617"
+/>
+
+しかし、共有用 URL をクリックして写真に移動した場合や、ページをリフレッシュした場合は、モーダルではなく写真ページ全体がレンダーされるようにします。このときはルートのインターセプトは行われません。
+
+<Image
+  alt="インターセプトルートのハードナビゲーション"
+  srcLight="/docs/light/intercepting-routes-hard-navigate.png"
+  srcDark="/docs/dark/intercepting-routes-hard-navigate.png"
+  width="1600"
+  height="604"
+/>
+
+## 規約
+
+Intercepting Routes は、`(..)` 規約を使って定義できます。これは、ファイルシステムの相対パス `../` に似ていますが、ルートセグメント用の記法です。
+
+次のように使用できます:
+
+- `(.)` 同じ階層のセグメントにマッチ
+- `(..)` **1つ上の階層**のセグメントにマッチ
+- `(..)(..)` **2つ上の階層**のセグメントにマッチ
+- `(...)` ルートである `app` ディレクトリからのセグメントにマッチ
+
+たとえば、`feed` セグメント内から `photo` セグメントをインターセプトするには、`(..)photo` ディレクトリを作成します。
+
+<Image
+  alt="Intercepting Routes のフォルダ構造"
+  srcLight="/docs/light/intercepted-routes-files.png"
+  srcDark="/docs/dark/intercepted-routes-files.png"
+  width="1600"
+  height="604"
+/>
+
+> **補足:** `(..)` 規約はファイルシステムではなく、_ルートセグメント_ に基づきます。たとえば、[Parallel Routes](/docs/app/api-reference/file-conventions/parallel-routes) 内の `@slot` フォルダは考慮されません。
+
+## 例
+
+### モーダル
+
+Intercepting Routes は [Parallel Routes](/docs/app/api-reference/file-conventions/parallel-routes) と組み合わせてモーダルを作成するために利用できます。これにより、モーダルを構築する際によくある次のような課題を解決できます：
+
+- モーダルのコンテンツを **URL 経由で共有可能にする**。
+- モーダルが閉じてしまうのではなく、ページをリフレッシュした際にも **コンテキストを保持する**。
+- 前のルートに戻るのではなく、**ブラウザの戻る操作時にモーダルを閉じる**。
+- **進む操作時にモーダルを再度開く**。
+
+次のような UI パターンを考えてみましょう。ユーザーはクライアントサイドナビゲーションを使用してギャラリーから写真モーダルを開くことも、共有可能な URL から写真ページに直接移動することもできます：
+
+<Image
+  alt="Intercepting routes modal example"
+  srcLight="/docs/light/intercepted-routes-modal-example.png"
+  srcDark="/docs/dark/intercepted-routes-modal-example.png"
+  width="1600"
+  height="976"
+/>
+
+上記の例では、`photo` セグメントへのパスは、`@modal` がスロットでありセグメント **ではない** ため、`(..)` マッチャーを使用できます。これは、ファイルシステム上では 2 レベル上にあるにもかかわらず、セグメント階層としては `photo` ルートは 1 レベル上にあるだけであることを意味します。
+
+ステップバイステップの例については [Parallel Routes](/docs/app/api-reference/file-conventions/parallel-routes#modals) のドキュメントを参照するか、[image gallery example](https://github.com/vercel-labs/nextgram) を参照してください。
+
+> **補足:**
+>
+> - 他の例としては、トップナビゲーションバーでログインモーダルを開きつつ専用の `/login` ページも用意する、またはサイドモーダルでショッピングカートを開くといったものがあります。

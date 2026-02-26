@@ -1,0 +1,79 @@
+---
+title: basePath
+description: '`basePath` を使用して、Next.js アプリケーションをドメイン配下のサブパスにデプロイします。'
+---
+
+{/* このドキュメントのコンテンツは、App Router と Pages Router の両方で共有されています。Pages Router 専用のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有コンテンツは、コンポーネントでラップしないでください。 */}
+
+ドメインのサブパスとして Next.js アプリケーションをデプロイするには、`basePath` 設定オプションを使用できます。
+
+`basePath` を使うと、アプリケーションにパスプレフィックスを設定できます。例えば、デフォルトの `''`（空文字列）の代わりに `/docs` を使用するには、`next.config.js` を開き、`basePath` 設定を追加します。
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+}
+```
+
+> **補足**: この値はビルド時に設定する必要があり、クライアントサイドのバンドルにインラインで埋め込まれるため、再ビルドしない限り変更できません。
+
+### リンク
+
+`next/link` と `next/router` を使用して他のページにリンクする場合、`basePath` は自動的に適用されます。
+
+たとえば、`basePath` が `/docs` に設定されているときにリンク先のパスとして `/about` を指定すると、自動的に `/docs/about` になります。
+
+```js
+export default function HomePage() {
+  return (
+    <>
+      <Link href="/about">About Page</Link>
+    </>
+  )
+}
+```
+
+出力されるHTML：
+
+```html
+<a href="/docs/about">About Page</a>
+```
+
+これにより、`basePath` の値を変更しても、アプリケーション内のすべてのリンクを更新し直す必要がなくなります。
+
+### 画像
+
+<AppOnly>
+  [`next/image`](/docs/app/api-reference/components/image)
+  コンポーネントを使用する場合は、`src` の前に `basePath`
+  を付ける必要があります。
+</AppOnly>
+
+<PagesOnly>
+  [`next/image`](/docs/pages/api-reference/components/image)
+  コンポーネントを使用する場合は、`src` の前に `basePath`
+  を付ける必要があります。
+</PagesOnly>
+
+例えば、`basePath` が `/docs` に設定されている場合、`/docs/me.png` を指定すると画像が正しく表示されます。
+
+```jsx
+import Image from 'next/image'
+
+function Home() {
+  return (
+    <>
+      <h1>My Homepage</h1>
+      <Image
+        src="/docs/me.png"
+        alt="Picture of the author"
+        width={500}
+        height={500}
+      />
+      <p>Welcome to my homepage!</p>
+    </>
+  )
+}
+
+export default Home
+```

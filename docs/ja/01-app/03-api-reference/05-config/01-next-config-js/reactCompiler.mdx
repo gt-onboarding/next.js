@@ -1,0 +1,98 @@
+---
+title: reactCompiler
+description: React Compiler を有効にして、コンポーネントのレンダリングを自動的に最適化します。
+---
+
+Next.js には、コンポーネントのレンダリングを自動的に最適化することでパフォーマンスを向上させるよう設計されたツールである [React Compiler](https://react.dev/learn/react-compiler/introduction) のサポートが含まれています。これにより、`useMemo` や `useCallback` を使った手動でのメモ化の必要性が減ります。
+
+Next.js には、React Compiler をより効率的にするために SWC で実装されたカスタムのパフォーマンス最適化が含まれています。すべてのファイルに対してコンパイラを実行する代わりに、Next.js はプロジェクトを解析し、関連するファイルに対してのみ React Compiler を適用します。これにより不要な処理を避けられ、Babel プラグイン単体を使用する場合と比較してビルドが高速になります。
+
+## 仕組み
+
+React Compiler は Babel プラグインとして動作します。ビルドを高速に保つために、Next.js はカスタムの SWC 最適化を使用しており、JSX や React Hooks を含むファイルなどの関連ファイルに対してのみ React Compiler を適用します。
+
+これにより、すべてのファイルをコンパイルせずに済み、パフォーマンスコストを最小限に抑えられます。デフォルトの Rust ベースのコンパイラと比べるとビルドがわずかに遅くなる場合がありますが、その影響は小さく限定的です。
+
+使用するには、`babel-plugin-react-compiler` をインストールします。
+
+```bash package="pnpm"
+pnpm add -D babel-plugin-react-compiler
+```
+
+```bash package="npm"
+npm install -D babel-plugin-react-compiler
+```
+
+```bash package="yarn"
+yarn add -D babel-plugin-react-compiler
+```
+
+```bash package="bun"
+bun add -D babel-plugin-react-compiler
+```
+
+次に、`next.config.js` に `reactCompiler` オプションを追加します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactCompiler: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactCompiler: true,
+}
+
+module.exports = nextConfig
+```
+
+## アノテーション
+
+コンパイラを「オプトイン」モードで動作させるように設定できます。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactCompiler: {
+    compilationMode: 'annotation',
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactCompiler: {
+    compilationMode: 'annotation',
+  },
+}
+
+module.exports = nextConfig
+```
+
+次に、特定のコンポーネントやフックに React の `"use memo"` ディレクティブを付けてオプトインできます。
+
+```ts filename="app/page.tsx" switcher
+export default function Page() {
+  'use memo'
+  // ...
+}
+```
+
+```js filename="app/page.js" switcher
+export default function Page() {
+  'use memo'
+  // ...
+}
+```
+
+> **注意:** 逆の効果を得るために、コンポーネントやフックを対象外にしたい場合は、React の `"use no memo"` ディレクティブを使用することもできます。

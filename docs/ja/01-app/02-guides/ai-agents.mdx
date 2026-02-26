@@ -1,0 +1,90 @@
+---
+title: Next.js プロジェクトを AI コーディングエージェント向けにセットアップする方法
+nav_title: AI コーディングエージェント
+description: Next.js プロジェクトを設定して、AI コーディングエージェントが古い学習データではなく最新のドキュメントを使用するようにする方法を説明します。
+related:
+  title: 次のステップ
+  links:
+    - app/guides/mcp
+---
+
+Next.js には、`next` パッケージ内に利用中のバージョンに対応したドキュメントが同梱されており、AI コーディングエージェントは正確で最新の API やパターンを参照できます。プロジェクトのルートにある `AGENTS.md` ファイルは、エージェントに、事前学習データではなくこれらのバンドルされたドキュメントを参照するよう指示します。
+
+## 仕組み
+
+`next` をインストールすると、Next.js のドキュメントが `node_modules/next/dist/docs/` に同梱されます。同梱されているドキュメントの構成は、[Next.js のドキュメントサイト](https://nextjs.org/docs) と同じです。
+
+```txt
+node_modules/next/dist/docs/
+├── 01-app/
+│   ├── 01-getting-started/
+│   ├── 02-guides/
+│   └── 03-api-reference/
+├── 02-pages/
+├── 03-architecture/
+└── index.mdx
+```
+
+これは、エージェントが常にインストール済みのバージョンに対応したドキュメントへアクセスできることを意味します。ネットワークリクエストや外部でのルックアップは不要です。
+
+プロジェクトのルートにある `AGENTS.md` ファイルは、エージェントに対してコードを書く前にこれらの同梱ドキュメントを読むよう指示します。Claude Code、Cursor、GitHub Copilot などを含むほとんどの AI コーディングエージェントは、セッション開始時に自動的に `AGENTS.md` を読み込みます。
+
+## はじめに
+
+### 新規プロジェクト
+
+[`create-next-app`](/docs/app/api-reference/cli/create-next-app) は `AGENTS.md` と `CLAUDE.md` を自動的に生成します。追加のセットアップは不要です。
+
+```bash package="pnpm"
+pnpm create next-app@canary
+```
+
+```bash package="npm"
+npx create-next-app@canary
+```
+
+```bash package="yarn"
+yarn create next-app@canary
+```
+
+```bash package="bun"
+bun create next-app@canary
+```
+
+エージェント用ファイルが不要な場合は、`--no-agents-md` を指定します:
+
+```bash
+npx create-next-app@canary --no-agents-md
+```
+
+### 既存のプロジェクト
+
+Next.js が `v16.2.0-canary.37` 以降で動作していることを確認し、そのうえで次のファイルをプロジェクトのルートに追加します。
+
+`AGENTS.md` には、エージェントが参照する手順が記載されています。
+
+```md filename="AGENTS.md"
+<!-- BEGIN:nextjs-agent-rules -->
+
+# Next.js: ALWAYS read docs before coding
+
+Before any Next.js work, find and read the relevant doc in `node_modules/next/dist/docs/`. Your training data is outdated — the docs are the source of truth.
+
+<!-- END:nextjs-agent-rules -->
+```
+
+`CLAUDE.md` は `@` インポート構文を使って `AGENTS.md` を読み込んでいるため、[Claude Code](https://docs.anthropic.com/en/docs/claude-code) のユーザーも、コンテンツを重複させることなく同じ指示を利用できます。
+
+```md filename="CLAUDE.md"
+@AGENTS.md
+```
+
+## AGENTS.md を理解する
+
+デフォルトの `AGENTS.md` には、単一かつ明確な指示が 1 つだけ含まれています。**コードを書く前にバンドルされたドキュメントを読むこと** です。これは意図的に最小限にしてあり、エージェントを古い学習データではなく、`node_modules/next/dist/docs/` にある正確でバージョン対応済みのドキュメントへ誘導することが目的です。
+
+`<!-- BEGIN:nextjs-agent-rules -->` と `<!-- END:nextjs-agent-rules -->` のコメントマーカーは、Next.js によって管理されるセクションの境界を示します。将来のアップデートで上書きされる心配をせずに、これらのマーカーの外側にプロジェクト固有の指示を追加できます。
+
+バンドルされたドキュメントには、App Router と Pages Router のガイド、API リファレンス、ファイル規約が含まれています。エージェントがルーティングやデータ取得、その他の Next.js 機能に関わるタスクに直面したときは、古くなっている可能性のある学習データに頼るのではなく、バンドルされたドキュメントで正しい API を参照できます。
+
+> **補足:** バンドルされたドキュメントと `AGENTS.md` が、実際の Next.js タスクにおけるエージェントのパフォーマンスをどのように改善するかを確認するには、[ベンチマーク結果](https://nextjs.org/evals) を参照してください。

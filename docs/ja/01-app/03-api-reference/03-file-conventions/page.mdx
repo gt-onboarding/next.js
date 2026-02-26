@@ -1,0 +1,239 @@
+---
+title: page.js
+description: page.js ファイルの API リファレンス。
+---
+
+`page` ファイルでは、特定のルートに対して**固有**の UI を定義できます。このファイルでコンポーネントをデフォルトエクスポートすると、ページを作成できます。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export default function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  return <h1>My Page</h1>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export default function Page({ params, searchParams }) {
+  return <h1>My Page</h1>
+}
+```
+
+## 補足
+
+- `page` には `.js`、`.jsx`、`.tsx` のいずれかの拡張子を使用できます。
+- `page` は常にルート部分木の**末端ノード**です。
+- ルートセグメントを**公開して外部からアクセス可能**にするには、`page` ファイルが必要です。
+- ページはデフォルトで[サーバーコンポーネント](https://react.dev/reference/rsc/server-components)ですが、[クライアントコンポーネント](https://react.dev/reference/rsc/use-client)として設定することもできます。
+
+## リファレンス
+
+### Props
+
+#### `params` (optional)
+
+ルートセグメントからそのページに至るまでの[動的ルートパラメータ](/docs/app/api-reference/file-conventions/dynamic-routes)を含むオブジェクトに解決される Promise です。
+
+```tsx filename="app/shop/[slug]/page.tsx" switcher
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+}
+```
+
+```jsx filename="app/shop/[slug]/page.js" switcher
+export default async function Page({ params }) {
+  const { slug } = await params
+}
+```
+
+| ルート例                             | URL         | `params`                                |
+| ------------------------------------ | ----------- | --------------------------------------- |
+| `app/shop/[slug]/page.js`            | `/shop/1`   | `Promise<{ slug: '1' }>`                |
+| `app/shop/[category]/[item]/page.js` | `/shop/1/2` | `Promise<{ category: '1', item: '2' }>` |
+| `app/shop/[...slug]/page.js`         | `/shop/1/2` | `Promise<{ slug: ['1', '2'] }>`         |
+
+- `params` props は Promise であるため、値にアクセスするには `async/await` か、React の [`use`](https://react.dev/reference/react/use) 関数を使用する必要があります。
+  - バージョン 14 以前では、`params` は同期的な props でした。後方互換性のため、Next.js 15 でも同期的にアクセスできますが、この挙動は将来的に非推奨となる予定です。
+
+#### `searchParams` (任意)
+
+現在の URL の[検索パラメーター](https://developer.mozilla.org/docs/Learn/Common_questions/What_is_a_URL#parameters)を含むオブジェクトに解決される Promise です。例えば次のとおりです。
+
+```tsx filename="app/shop/page.tsx" switcher
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const filters = (await searchParams).filters
+}
+```
+
+```jsx filename="app/shop/page.js" switcher
+export default async function Page({ searchParams }) {
+  const filters = (await searchParams).filters
+}
+```
+
+クライアントコンポーネントである **pages** からも、React の [`use`](https://react.dev/reference/react/use) フックを使って `searchParams` にアクセスできます。
+
+```tsx filename="app/shop/page.tsx" switcher
+'use client'
+import { use } from 'react'
+
+export default function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const filters = use(searchParams).filters
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+'use client'
+import { use } from 'react'
+
+export default function Page({ searchParams }) {
+  const filters = use(searchParams).filters
+}
+```
+
+| URL の例        | `searchParams`                |
+| --------------- | ----------------------------- |
+| `/shop?a=1`     | `Promise<{ a: '1' }>`         |
+| `/shop?a=1&b=2` | `Promise<{ a: '1', b: '2' }>` |
+| `/shop?a=1&a=2` | `Promise<{ a: ['1', '2'] }>`  |
+
+- `searchParams` props は Promise なので、値にアクセスするには `async/await` か React の [`use`](https://react.dev/reference/react/use) 関数を使用する必要があります。
+  - バージョン 14 以前では、`searchParams` は同期的な props でした。後方互換性を保つため、Next.js 15 でも同期的にアクセスできますが、この挙動は将来的に非推奨となる予定です。
+- `searchParams` は、その値を事前に知ることができない **[Dynamic API](/docs/app/guides/caching#dynamic-rendering)** です。これを使用すると、そのページはリクエスト時に **[動的レンダリング](/docs/app/guides/caching#dynamic-rendering)** されるようになります。
+- `searchParams` は `URLSearchParams` インスタンスではなく、プレーンな JavaScript オブジェクトです。
+
+### Page Props ヘルパー
+
+ルートリテラルから厳密に型付けされた `params` および `searchParams` を取得するために、ページを `PageProps` で型付けできます。`PageProps` はグローバルに利用可能なヘルパーです。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+export default async function Page(props: PageProps<'/blog/[slug]'>) {
+  const { slug } = await props.params
+  const query = await props.searchParams
+  return <h1>Blog Post: {slug}</h1>
+}
+```
+
+> **補足**
+>
+> - リテラルなルート（例: `'/blog/[slug]'`）を使用すると、`params` に対してオートコンプリートと厳密なキー型が有効になります。
+> - 静的ルートでは、`params` は `{}` に解決されます。
+> - 型は `next dev`、`next build`、または `next typegen` の実行時に生成されます。
+> - 型生成後は、`PageProps` ヘルパーがグローバルに利用できるようになります。インポートする必要はありません。
+
+## 使用例
+
+### `params` に基づくコンテンツの表示
+
+[dynamic route segments](/docs/app/api-reference/file-conventions/dynamic-routes) を使用すると、`params` props に基づいて、そのページの特定のコンテンツを表示したり取得したりできます。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  return <h1>Blog Post: {slug}</h1>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export default async function Page({ params }) {
+  const { slug } = await params
+  return <h1>Blog Post: {slug}</h1>
+}
+```
+
+### `searchParams` を使ったフィルタリングの処理
+
+URL のクエリ文字列に基づいてフィルタリングやページネーション、ソートを行うには、`searchParams` props を使用できます。
+
+```tsx filename="app/shop/page.tsx" switcher
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const { page = '1', sort = 'asc', query = '' } = await searchParams
+
+  return (
+    <div>
+      <h1>Product Listing</h1>
+      <p>Search query: {query}</p>
+      <p>Current page: {page}</p>
+      <p>Sort order: {sort}</p>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/shop/page.js" switcher
+export default async function Page({ searchParams }) {
+  const { page = '1', sort = 'asc', query = '' } = await searchParams
+
+  return (
+    <div>
+      <h1>Product Listing</h1>
+      <p>Search query: {query}</p>
+      <p>Current page: {page}</p>
+      <p>Sort order: {sort}</p>
+    </div>
+  )
+}
+```
+
+### Client Component での `searchParams` と `params` の読み取り
+
+Client Component（`async` にできない）の中で `searchParams` と `params` を使用するには、React の [`use`](https://react.dev/reference/react/use) 関数を使って Promise の結果を読み取ることができます。
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { use } from 'react'
+
+export default function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const { slug } = use(params)
+  const { query } = use(searchParams)
+}
+```
+
+```js filename="app/page.js" switcher
+'use client'
+
+import { use } from 'react'
+
+export default function Page({ params, searchParams }) {
+  const { slug } = use(params)
+  const { query } = use(searchParams)
+}
+```
+
+## バージョン履歴
+
+| バージョン   | 変更点                                                                                                                      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `v15.0.0-RC` | `params` と `searchParams` は Promise になりました。[codemod](/docs/app/guides/upgrading/codemods#150) が提供されています。 |
+| `v13.0.0`    | `page` が導入されました。                                                                                                   |

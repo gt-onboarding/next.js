@@ -1,0 +1,45 @@
+---
+title: staleTimes
+description: Client Router Cache の失効タイミングを上書きする方法を学びます。
+version: experimental
+---
+
+`staleTimes` は、[クライアントサイドのルーターキャッシュ](/docs/app/guides/caching#client-side-router-cache)内でページセグメントをキャッシュできるようにする実験的な機能です。
+
+実験的な `staleTimes` フラグを設定することで、この機能を有効にし、独自の再検証時間を指定できます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+`static` と `dynamic` プロパティは、[link prefetching](/docs/app/api-reference/components/link#prefetch) の種類に基づいて、期間（秒）を表します。
+
+- `dynamic` プロパティは、ページが静的生成されておらず、かつ完全にはプリフェッチされていない場合（例: `prefetch={true}` を指定していない場合）に使用されます。
+  - デフォルト: 0 秒（キャッシュなし）
+- `static` プロパティは、静的に生成されたページ、`Link` の `prefetch` prop が `true` に設定されている場合、または [`router.prefetch`](/docs/app/guides/caching#routerprefetch) を呼び出した場合に使用されます。
+  - デフォルト: 5 分
+
+> **補足:**
+>
+> - [Loading boundaries](/docs/app/api-reference/file-conventions/loading) は、この設定で定義された `static` 期間中は再利用可能とみなされます。
+> - これは[部分レンダリング](/docs/app/getting-started/linking-and-navigating#client-side-transitions)には影響しません。**つまり、共有レイアウトがナビゲーションのたびに自動的に再フェッチされることはなく、変更されたページセグメントのみが再フェッチされます。**
+> - これは、レイアウトシフトを防ぎ、ブラウザのスクロール位置が失われることを防ぐために、[戻る/進む キャッシュ](/docs/app/guides/caching#client-side-router-cache) の挙動を変更しません。
+
+Client Router Cache の詳細は[こちら](/docs/app/guides/caching#client-side-router-cache)を参照してください。
+
+### バージョン履歴
+
+| バージョン | 変更内容                                                                    |
+| ---------- | --------------------------------------------------------------------------- |
+| `v15.0.0`  | `dynamic` の `staleTimes` のデフォルト値が 30 秒から 0 秒に変更されました。 |
+| `v14.2.0`  | 実験的な `staleTimes` が導入されました。                                    |

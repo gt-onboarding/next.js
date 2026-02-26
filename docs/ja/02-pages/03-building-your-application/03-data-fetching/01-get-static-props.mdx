@@ -1,0 +1,201 @@
+---
+title: getStaticProps
+description: '`getStaticProps` を使ってデータを取得し、静的ページを生成します。Next.js におけるこのデータ取得用 API について詳しく学びましょう。'
+---
+
+ページから `getStaticProps`（静的サイト生成 / Static Site Generation）という関数をエクスポートすると、Next.js はビルド時に `getStaticProps` が返す props を使ってそのページを事前レンダリングします。
+
+```tsx filename="pages/index.tsx" switcher
+import type { InferGetStaticPropsType, GetStaticProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getStaticProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetStaticProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export async function getStaticProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+> レンダリング方式に関係なく、あらゆる `props` はページコンポーネントに渡され、初期 HTML 内でクライアント側から参照できる点に注意してください。これはページを正しく[ハイドレーション](https://react.dev/reference/react-dom/hydrate)できるようにするためです。クライアントで利用可能であるべきではない機密情報を props に渡さないようにしてください。
+
+[`getStaticProps` の API リファレンス](/docs/pages/api-reference/functions/get-static-props)では、`getStaticProps` で使用できるすべてのパラメータと props について説明しています。
+
+## getStaticProps はいつ使用すべきですか？
+
+次のような場合は `getStaticProps` を使用します:
+
+- ページをレンダーするために必要なデータが、ユーザーからのリクエストより前のビルド時点で利用可能な場合
+- データがヘッドレス CMS から取得される場合
+- ページを事前レンダリング（SEO のため）し、かつ非常に高速にする必要がある場合 — `getStaticProps` は `HTML` と `JSON` ファイルを生成し、どちらも CDN によってキャッシュ可能なためパフォーマンスを向上できます
+- データが公開キャッシュ可能（ユーザー固有ではない）な場合。この条件は、プロキシを使ってパスを書き換える特定の状況では回避できます。
+
+## getStaticProps が実行されるタイミング
+
+`getStaticProps` は常にサーバー上で実行され、クライアント上で実行されることはありません。`getStaticProps` 内に書かれたコードがクライアントサイドのバンドルから取り除かれていることは、[このツール](https://next-code-elimination.vercel.app/)で検証できます。
+
+- `getStaticProps` は常に `next build` 中に実行される
+- [`fallback: true`](/docs/pages/api-reference/functions/get-static-paths#fallback-true) を使用している場合、`getStaticProps` はバックグラウンドで実行される
+- [`fallback: blocking`](/docs/pages/api-reference/functions/get-static-paths#fallback-blocking) を使用している場合、`getStaticProps` は初回レンダーの前に呼び出される
+- `revalidate` を使用している場合、`getStaticProps` はバックグラウンドで実行される
+- [`revalidate()`](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) を使用している場合、`getStaticProps` はオンデマンドでバックグラウンド実行される
+
+[Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration) と組み合わせると、`getStaticProps` は古いページが再検証されている間にバックグラウンドで実行され、更新されたページがブラウザに配信されます。
+
+`getStaticProps` は静的 HTML を生成するため、受信したリクエスト（クエリパラメーターや HTTP ヘッダーなど）にはアクセスできません。ページでリクエスト情報にアクセスする必要がある場合は、`getStaticProps` に加えて [Proxy](/docs/pages/api-reference/file-conventions/proxy) の使用を検討してください。
+
+## getStaticProps を使って CMS からデータを取得する
+
+次の例では、CMS からブログ投稿の一覧を取得する方法を示します。
+
+```tsx filename="pages/blog.tsx" switcher
+// posts は getStaticProps() によってビルド時に生成されます
+export default function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// この関数はサーバーサイドのビルド時に呼び出されます。
+// クライアントサイドでは呼び出されないため、
+// データベースへの直接クエリも実行できます。
+export async function getStaticProps() {
+  // 外部 API エンドポイントを呼び出して投稿を取得します。
+  // 任意のデータ取得ライブラリを使用できます
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // { props: { posts } } を返すことで、Blog コンポーネントは
+  // ビルド時に `posts` を props として受け取ります
+  return {
+    props: {
+      posts,
+    },
+  }
+}
+```
+
+```jsx filename="pages/blog.js" switcher
+// posts は getStaticProps() によってビルド時に生成されます
+export default function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// この関数はサーバーサイドのビルド時に呼び出されます。
+// クライアントサイドでは呼び出されないため、
+// データベースへの直接クエリも実行できます。
+export async function getStaticProps() {
+  // 外部 API エンドポイントを呼び出して投稿を取得します。
+  // 任意のデータ取得ライブラリを使用できます
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // { props: { posts } } を返すことで、Blog コンポーネントは
+  // ビルド時に `posts` を prop として受け取ります
+  return {
+    props: {
+      posts,
+    },
+  }
+}
+```
+
+[`getStaticProps` API リファレンス](/docs/pages/api-reference/functions/get-static-props) では、`getStaticProps` で使用できるすべてのパラメーターと props が説明されています。
+
+## サーバーサイドコードを直接記述する
+
+`getStaticProps` はサーバーサイドでのみ実行され、クライアントサイドでは実行されません。ブラウザ向けの JS バンドルにも含まれないため、データベースへのクエリを直接記述しても、それがブラウザに送信されることはありません。
+
+つまり、`getStaticProps` から（外部ソースからデータを取得する）**API ルート**をフェッチする代わりに、サーバーサイドのコードを `getStaticProps` 内に直接書くことができます。
+
+次の例を見てみましょう。ある API ルートは CMS からデータを取得するために使われています。その API ルートが `getStaticProps` から直接呼び出されています。これによりリクエストが 1 回余分に発生し、パフォーマンスが低下します。代わりに、CMS からデータを取得するロジックを `lib/` ディレクトリで共通化しておくことで、そのロジックを `getStaticProps` と共有できます。
+
+```js filename="lib/load-posts.js"
+// 以下の関数は `lib/` ディレクトリから
+// getStaticProps と API ルートで共有されます
+export async function loadPosts() {
+  // 外部 API エンドポイントを呼び出して投稿を取得する
+  const res = await fetch('https://.../posts/')
+  const data = await res.json()
+
+  return data
+}
+```
+
+```jsx filename="pages/blog.js"
+// pages/blog.js
+import { loadPosts } from '../lib/load-posts'
+
+// この関数はサーバーサイドでのみ実行される
+export async function getStaticProps() {
+  // `/api` ルートをフェッチする代わりに、同じ関数を
+  // `getStaticProps` 内で直接呼び出すことができる
+  const posts = await loadPosts()
+
+  // 返された props はページコンポーネントに渡される
+  return { props: { posts } }
+}
+```
+
+あるいは、データ取得に API Routes を**使用していない**場合は、`getStaticProps` 内で [`fetch()`](https://developer.mozilla.org/docs/Web/API/Fetch_API) API を直接使用してデータを取得できます。
+
+Next.js がクライアントサイドのバンドルから何を除去しているかを確認するには、[next-code-elimination ツール](https://next-code-elimination.vercel.app/)を使用できます。
+
+## HTML と JSON の両方を静的に生成する
+
+ビルド時に `getStaticProps` を使ったページがプリレンダーされると、ページの HTML ファイルに加えて、`getStaticProps` の実行結果を保持する JSON ファイルも Next.js によって生成されます。
+
+この JSON ファイルは、[`next/link`](/docs/pages/api-reference/components/link) や [`next/router`](/docs/pages/api-reference/functions/use-router) を使ったクライアントサイドのルーティングで利用されます。`getStaticProps` を使ってプリレンダーされたページへ遷移するとき、Next.js はこの JSON ファイル（ビルド時にあらかじめ生成されたもの）を取得し、その内容をページコンポーネントの props として使用します。これは、クライアントサイドでのページ遷移時にはエクスポートされた JSON だけが使われ、`getStaticProps` は **呼び出されない** ことを意味します。
+
+インクリメンタル静的生成を使用している場合、クライアントサイドナビゲーションに必要な JSON を生成するために、`getStaticProps` はバックグラウンドで実行されます。同じページに対して複数のリクエストが行われる形でこれが見えることがありますが、これは意図された動作であり、エンドユーザーのパフォーマンスには影響しません。
+
+## getStaticProps はどこで使えるか
+
+`getStaticProps` は **ページ** からのみ export できます。ページ以外のファイルや `_app`、`_document`、`_error` からは **export できません**。
+
+この制限がある理由の一つは、ページがレンダーされる前に、必要なデータがすべて React によって用意されている必要があるためです。
+
+また、`getStaticProps` は独立した関数として export する必要があります。ページコンポーネントのプロパティとして `getStaticProps` を追加しても、**動作しません**。
+
+> **補足**: [カスタム App](/docs/pages/building-your-application/routing/custom-app) を作成している場合は、リンク先のドキュメントにあるように、`pageProps` をページコンポーネントに渡していることを確認してください。そうしないと props が空になってしまいます。
+
+## 開発環境ではリクエストごとに実行される
+
+開発環境（`next dev`）では、`getStaticProps` はリクエストのたびに呼び出されます。
+
+## プレビューモード
+
+[**プレビューモード**](/docs/pages/guides/preview-mode) を使用すると、ビルド時ではなく **リクエスト時** にページをレンダリングして、静的生成を一時的に回避できます。たとえば、ヘッドレス CMS を使用していて、公開前の下書きをプレビューしたい場合などに便利です。

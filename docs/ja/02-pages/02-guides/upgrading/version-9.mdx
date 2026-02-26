@@ -1,0 +1,226 @@
+---
+title: バージョン 9 へのアップグレード方法
+nav_title: バージョン 9
+description: Next.js アプリケーションをバージョン 8 からバージョン 9 にアップグレードします。
+---
+
+バージョン 9 にアップグレードするには、以下のコマンドを実行します。
+
+```bash filename="Terminal"
+npm i next@9
+```
+
+```bash filename="Terminal"
+yarn add next@9
+```
+
+```bash filename="Terminal"
+pnpm up next@9
+```
+
+```bash filename="Terminal"
+bun add next@9
+```
+
+> **補足:** TypeScript を使用している場合は、`@types/react` と `@types/react-dom` もそれぞれ対応するバージョンにアップグレードしてください。
+
+## カスタム App ファイル（`pages/_app.js`）を確認する
+
+以前に [Custom `<App>`](/docs/pages/building-your-application/routing/custom-app) の例をコピーしている場合は、`getInitialProps` を削除できる可能性があります。
+
+`pages/_app.js` から（可能な場合は）`getInitialProps` を削除することは、新しい Next.js 機能を活用するうえで重要です。
+
+次の `getInitialProps` は何もしていないため、削除して構いません:
+
+```js
+class MyApp extends App {
+  // 削除してください。何もしていません！
+  static async getInitialProps({ Component, ctx }) {
+    let pageProps = {}
+
+    if (Component.getInitialProps) {
+      pageProps = await Component.getInitialProps(ctx)
+    }
+
+    return { pageProps }
+  }
+
+  render() {
+    // ... etc
+  }
+}
+```
+
+## 互換性のない変更
+
+### `@zeit/next-typescript` はもう必要ありません
+
+Next.js は今後 `@zeit/next-typescript` の使用を無視し、削除するよう警告を表示します。このプラグインを `next.config.js` から削除してください。
+
+カスタム `.babelrc` に含まれている場合は、`@zeit/next-typescript/babel` への参照を削除してください。
+
+[`fork-ts-checker-webpack-plugin`](https://github.com/Realytics/fork-ts-checker-webpack-plugin/issues) の使用も `next.config.js` から削除する必要があります。
+
+TypeScript の型定義は `next` パッケージとともに公開されているため、競合を避けるために `@types/next` をアンインストールする必要があります。
+
+以下の型は異なります:
+
+> このリストはアップグレードの助けとなるようコミュニティによって作成されました。他にも違いを見つけた場合は、このリストへの Pull Request を送って、このリストを更新し、他のユーザーの助けとなるようにしてください。
+
+From:
+
+```tsx
+import { NextContext } from 'next'
+import { NextAppContext, DefaultAppIProps } from 'next/app'
+import { NextDocumentContext, DefaultDocumentIProps } from 'next/document'
+```
+
+に
+
+```tsx
+import { NextPageContext } from 'next'
+import { AppContext, AppInitialProps } from 'next/app'
+import { DocumentContext, DocumentInitialProps } from 'next/document'
+```
+
+### `config` キーはページからのエクスポートになりました
+
+ページから `config` という名前のカスタム変数をエクスポートすることはできなくなりました（例: `export { config }` / `export const config ...`）。
+このエクスポートされた変数は、オプトインの AMP や API Route 機能など、ページレベルの Next.js 設定を指定するために使用されるようになりました。
+
+Next.js での利用を目的としない `config` のエクスポートは、別の名前にリネームする必要があります。
+
+### `next/dynamic` は読み込み中にデフォルトで "loading..." をレンダーしなくなりました
+
+動的コンポーネントは、読み込み中はデフォルトで何もレンダーしません。`loading` プロパティを設定することで、この挙動を引き続きカスタマイズできます。
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicComponentWithCustomLoading = dynamic(
+  () => import('../components/hello2'),
+  {
+    loading: () => <p>Loading</p>,
+  }
+)
+```
+
+### `withAmp` はエクスポートする設定オブジェクトに置き換えられ、削除されました
+
+Next.js にはページレベルの設定という概念が導入されたため、一貫性を保つ目的で `withAmp` 高階コンポーネントは削除されました。
+
+この変更は、**Next.js プロジェクトのルートディレクトリで次のコマンドを実行することで自動的に移行できます。**
+
+```bash filename="Terminal"
+curl -L https://github.com/vercel/next-codemod/archive/master.tar.gz | tar -xz --strip=2 next-codemod-master/transforms/withamp-to-config.js npx jscodeshift -t ./withamp-to-config.js pages/**/*.js
+```
+
+この移行を手動で行う場合や、codemod がどのようなコードを生成するか確認したい場合は、以下を参照してください。
+
+**変更前**
+
+```jsx
+import { withAmp } from 'next/amp'
+
+function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export default withAmp(Home)
+// または
+export default withAmp(Home, { hybrid: true })
+```
+
+**変更後**
+
+```jsx
+export default function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export const config = {
+  amp: true,
+  // または
+  amp: 'hybrid',
+}
+```
+
+### `next export` はページを `index.html` としてエクスポートしなくなりました
+
+以前は、`pages/about.js` をエクスポートすると `out/about/index.html` が生成されていました。この動作は変更され、現在は `out/about.html` が生成されます。
+
+次の内容の `next.config.js` を作成することで、以前の動作に戻すことができます。
+
+```js filename="next.config.js"
+module.exports = {
+  trailingSlash: true,
+}
+```
+
+### `pages/api/` は特別な扱いになります
+
+`pages/api/` 内のページは、[API Routes](https://nextjs.org/blog/next-9#api-routes) として扱われるようになりました。
+このディレクトリ内のページには、クライアントサイド用のバンドルは生成されなくなります。
+
+## 非推奨機能
+
+### `next/dynamic` では複数のモジュールの同時読み込みが非推奨になりました
+
+`next/dynamic` では、React の実装（`React.lazy` と `Suspense`）に近づけるために、複数のモジュールを同時に読み込む機能が非推奨になりました。
+
+この挙動に依存しているコードの修正は比較的容易です。アプリケーション移行の参考になるように、変更前と変更後の例を用意しました。
+
+**変更前**
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const HelloBundle = dynamic({
+  modules: () => {
+    const components = {
+      Hello1: () => import('../components/hello1').then((m) => m.default),
+      Hello2: () => import('../components/hello2').then((m) => m.default),
+    }
+
+    return components
+  },
+  render: (props, { Hello1, Hello2 }) => (
+    <div>
+      <h1>{props.title}</h1>
+      <Hello1 />
+      <Hello2 />
+    </div>
+  ),
+})
+
+function DynamicBundle() {
+  return <HelloBundle title="Dynamic Bundle" />
+}
+
+export default DynamicBundle
+```
+
+**変更後**
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const Hello1 = dynamic(() => import('../components/hello1'))
+const Hello2 = dynamic(() => import('../components/hello2'))
+
+function HelloBundle({ title }) {
+  return (
+    <div>
+      <h1>{title}</h1>
+      <Hello1 />
+      <Hello2 />
+    </div>
+  )
+}
+
+function DynamicBundle() {
+  return <HelloBundle title="Dynamic Bundle" />
+}
+
+export default DynamicBundle
+```

@@ -1,0 +1,253 @@
+---
+title: 公開ページの構築
+description: ランディングページ、一覧ページ（商品、ブログなど）、マーケティングサイトやニュースサイトのように、ユーザー間でデータを共有する「静的」な公開ページの構築方法を学びます。
+nav_title: 公開ページ
+---
+
+公開ページは、すべてのユーザーに同じコンテンツを表示します。代表的な例としては、ランディングページ、マーケティングページ、商品ページなどがあります。
+
+データが共有されているため、このようなページは事前に[プリレンダー](/docs/app/glossary#prerendering)して再利用できます。これにより、ページの読み込みが高速になり、サーバーコストも削減できます。
+
+このガイドでは、ユーザー間でデータを共有する公開ページの構築方法を解説します。
+
+## 例
+
+例として、商品一覧ページを作成します。
+
+まずは静的なヘッダーから始めて、非同期の外部データを使った商品一覧を追加し、レスポンスをブロックせずにレンダリングする方法を学びます。最後に、ページ全体を[リクエスト時レンダリング](/docs/app/glossary#request-time-rendering)に切り替えることなく、ユーザーごとにパーソナライズされたプロモーションバナーを追加します。
+
+この例で使用しているリソースは次から参照できます:
+
+- [Video](https://youtu.be/F6romq71KtI)
+- [Demo](https://cache-components-public-pages.labs.vercel.dev/)
+- [Code](https://github.com/vercel-labs/cache-components-public-pages)
+
+### ステップ 1: 簡単なヘッダーを追加する
+
+まずは簡単なヘッダーを追加しましょう。
+
+```tsx filename="app/products/page.tsx"
+// 静的コンポーネント
+function Header() {
+  return <h1>Shop</h1>
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Header />
+    </>
+  )
+}
+```
+
+#### 静的コンポーネント
+
+`<Header />` コンポーネントは、外部データ、リクエストヘッダー、ルートパラメータ、現在時刻、ランダムな値など、リクエストごとに変化する入力に依存しません。
+
+その出力は決して変化せず、事前に決定できるため、このようなコンポーネントは **静的コンポーネント** と呼ばれます。リクエストを待つ必要がないので、Next.js は [ビルド時](/docs/app/glossary#build-time) にページを安全に **プリレンダー** できます。
+
+これは、[`next build`](/docs/app/api-reference/cli/next#next-build-options) を実行することで確認できます。
+
+```bash filename="Terminal"
+Route (app)      Revalidate  Expire
+┌ ○ /products           15m      1y
+└ ○ /_not-found
+
+○  (Static)  prerendered as static content
+```
+
+明示的な設定を追加していないにもかかわらず、product ルートが static としてマークされていることに気付くでしょう。
+
+### ステップ 2: 商品リストを追加する
+
+それでは、商品リストを取得してレンダリングしましょう。
+
+```tsx filename="app/products/page.tsx"
+import db from '@/db'
+import { List } from '@/app/products/ui'
+
+function Header() {}
+
+// 動的コンポーネント
+async function ProductList() {
+  const products = await db.product.findMany()
+  return <List items={products} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+ヘッダーとは異なり、商品リストは外部データに依存します。
+
+#### 動的コンポーネント
+
+このデータは時間とともに変化する**可能性がある**ため、レンダー結果はもはや安定しているとは保証できません。これにより、商品リストは**動的な**コンポーネントになります。
+
+特に指定しない場合、フレームワークはユーザーからのリクエストごとに**最新の**データを取得したいと仮定します。この設計は、新しいサーバーリクエストでページがレンダーされるという標準的なウェブの挙動を反映しています。
+
+しかし、このコンポーネントがリクエスト時にレンダーされる場合、そのデータ取得が完了するまで、そのルート**全体**のレスポンスが遅延します。ページをリフレッシュすると、その様子が確認できます。
+
+ヘッダー自体は即座にレンダーされていても、商品リストのフェッチが完了するまで、ブラウザに送信することはできません。
+
+このような深刻なパフォーマンス低下を防ぐため、Next.js は最初にデータを **await** したタイミングで、次のような[警告](/docs/messages/blocking-route)を表示します: `Blocking data was accessed outside of Suspense`
+
+ここで、レスポンスの**ブロックを解除**する方法を決める必要があります。次のいずれかです:
+
+- コンポーネントを[**キャッシュ**](/docs/app/glossary#cache-components)して**安定**させ、ページの他の部分と一緒に事前レンダーできるようにする。
+- コンポーネントを[**ストリーミング**](/docs/app/glossary#streaming)して**ノンブロッキング**にし、ページの残りの部分がそれを待つ必要がないようにする。
+
+今回の場合、商品カタログはすべてのユーザー間で共有されているため、キャッシュするのが正しい選択です。
+
+### コンポーネントのキャッシュ
+
+[`'use cache'`](/docs/app/api-reference/directives/use-cache) ディレクティブを使用して、関数をキャッシュ可能なものとして指定できます。
+
+```tsx filename="app/products/page.tsx"
+import db from '@/db'
+import { List } from '@/app/products/ui'
+
+function Header() {}
+
+// キャッシュコンポーネント
+async function ProductList() {
+  'use cache'
+  const products = await db.product.findMany()
+  return <List items={products} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+これにより、このコンポーネントは[cache component](/docs/app/glossary#cache-components)になります。最初に実行されたとき、その返り値がキャッシュされ、再利用されます。
+
+cache component の入力がリクエスト到着の**前に**すでに揃っている場合、そのコンポーネントは静的コンポーネントと同様にプリレンダリングできます。
+
+もう一度ページを再読み込みしてみると、cache component がレスポンスをブロックしないため、ページが即座に読み込まれることがわかります。さらに、`next build` をもう一度実行すると、ページが依然として静的であることを確認できます。
+
+```bash filename="Terminal"
+Route (app)      Revalidate  Expire
+┌ ○ /products           15m      1y
+└ ○ /_not-found
+
+○  (Static)  prerendered as static content
+```
+
+しかし、ページがずっと静的なままということはほとんどありません。
+
+### ステップ 3: 動的なプロモーションバナーを追加する
+
+いずれは、シンプルなページであっても動的なコンテンツが必要になります。これを示すために、プロモーションバナーを追加してみましょう。
+
+```tsx filename="app/products/page.tsx"
+import db from '@/db'
+import { List, Promotion } from '@/app/products/ui'
+import { getPromotion } from '@/app/products/data'
+
+function Header() {}
+
+async function ProductList() {}
+
+// 動的コンポーネント
+async function PromotionContent() {
+  const promotion = await getPromotion()
+  return <Promotion data={promotion} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <PromotionContent />
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+ここでも、今回もまずは動的レンダリングとして始まります。そして前と同様に、ブロッキングな挙動を導入すると Next.js の警告が発生します。
+
+前回はデータが共有されていたため、キャッシュすることができました。しかし今回は、プロモーションがユーザーの位置情報や A/B テストといったリクエスト固有の入力に依存しているため、キャッシュでブロッキングな挙動を回避することはできません。
+
+### 部分的なプリレンダリング
+
+動的コンテンツを追加しても、完全にブロッキングするレンダーに戻る必要はありません。ストリーミングによってレスポンスのブロックを回避できます。
+
+Next.js はデフォルトでストリーミングをサポートしています。[Suspense boundary](/docs/app/glossary#suspense-boundary) を使用して、ストリーミングされたレスポンスをどこで「チャンク」に分割するか、またコンテンツの読み込み中にどのフォールバック UI を表示するかをフレームワークに指示できます。
+
+```tsx filename="app/products/page.tsx"
+import { Suspense } from 'react'
+import db from '@/db'
+import { List, Promotion, PromotionSkeleton } from '@/app/products/ui'
+import { getPromotion } from '@/app/products/data'
+
+function Header() {}
+
+async function ProductList() {}
+
+// 動的コンポーネント（ストリーミング）
+async function PromotionContent() {
+  const promotion = await getPromotion()
+  return <Promotion data={promotion} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Suspense fallback={<PromotionSkeleton />}>
+        <PromotionContent />
+      </Suspense>
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+フォールバックは、他の静的コンテンツやキャッシュ済みコンテンツと同様に事前レンダリングされます。内部のコンポーネントは、その非同期処理が完了したあとにストリームとして配信されます。
+
+この変更により、Next.js は事前レンダリング可能な処理とリクエスト時の処理を分離できるようになり、ルートは[部分的に事前レンダリング](/docs/app/glossary#partial-prerendering-ppr)されるようになります。
+
+同様に、`next build` を実行してこれを確認できます。
+
+```bash filename="Terminal"
+Route (app)      Revalidate  Expire
+┌ ◐ /products    15m      1y
+└ ◐ /_not-found
+
+◐  (Partial Prerender)  Prerendered as static HTML with dynamic server-streamed content
+```
+
+[**ビルド時**](/docs/app/glossary#build-time)には、ヘッダー、商品リスト、プロモーションのフォールバックを含むページの大部分がレンダリングされてキャッシュされ、コンテンツデリバリーネットワークにプッシュされます。
+
+[**リクエスト時**](/docs/app/glossary#request-time)には、事前レンダリングされた部分が、ユーザーに近い CDN ノードから即座に配信されます。
+
+同時に、ユーザーごとのプロモーションがサーバー上でレンダリングされ、クライアントへストリーミングされ、フォールバックのスロットと入れ替えられます。
+
+最後にもう一度ページをリロードすると、ページの大部分は即座に読み込まれ、動的な部分は利用可能になり次第ストリーミングされてくることが確認できます。
+
+### 次のステップ
+
+ここまでで、主に静的なページの中に一部の動的コンテンツを含める方法を学びました。
+
+静的ページから始めて非同期処理を追加し、プリレンダー可能なものはキャッシュし、そうでないものはストリーミングすることで、ブロッキングな挙動を解消しました。
+
+今後のガイドでは、次の内容を学びます:
+
+- プリレンダーされたページやキャッシュされたデータを再検証する方法。
+- ルートパラメータを使って同じページのバリエーションを作成する方法。
+- パーソナライズされたユーザーデータを使ってプライベートページを作成する方法。

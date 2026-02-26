@@ -1,0 +1,19 @@
+{
+  "$schema": "https://assets.gtx.dev/config-schema.json",
+  "projectId": "prj_aza8wq4dlc6702zzsx6kvdl2",
+  "defaultLocale": "en",
+  "framework": "next-app",
+  "files": {
+    "gt": {
+      "output": "public/_gt/[locale].json"
+    },
+    "mdx": {
+      "include": ["../../docs/[locale]/**/*.mdx"]
+    },
+    "json": {
+      "include": ["public/fuma-content/[locale].json"]
+    }
+  },
+  "locales": ["ja"],
+  "_versionId": "49cda6bb99aa4abec5a0fde80c944a89342cde70df5594120a9cb930c433c389"
+}

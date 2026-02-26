@@ -1,3 +1,4 @@
+import { withGTConfig } from 'gt-next/config'
 import type { NextConfig } from 'next'
 import { createMDX } from 'fumadocs-mdx/next'
 
@@ -7,4 +8,10 @@ const config: NextConfig = {
   reactStrictMode: true,
 }
 
-export default withMDX(config)
+const mdxConfig = withMDX(config)
+const gtConfig = withGTConfig(mdxConfig, {
+  getLocalePath: './lib/getLocale.ts',
+  getRegionPath: './lib/getRegion.ts',
+})
+
+export default gtConfig

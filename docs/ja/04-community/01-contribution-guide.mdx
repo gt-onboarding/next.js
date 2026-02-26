@@ -1,0 +1,438 @@
+---
+title: Docs 貢献ガイド
+nav_title: 貢献ガイド
+description: Next.js ドキュメントへの貢献方法について学びましょう
+---
+
+Next.js Docs 貢献ガイドへようこそ。
+
+このページでは、Next.js ドキュメントを編集する方法について説明します。私たちの目標は、コミュニティの誰もが自信を持ってドキュメントに貢献し、改善していけるようにすることです。
+
+## なぜ貢献するのか？
+
+オープンソースの取り組みが完全に終わることはなく、ドキュメントも同様です。ドキュメントへの貢献は、初心者にとってはオープンソースに関わる良いきっかけになり、経験豊富な開発者にとっては、コミュニティと知識を共有しながら複雑なトピックを整理して明確にする機会になります。
+
+Next.js のドキュメントに貢献することで、すべての開発者にとって、より堅牢な学習リソースを一緒に作り上げることができます。誤字を見つけたとき、分かりにくいセクションがあったとき、あるいは特定のトピックが抜けていると気づいたときなど、どのような形であれ、あなたの貢献は歓迎され、感謝されます。
+
+## 貢献方法
+
+ドキュメントのコンテンツは [Next.js リポジトリ](https://github.com/vercel/next.js/tree/canary/docs) にあります。コントリビュートするには、GitHub 上でファイルを直接編集するか、リポジトリをクローンしてローカルでファイルを編集してください。
+
+### GitHub ワークフロー
+
+GitHub を初めて使う場合は、リポジトリをフォークし、ブランチを作成して、プルリクエストを作成・送信する方法を学ぶために、[GitHub Open Source Guide](https://opensource.guide/how-to-contribute/#opening-a-pull-request) を読むことをおすすめします。
+
+> **補足**: ドキュメントの元となるコードは、Next.js の公開リポジトリと同期されるプライベートなコードベースにあります。これは、ローカルでドキュメントをプレビューできないことを意味します。ただし、プルリクエストがマージされると、[nextjs.org](https://nextjs.org/docs) に反映された変更を確認できます。
+
+### MDX の記述
+
+ドキュメントは [MDX](https://mdxjs.com/) で記述されています。MDX は JSX 構文をサポートする Markdown フォーマットです。これにより、ドキュメント内に React コンポーネントを埋め込むことができます。Markdown 構文の簡単な概要については、[GitHub Markdown Guide](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) を参照してください。
+
+### VS Code
+
+#### ローカルで変更をプレビューする
+
+VSCode には、ローカルで編集内容を確認できる組み込みの Markdown プレビュー機能があります。MDX ファイルでプレビュー機能を有効にするには、ユーザー設定に設定オプションを追加する必要があります。
+
+コマンドパレット（Mac では `⌘ + ⇧ + P`、Windows では `Ctrl + Shift + P`）を開き、`Preferences: Open User Settings (JSON)` を検索します。
+
+次に、`settings.json` ファイルに次の行を追加します。
+
+```json filename="settings.json"
+{
+  "files.associations": {
+    "*.mdx": "markdown"
+  }
+}
+```
+
+次に、もう一度コマンドパレットを開き、`Markdown: Preview File` または `Markdown: Open Preview to the Side` を検索します。すると、書式が反映された変更内容を確認できるプレビューウィンドウが開きます。
+
+#### 拡張機能
+
+VSCode ユーザーには、次の拡張機能の利用もおすすめします:
+
+- [MDX](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx): MDX 用の IntelliSense とシンタックスハイライト。
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode): 保存時に MDX ファイルを自動整形します。
+
+### レビュープロセス
+
+コントリビューションを送信すると、Next.js チームまたは Developer Experience チームが変更内容をレビューし、フィードバックを行ったうえで、準備が整い次第プルリクエスト (PR) をマージします。
+
+質問がある場合や PR で追加のサポートが必要な場合は、PR のコメントでお知らせください。Next.js ドキュメントへのご貢献と、コミュニティの一員としてご参加いただいていることに感謝します。
+
+> **ヒント:** PR を送信する前に Prettier を実行するには、`pnpm prettier-fix` を実行してください。
+
+## ファイル構造
+
+このドキュメントでは **ファイルシステムベースのルーティング** を使用しています。[`/docs`](https://github.com/vercel/next.js/tree/canary/docs) 内の各フォルダーおよびその中のファイルは、それぞれルートセグメントを表します。これらのセグメントは、URL パス、ナビゲーション、パンくずリストの生成に使用されます。
+
+ファイル構造はサイト上のナビゲーションを反映しており、デフォルトではナビゲーション項目はアルファベット順に並びます。ただし、フォルダー名またはファイル名の先頭に 2 桁の数字（`00-`）を付けることで、項目の順序を変更できます。
+
+たとえば、[functions API Reference](/docs/app/api-reference/functions) では、開発者が特定の関数を見つけやすいように、ページはアルファベット順に並べられています。
+
+```txt
+04-functions
+├── after.mdx
+├── cacheLife.mdx
+├── cacheTag.mdx
+└── ...
+```
+
+しかし、[App Router セクション](/docs/app) では、ファイル名の先頭に 2 桁の数字が付けられ、開発者がこれらの概念を学習していく推奨順に並べられています。
+
+```txt
+01-getting-started
+├── 01-installation.mdx
+├── 02-project-structure.mdx
+├── 03-layouts-and-pages.mdx
+└── ...
+```
+
+ページを素早く見つけるには、VS Code で `⌘ + P` (Mac) または `Ctrl + P` (Windows) を押して検索バーを開きます。その後、探しているページのスラッグを入力します。例: `installation`
+
+> **なぜ manifest を使わないのですか？**
+>
+> ドキュメントのナビゲーションを生成する一般的な方法として manifest ファイルを使うことも検討しましたが、manifest はファイルとの同期がすぐに取れなくなることが分かりました。ファイルシステムルーティングであれば、ドキュメントの構造を常に意識せざるを得ず、Next.js によりネイティブな形に感じられます。
+
+## メタデータ
+
+各ページのファイル先頭には、3 つのダッシュで区切られたメタデータブロックがあります。
+
+### 必須フィールド
+
+次のフィールドは**必須**です。
+
+| Field         | Description                                                                 |
+| ------------- | --------------------------------------------------------------------------- |
+| `title`       | ページの `<h1>` 見出しタイトル。SEO や OG 画像で使用されます。              |
+| `description` | ページの説明。SEO のために `<meta name="description">` タグで使用されます。 |
+
+```yaml filename="required-fields.mdx"
+---
+title: Page Title
+description: Page Description
+---
+```
+
+ページタイトルは 2～3 語（例: Optimizing Images）、説明文は 1～2 文（例: Learn how to optimize images in Next.js）に収めることが推奨されます。
+
+### 任意フィールド
+
+次のフィールドは**任意**です:
+
+| Field       | Description                                                                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `nav_title` | ナビゲーション内でページタイトルを上書きします。ページタイトルが長すぎて収まらない場合に便利です。指定しない場合は、`title` フィールドが使用されます。 |
+| `source`    | コンテンツを共有ページに取り込みます。「[Shared Pages](#shared-pages)」を参照してください。                                                            |
+| `related`   | ドキュメントの末尾に表示される関連ページのリストです。これらは自動的にカードに変換されます。「[Related Links](#related-links)」を参照してください。    |
+| `version`   | 開発段階を表します。例: `experimental`,`legacy`,`unstable`,`RC`                                                                                        |
+
+```yaml filename="optional-fields.mdx"
+---
+nav_title: Nav Item Title
+source: app/building-your-application/optimizing/images
+related:
+  description: See the image component API reference.
+  links:
+    - app/api-reference/components/image
+version: experimental
+---
+```
+
+## `App` と `Pages` のドキュメント
+
+**App Router** と **Pages Router** の機能のほとんどは異なっているため、それぞれのドキュメントは別々のセクション（`02-app` と `03-pages`）に分かれています。ただし、両者で共通している機能もいくつかあります。
+
+### 共有ページ
+
+コンテンツの重複や内容の不整合を避けるために、あるページのコンテンツを別のページから参照する際には `source` フィールドを使用します。たとえば、`<Link>` コンポーネントは **App** と **Pages** の両方で _ほぼ_ 同じ挙動をします。コンテンツを重複させる代わりに、`app/.../link.mdx` のコンテンツを `pages/.../link.mdx` から参照して再利用できます。
+
+```mdx filename="app/.../link.mdx"
+---
+title: <Link>
+description: API reference for the <Link> component.
+---
+
+This API reference will help you understand how to use the props
+and configuration options available for the Link Component.
+```
+
+```mdx filename="pages/.../link.mdx"
+---
+title: <Link>
+description: API reference for the <Link> component.
+source: app/api-reference/components/link
+---
+
+{/* このページを編集しないでください。 */}
+{/* このページのコンテンツは上記のソースから取得されます。 */}
+```
+
+したがって、その内容を1か所で編集するだけで、同じ変更を両方のセクションに反映させることができます。
+
+### 共有コンテンツ
+
+共有ページでは、**App Router** 固有または **Pages Router** 固有のコンテンツが含まれることがあります。例えば、`<Link>` コンポーネントには、**App** ではなく **Pages** でのみ利用可能な `shallow` プロパティがあります。
+
+コンテンツが正しいルーターでのみ表示されるようにするために、コンテンツブロックを `<AppOnly>` または `<PagesOnly>` コンポーネントでラップできます：
+
+```mdx filename="app/.../link.mdx"
+このコンテンツはAppとPagesで共有されます。
+
+<PagesOnly>
+
+このコンテンツはPagesのドキュメントにのみ表示されます。
+
+</PagesOnly>
+
+このコンテンツはAppとPagesで共有されます。
+```
+
+例やコードブロックでは、これらのコンポーネントをよく使用することになります。
+
+## コードブロック
+
+コードブロックには、コピー＆ペーストしてそのまま使える最小限の動作サンプルを含めてください。これは、追加の設定を行わなくてもそのまま実行できるコードであることを意味します。
+
+たとえば、`<Link>` コンポーネントの使い方を示す場合は、`import` 文と `<Link>` コンポーネントのコード自体の両方を含める必要があります。
+
+```tsx filename="app/page.tsx"
+import Link from 'next/link'
+
+export default function Page() {
+  return <Link href="/about">About</Link>
+}
+```
+
+サンプルコードをコミットする前に、必ずローカルで実行してください。これにより、コードが最新の状態で正しく動作していることを確認できます。
+
+### 言語とファイル名
+
+コードブロックには、言語と `filename` を含むヘッダーを付けてください。たとえば、次のようになります。
+
+````mdx filename="code-example.mdx"
+```tsx filename="app/page.tsx"
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+```
+````
+
+CLI コマンドを記述する場合は、各パッケージマネージャーごとのコマンドを表示するために `package` プロパティを使用してください。
+
+````mdx filename="code-example.mdx"
+```bash package="pnpm"
+pnpm create next-app
+```
+
+```bash package="npm"
+npx create-next-app@latest
+```
+
+```bash package="yarn"
+yarn create next-app
+```
+
+```bash package="bun"
+bun create next-app
+```
+````
+
+このドキュメント内のほとんどのサンプルコードは `tsx` と `jsx`、一部は `bash` で記述されています。ただし、サポートされている任意の言語を使用できます。対応言語の[完全な一覧](https://github.com/shikijs/shiki/blob/main/docs/languages.md#all-languages)はこちらです。
+
+JavaScript のコードブロックでは、次の言語と拡張子の組み合わせを使用します。
+
+|                                      | Language | Extension |
+| ------------------------------------ | -------- | --------- |
+| JSX コードを含む JavaScript ファイル | ```jsx   | .js       |
+| JSX を含まない JavaScript ファイル   | ```js    | .js       |
+| JSX を含む TypeScript ファイル       | ```tsx   | .tsx      |
+| JSX を含まない TypeScript ファイル   | ```ts    | .ts       |
+
+> **補足**:
+>
+> - **JSX** コードを含む JavaScript ファイルには、必ず **`.js`** 拡張子を使用してください。
+> - たとえば、```jsx filename="app/layout.js"
+
+### TS と JS のスイッチャー
+
+TypeScript と JavaScript を切り替えるための言語スイッチャーを追加します。コードブロックは TypeScript を先頭にし、その後に JavaScript 版を用意してユーザーに対応します。
+
+現在は、TS と JS のサンプルコードを続けて記述し、`switcher` プロップでそれらを関連付けています。
+
+````mdx filename="code-example.mdx"
+```tsx filename="app/page.tsx" switcher
+
+```
+
+```jsx filename="app/page.js" switcher
+
+```
+````
+
+> **補足**: 将来的には、TypeScript のスニペットを自動的に JavaScript にコンパイルする予定です。それまでは、[transform.tools](https://transform.tools/typescript-to-javascript) を利用できます。
+
+### 行のハイライト
+
+コード内の行をハイライトできます。コードの特定の部分に注目を集めたいときに役立ちます。`highlight` プロップに数値を渡すことで行をハイライトできます。
+
+**単一行:** `highlight={1}`
+
+```tsx filename="app/page.tsx" {1}
+import Link from 'next/link'
+
+export default function Page() {
+  return <Link href="/about">About</Link>
+}
+```
+
+**複数行の指定:** `highlight={1,3}`
+
+```tsx filename="app/page.tsx" highlight={1,3}
+import Link from 'next/link'
+
+export default function Page() {
+  return <Link href="/about">About</Link>
+}
+```
+
+**行範囲:** `highlight={1-5}`
+
+```tsx filename="app/page.tsx" highlight={1-5}
+import Link from 'next/link'
+
+export default function Page() {
+  return <Link href="/about">About</Link>
+}
+```
+
+## アイコン
+
+このドキュメントで使用できるアイコンは次のとおりです。
+
+```mdx filename="mdx-icon.mdx"
+<Check size={18} />
+<Cross size={18} />
+```
+
+**出力:**
+
+<Check size={18} />
+
+<Cross size={18} />
+
+本ドキュメントでは絵文字は使用しません。
+
+## 注意事項
+
+重要だが、必ずしも不可欠ではない情報には補足を使います。補足を使うと、メインコンテンツからユーザーの注意をそらすことなく情報を補足できます。
+
+```mdx filename="notes.mdx"
+> **補足**: これは1行のノートです。
+
+> **補足**:
+>
+> - 複数行のノートにもこの形式を使用します。
+> - 知っておくべき、または念頭に置くべき項目が複数ある場合があります。
+```
+
+**出力:**
+
+> **補足**: これは 1 行のメモです。
+
+> **補足**:
+>
+> - 複数行のメモにもこの形式を使用します。
+> - 知っておくと便利な項目が複数ある場合もあります。
+
+## 関連リンク
+
+関連リンクは、次の論理的なステップへのリンクを追加することで、ユーザーの学習の流れを案内します。
+
+- リンクは、ページのメインコンテンツの下にカードとして表示されます。
+- 子ページを持つページでは、リンクが自動的に生成されます。
+
+ページのメタデータにある `related` フィールドを使って関連リンクを作成します。
+
+```yaml filename="example.mdx"
+---
+related:
+  description: Learn how to quickly get started with your first application.
+  links:
+    - app/building-your-application/routing/defining-routes
+    - app/building-your-application/data-fetching
+    - app/api-reference/file-conventions/page
+---
+```
+
+### ネストされたフィールド
+
+| フィールド    | 必須かどうか | 説明                                                                                                                                                                 |
+| ------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | 任意         | カードリストのタイトル。指定しない場合、デフォルトは **Next Steps** です。                                                                                           |
+| `description` | 任意         | カードリストの説明。                                                                                                                                                 |
+| `links`       | 必須         | 他のドキュメントページへのリンクのリスト。各リスト項目は相対 URL パス（先頭のスラッシュなし）である必要があります（例: `app/api-reference/file-conventions/page`）。 |
+
+## 図
+
+図は複雑な概念を説明するのに有効な手段です。私たちは Vercel のデザインガイドに従い、[Figma](https://www.figma.com/) を使用して図を作成しています。
+
+現在、図はプライベートな Next.js サイトの `/public` フォルダーに配置されています。図を更新したり追加したりしたい場合は、アイデアを添えて [GitHub Issue](https://github.com/vercel/next.js/issues/new?assignees=&labels=template%3A+documentation&projects=&template=4.docs_request.yml&title=Docs%3A+) を作成してください。
+
+## カスタムコンポーネントと HTML
+
+ドキュメントで利用できる React コンポーネントは、`<Image />` (next/image)、`<PagesOnly />`、`<AppOnly />`、`<Cross />`、`<Check />` です。`<details>` タグ以外の生の HTML をドキュメント内で使用することはできません。
+
+新しいコンポーネントのアイデアがある場合は、[GitHub issue](https://github.com/vercel/next.js/issues/new/choose) を作成してください。
+
+## スタイルガイド
+
+このセクションでは、技術文書の執筆に不慣れな方のためのガイドラインを示します。
+
+### ページテンプレート
+
+ページ用の厳密なテンプレートはありませんが、ドキュメント全体で繰り返し登場するセクションがあります:
+
+- **概要 (Overview):** ページの最初の段落では、その機能が何で、何に使われるかを説明してください。その後に、最小限の動作例、もしくは対応する API リファレンスを続けてください。
+- **規約 (Convention):** 機能に規約がある場合は、ここで説明してください。
+- **例 (Examples)**: 機能がさまざまなユースケースでどのように使えるかを示してください。
+- **API テーブル (API Tables)**: API ページには、可能であればページの先頭に、各セクションへのジャンプリンクを含む概要テーブルを用意してください。
+- **次のステップ (関連リンク) (Next Steps (Related Links))**: ユーザーの学習をガイドするために、関連ページへのリンクを追加してください。
+
+必要に応じて、これらのセクションを自由に追加してください。
+
+### ページの種類
+
+ドキュメントのページは、「Conceptual」と「Reference」の 2 つのカテゴリに分かれます。
+
+- **Conceptual** ページは、ある概念や機能を説明するためのページです。通常は長めで、Reference ページよりも多くの情報を含みます。Next.js のドキュメントでは、Conceptual ページは **Building Your Application** セクションにあります。
+- **Reference** ページは、特定の API を説明するためのページです。通常は短く、内容が絞り込まれています。Next.js のドキュメントでは、Reference ページは **API Reference** セクションにあります。
+
+> **補足**: 対象となるページによって、文体やスタイルが異なる場合があります。たとえば、Conceptual ページはよりチュートリアル寄りで、ユーザーに呼びかける際に _you_ を用います。Reference ページはより技術的で、「create, update, accept」のような命令形の語を多く用い、_you_ という語は省略される傾向があります。
+
+### 文体
+
+ドキュメント全体で一貫した文体とトーンを保つためのガイドラインです:
+
+- 明確で簡潔な文章を書きましょう。脱線は避けてください。
+  - カンマが多くなってきたら、文を複数に分割するか、リストにすることを検討してください。
+  - 複雑な語よりも平易な語に置き換えましょう。たとえば、_utilize_ ではなく _use_ を使います。
+- _this_ という単語の使い方に注意しましょう。あいまいで分かりにくくなることがあります。主語が不明瞭な場合は、遠慮せずに文の主語を繰り返してください。
+  - たとえば、_Next.js uses React_ のように書き、_Next.js uses this_ としないようにします。
+- 受動態ではなく能動態を使いましょう。能動態の文の方が読みやすくなります。
+  - たとえば、_Next.js uses React_ と書き、_React is used by Next.js_ としないようにします。_was_ や _by_ といった語を多用している場合、受動態を使っている可能性があります。
+- _easy_、_quick_、_simple_、_just_ などの言葉は避けましょう。これらは主観的であり、ユーザーを落胆させる場合があります。
+- _don&#39;t_、_can&#39;t_、_won&#39;t_ などの否定的な言葉は避けましょう。読者を落胆させる可能性があります。
+  - たとえば、_&quot;You can use the `Link` component to create links between pages&quot;_ のように書き、_&quot;Don&#39;t use the `<a>` tag to create links between pages&quot;_ としないようにします。
+- 二人称（you/your）で書きましょう。その方がより個人的で、読み手を引き込みやすくなります。
+- ジェンダーニュートラルな表現を使いましょう。読者を指すときは _developers_、_users_、_readers_ などを使ってください。
+- コード例を追加する場合は、正しくフォーマットされ、実際に動作することを確認してください。
+
+これらのガイドラインは網羅的なものではありませんが、執筆を始めるうえで役に立つはずです。技術文書の書き方をさらに深く学びたい場合は、[Google Technical Writing Course](https://developers.google.com/tech-writing/overview) を参照してください。
+
+---
+
+ドキュメントへの貢献と Next.js コミュニティの一員でいてくださっていることに感謝します。
+
+{/* TODO: Latest Contributors コンポーネント */}

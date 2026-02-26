@@ -1,0 +1,187 @@
+---
+title: コーディングエージェント向け Next.js MCP サーバーの有効化
+nav_title: Next.js MCP サーバー
+description: Next.js の MCP サポートを利用して、コーディングエージェントからアプリケーション状態へアクセスできるようにする方法を学びます
+---
+
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io) は、AI エージェントやコーディングアシスタントが標準化されたインターフェイスを通じてアプリケーションとやり取りできるようにするオープンな標準仕様です。
+
+Next.js 16 以降には MCP サポートが含まれており、コーディングエージェントがアプリケーションの内部にリアルタイムでアクセスできるようになります。この機能を使用するには、[`next-devtools-mcp`](https://www.npmjs.com/package/next-devtools-mcp) パッケージをインストールします。
+
+## はじめに
+
+**要件：** Next.js 16 以降
+
+プロジェクトのルートにある `.mcp.json` ファイルに `next-devtools-mcp` を追加します。
+
+```json filename=".mcp.json"
+{
+  "mcpServers": {
+    "next-devtools": {
+      "command": "npx",
+      "args": ["-y", "next-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+これで完了です！開発サーバーを起動すると、`next-devtools-mcp` が実行中の Next.js インスタンスを自動的に検出して接続します。
+
+より詳しい設定オプションについては、[next-devtools-mcp リポジトリ](https://github.com/vercel/next-devtools-mcp)を参照してください。
+
+## 機能
+
+`next-devtools-mcp` は、コーディングエージェントに対して、増え続ける一連の機能を提供します。
+
+### アプリケーションランタイムへのアクセス
+
+- **エラー検出**: 開発サーバーから現在のビルドエラー、ランタイムエラー、型エラーを取得できます
+- **ライブ状態クエリ**: リアルタイムのアプリケーション状態やランタイム情報にアクセスできます
+- **ページメタデータ**: ページのルート、コンポーネント、レンダリングの詳細を照会できます
+- **Server Actions**: Server Actions やコンポーネント階層を確認できます
+- **開発ログ**: 開発サーバーのログやコンソール出力にアクセスできます
+
+### 開発ツール
+
+- **Next.js Knowledge Base**: 包括的な Next.js ドキュメントとベストプラクティスへのクエリ
+- **Migration and Upgrade Tools**: codemod を用いて Next.js 16 へのアップグレードを自動化するヘルパーツール
+- **Cache Components Guide**: Cache Components のセットアップおよび構成に関するガイド
+- **Browser Testing**: ブラウザ上でページを検証するための [Playwright MCP](https://github.com/microsoft/playwright-mcp) 連携
+
+> **注意:** Next.js チームは、これらの機能を積極的に拡充しています。エージェント開発体験を向上させるために、新しいツールや機能が継続的に追加されています。
+
+## 開発ワークフロー
+
+1. Next.js の開発サーバーを起動します。
+
+```bash package="pnpm"
+pnpm dev
+```
+
+```bash package="npm"
+npm run dev
+```
+
+```bash package="yarn"
+yarn dev
+```
+
+```bash package="bun"
+bun dev
+```
+
+2. Coding Agent は、`next-devtools-mcp` を通じて実行中の Next.js インスタンスに自動的に接続されます
+
+3. ブラウザでアプリケーションを開き、ページを表示します
+
+4. エージェントにインサイトや診断情報を問い合わせます（下記の例を参照）
+
+### 利用可能なツール
+
+`next-devtools-mcp` を通じて、エージェントは次のツールを使用できます:
+
+- **`get_errors`**: 開発サーバーから現在のビルドエラー、ランタイムエラー、型エラーを取得します
+- **`get_logs`**: ブラウザのコンソールログとサーバー出力を含む開発ログファイルへのパスを取得します
+- **`get_page_metadata`**: 特定のページに関する、ルート、コンポーネント、レンダリング情報を含むメタデータを取得します
+- **`get_project_metadata`**: プロジェクト構造、設定情報、および開発サーバーの URL を取得します
+- **`get_routes`**: ファイルシステムをスキャンして、エントリポイントとなるすべてのルートを取得します。ルーターの種類 (appRouter, pagesRouter) ごとにグループ化されたルートを返します。動的セグメントは `[param]` または `[...slug]` パターンとして表現されます
+- **`get_server_action_by_id`**: Server Actions を ID で検索して、ソースファイルと関数名を特定します
+
+## エージェントとの併用
+
+MCP 対応の Coding Agent は、Next.js の開発サーバーを自動的に検出して接続し、プロジェクトに関する豊富なコンテキストを利用できるようになります。
+
+### エージェント支援開発の利点
+
+エージェントは次のことができます:
+
+- **コンテキストを考慮した提案を行う**: 既存の構造に基づいて、新機能を追加するのに適切な場所を提案する
+- **アプリケーションのライブ状態をクエリする**: 開発中の現在の設定、ルート、ミドルウェアを確認する
+- **App Router のページとレイアウト構成を理解する**: どのページとレイアウトがレンダーされているかを正確に把握する
+- **正確な実装を提供する**: プロジェクトのパターンや規約に従ったコードを生成する
+
+## 例
+
+### エラーの検出と診断
+
+エージェントにリアルタイムでエラーの内容を尋ねることができます。
+
+```bash
+User: "What errors are currently in my application?"
+```
+
+The agent will:
+
+- `next-devtools-mcp` を介して、稼働中の Next.js アプリケーションに対してクエリを実行します
+- 現在のビルドエラー、ランタイムエラー、型エラーを取得します
+- エラーを分析し、具体的な修正方法を提示します
+
+<details>
+  <summary>エージェントの応答（クリックして展開）</summary>
+
+```bash
+> fix errors on the page
+
+⏺ ページ上のエラー修正をお手伝いします。まず、プロジェクトの現在の状態を確認して、
+  どんなエラーがあるかをチェックします。
+
+⏺ next-devtools - nextjs_runtime (MCP)(action: "discover_servers")
+⏺ next-devtools - nextjs_runtime (MCP)(action: "call_tool", toolName: "get_errors")
+
+⏺ /about ページで hydration エラーを見つけました。サーバーでは "server" をレンダリングしているのに
+  クライアントでは "client" をレンダリングしており、不一致が発生しています。TODO リストを作成して
+   この問題を修正します。
+
+⏺ では、ページ上のエラーを確認します。           01:14 PM  claude-sonnet-4-5-20250929
+
+⏺ next-devtools - nextjs_runtime (MCP)(action: "call_tool", toolName: "get_errors")
+  ⎿ {
+      "success": true,
+      "port": 3000,
+      "toolName": "get_errors",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "# 1 件のブラウザセッションでエラーが見つかりました\n\n## セッション: /about\n\n**1 件のエラーが見つかりました**\n\n### Runtime Errors\n\n#### エラー 1 (Type: recoverable)\n\n**Error**: Hydration failed
+```
+
+</details>
+
+### アップグレードとベストプラクティス
+
+Next.js の概念や移行に関する情報は、次を参照してください:
+
+```bash
+User: "Help me upgrade my Next.js app to version 16"
+```
+
+エージェントは現在のバージョンを分析し、codemod を使った自動マイグレーションを案内し、破壊的な変更への対応方法をステップごとに説明します。
+
+概念に関する質問をする:
+
+```bash
+User: "When should I use 'use client' in App Router?"
+```
+
+エージェントは Next.js のナレッジベースを参照し、あなたのコードベースからの例を交えた、ドキュメントに裏付けられた説明を提供します。
+
+## 動作の仕組み
+
+Next.js 16 以降には、開発サーバー内で動作する `/_next/mcp` の組み込み MCP エンドポイントが用意されています。`next-devtools-mcp` パッケージはこれらのエンドポイントを自動的に検出して通信し、次のことを可能にします:
+
+- 異なるポートで動作する複数の Next.js インスタンスへの接続
+- ツール呼び出しの適切な Next.js 開発サーバーへの転送
+- コーディングエージェント向けの統一インターフェースの提供
+
+このアーキテクチャにより、エージェントインターフェースが内部実装から切り離され、`next-devtools-mcp` はさまざまな Next.js プロジェクト間でシームレスに動作できるようになります。
+
+## トラブルシューティング
+
+### MCP サーバーに接続できない場合
+
+- Next.js v16 以降を使用していることを確認してください
+- `.mcp.json` に `next-devtools-mcp` が設定されていることを確認してください
+- 開発サーバーを起動してください: `npm run dev`
+- すでに起動している場合は、開発サーバーを再起動してください
+- コーディングエージェントが MCP サーバーの設定を読み込んでいるか確認してください

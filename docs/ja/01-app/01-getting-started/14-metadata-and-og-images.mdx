@@ -1,0 +1,334 @@
+---
+title: メタデータと OG 画像
+description: ページにメタデータを追加し、動的な OG 画像を作成する方法を学びます。
+related:
+  title: API リファレンス
+  description: このページで言及されている Metadata API についてさらに学びます。
+  links:
+    - app/api-reference/functions/generate-metadata
+    - app/api-reference/functions/generate-viewport
+    - app/api-reference/functions/image-response
+    - app/api-reference/file-conventions/metadata
+    - app/api-reference/file-conventions/metadata/app-icons
+    - app/api-reference/file-conventions/metadata/opengraph-image
+    - app/api-reference/file-conventions/metadata/robots
+    - app/api-reference/file-conventions/metadata/sitemap
+    - app/api-reference/config/next-config-js/htmlLimitedBots
+---
+
+Metadata API は、アプリケーションのメタデータを定義して SEO と Web 上での共有しやすさを向上させるために使用でき、次のものが含まれます。
+
+1. [静的な `metadata` オブジェクト](#static-metadata)
+2. [動的な `generateMetadata` 関数](#generated-metadata)
+3. 静的または動的に生成された [favicon](#favicons) と [OG 画像](#static-open-graph-images) を追加するために使用できる専用の [ファイル規約](/docs/app/api-reference/file-conventions/metadata)。
+
+上記のすべてのオプションにより、Next.js はページに必要な `<head>` タグを自動的に生成します。これはブラウザのデベロッパーツールで確認できます。
+
+`metadata` オブジェクトと `generateMetadata` 関数としてのエクスポートは、サーバーコンポーネントでのみサポートされています。
+
+## デフォルトフィールド
+
+ルートでメタデータを定義していない場合でも、常に追加されるデフォルトの `meta` タグが 2 つあります。
+
+- [meta charset タグ](https://developer.mozilla.org/docs/Web/HTML/Element/meta#attr-charset) は、サイトの文字エンコーディングを設定します。
+- [meta viewport タグ](https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag) は、さまざまなデバイスに対応できるよう、サイトのビューポートの幅とスケールを設定します。
+
+```html
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+```
+
+その他のメタデータフィールドは、`Metadata` オブジェクト（[静的メタデータ](#static-metadata)）または `generateMetadata` 関数（[生成メタデータ](#generated-metadata)）で定義できます。
+
+## 静的メタデータ
+
+静的メタデータを定義するには、静的な [`layout.js`](/docs/app/api-reference/file-conventions/layout) または [`page.js`](/docs/app/api-reference/file-conventions/page) ファイルから [`Metadata` オブジェクト](/docs/app/api-reference/functions/generate-metadata#metadata-object) を export します。たとえば、ブログのルートに title と description を追加するには次のようにします：
+
+```tsx filename="app/blog/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My Blog',
+  description: '...',
+}
+
+export default function Layout() {}
+```
+
+```jsx filename="app/blog/layout.js" switcher
+export const metadata = {
+  title: 'My Blog',
+  description: '...',
+}
+
+export default function Layout() {}
+```
+
+利用可能なオプションの一覧は、[`generateMetadata` のドキュメント](/docs/app/api-reference/functions/generate-metadata#metadata-fields)で確認できます。
+
+## 生成されたメタデータ
+
+[`generateMetadata`](/docs/app/api-reference/functions/generate-metadata) 関数を使用して、データに依存するメタデータを `fetch` して取得できます。たとえば、特定のブログ記事のタイトルとディスクリプションを取得するには、次のようにします。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+import type { Metadata, ResolvingMetadata } from 'next'
+
+type Props = {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export async function generateMetadata(
+  { params, searchParams }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const slug = (await params).slug
+
+  // 投稿情報を取得する
+  const post = await fetch(`https://api.vercel.app/blog/${slug}`).then((res) =>
+    res.json()
+  )
+
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default function Page({ params, searchParams }: Props) {}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateMetadata({ params, searchParams }, parent) {
+  const slug = (await params).slug
+
+  // 投稿情報を取得する
+  const post = await fetch(`https://api.vercel.app/blog/${slug}`).then((res) =>
+    res.json()
+  )
+
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default function Page({ params, searchParams }) {}
+```
+
+### メタデータのストリーミング
+
+動的にレンダリングされるページでは、Next.js はメタデータを別途ストリーミングし、`generateMetadata` が解決され次第、HTML に挿入します。この際、UI のレンダリングはブロックされません。
+
+メタデータのストリーミングにより、視覚的なコンテンツを先にストリーミングできるため、体感パフォーマンスが向上します。
+
+メタデータのストリーミングは、メタデータが `<head>` タグ内にあることを期待する **ボットやクローラーに対しては無効化** されます（例: `Twitterbot`、`Slackbot`、`Bingbot`）。これらは受信リクエストの User Agent ヘッダーを使用して検出されます。
+
+Next.js の設定ファイル内の [`htmlLimitedBots`](/docs/app/api-reference/config/next-config-js/htmlLimitedBots#disabling) オプションを使用して、メタデータのストリーミングをカスタマイズしたり、完全に**無効化**したりできます。
+
+静的にレンダリングされるページでは、メタデータがビルド時に解決されるため、ストリーミングは使用されません。
+
+詳しくは、[メタデータのストリーミング](/docs/app/api-reference/functions/generate-metadata#streaming-metadata) を参照してください。
+
+### データリクエストのメモ化
+
+メタデータとページ本体の両方で、**同じ**データを取得する必要がある場合があります。重複したリクエストを避けるために、React の [`cache` 関数](https://react.dev/reference/react/cache) を使用して返り値をメモ化し、データの取得を一度だけ行うことができます。たとえば、メタデータとページの両方でブログ投稿情報を取得するには、次のようにします。
+
+```ts filename="app/lib/data.ts" highlight={5} switcher
+import { cache } from 'react'
+import { db } from '@/app/lib/db'
+
+// getPost は2回使用されるが、実行は1回のみ
+export const getPost = cache(async (slug: string) => {
+  const res = await db.query.posts.findFirst({ where: eq(posts.slug, slug) })
+  return res
+})
+```
+
+```js filename="app/lib/data.js" highlight={5} switcher
+import { cache } from 'react'
+import { db } from '@/app/lib/db'
+
+// getPost は2回使用されるが、実行は1回のみ
+export const getPost = cache(async (slug) => {
+  const res = await db.query.posts.findFirst({ where: eq(posts.slug, slug) })
+  return res
+})
+```
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+import { getPost } from '@/app/lib/data'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  const post = await getPost(params.slug)
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default async function Page({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug)
+  return <div>{post.title}</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+import { getPost } from '@/app/lib/data'
+
+export async function generateMetadata({ params }) {
+  const post = await getPost(params.slug)
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default async function Page({ params }) {
+  const post = await getPost(params.slug)
+  return <div>{post.title}</div>
+}
+```
+
+## ファイルベースのメタデータ
+
+メタデータ用に、次の専用ファイルが用意されています:
+
+- [favicon.ico、apple-icon.jpg、icon.jpg](/docs/app/api-reference/file-conventions/metadata/app-icons)
+- [opengraph-image.jpg、twitter-image.jpg](/docs/app/api-reference/file-conventions/metadata/opengraph-image)
+- [robots.txt](/docs/app/api-reference/file-conventions/metadata/robots)
+- [sitemap.xml](/docs/app/api-reference/file-conventions/metadata/sitemap)
+
+これらは静的なメタデータとして使用できるほか、コードでこれらのファイルを生成することもできます。
+
+## ファビコン
+
+ファビコンは、ブックマークや検索結果でサイトを表す小さなアイコンです。アプリケーションにファビコンを追加するには、`favicon.ico` を作成し、app フォルダのルートに配置します。
+
+<Image
+  alt="App フォルダ内で layout ファイルや page ファイルと並んで配置された特別な Favicon ファイル"
+  srcLight="/docs/light/favicon-ico.png"
+  srcDark="/docs/dark/favicon-ico.png"
+  width="1600"
+  height="444"
+/>
+
+> コードからファビコンを生成することもできます。詳しくは [favicon のドキュメント](/docs/app/api-reference/file-conventions/metadata/app-icons) を参照してください。
+
+## 静的な Open Graph 画像
+
+Open Graph (OG) 画像は、ソーシャルメディア上でサイトを表現するための画像です。アプリケーションに静的な OG 画像を追加するには、`app` フォルダのルートに `opengraph-image.jpg` ファイルを作成します。
+
+<Image
+  alt="App フォルダ内にレイアウトファイルとページファイルと並んで置かれた OG 画像用の特別なファイル"
+  srcLight="/docs/light/opengraph-image.png"
+  srcDark="/docs/dark/opengraph-image.png"
+  width="1600"
+  height="444"
+/>
+
+特定のルート用の OG 画像を追加するには、フォルダ構造のより深い場所に `opengraph-image.jpg` を作成します。たとえば、`/blog` ルート専用の OG 画像を作成するには、`blog` フォルダ内に `opengraph-image.jpg` ファイルを追加します。
+
+<Image
+  alt="blog フォルダ内にある OG 画像用の特別なファイル"
+  srcLight="/docs/light/opengraph-image-blog.png"
+  srcDark="/docs/dark/opengraph-image-blog.png"
+  width="1600"
+  height="525"
+/>
+
+より詳細に指定された画像は、フォルダ構造の上位にある他の OG 画像よりも優先されます。
+
+> `jpeg`、`png`、`gif` などの他の画像形式もサポートされています。詳しくは [Open Graph Image のドキュメント](/docs/app/api-reference/file-conventions/metadata/opengraph-image) を参照してください。
+
+## Open Graph 画像の生成
+
+[`ImageResponse` コンストラクタ](/docs/app/api-reference/functions/image-response) を使用すると、JSX と CSS を使って動的な画像を生成できます。これは、データに応じて変化する OG 画像に便利です。
+
+たとえば、各ブログ投稿に固有の OG 画像を生成するには、`blog` フォルダー内に `opengraph-image.tsx` ファイルを追加し、`next/og` から `ImageResponse` コンストラクタをインポートします。
+
+```tsx filename="app/blog/[slug]/opengraph-image.tsx" switcher
+import { ImageResponse } from 'next/og'
+import { getPost } from '@/app/lib/data'
+
+// 画像のメタデータ
+export const size = {
+  width: 1200,
+  height: 630,
+}
+
+export const contentType = 'image/png'
+
+// 画像の生成
+export default async function Image({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug)
+
+  return new ImageResponse(
+    (
+      // ImageResponse の JSX 要素
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    )
+  )
+}
+```
+
+```jsx filename="app/blog/[slug]/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+import { getPost } from '@/app/lib/data'
+
+// 画像メタデータ
+export const size = {
+  width: 1200,
+  height: 630,
+}
+
+export const contentType = 'image/png'
+
+// 画像生成
+export default async function Image({ params }) {
+  const post = await getPost(params.slug)
+
+  return new ImageResponse(
+    (
+      // ImageResponse JSX要素
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    )
+  )
+}
+```
+
+`ImageResponse` は、flexbox や絶対配置、カスタムフォント、テキストの折り返し、中央揃え、入れ子の画像など、一般的な CSS プロパティをサポートします。[サポートされている CSS プロパティの完全な一覧はこちら](/docs/app/api-reference/functions/image-response)。
+
+> **補足**:
+>
+> - 例は [Vercel OG Playground](https://og-playground.vercel.app/) で確認できます。
+> - `ImageResponse` は、HTML と CSS を PNG に変換するために [`@vercel/og`](https://vercel.com/docs/og-image-generation)、[`satori`](https://github.com/vercel/satori)、`resvg` を使用します。
+> - flexbox と CSS プロパティの一部のみがサポートされています。高度なレイアウト（例: `display: grid`）には対応していません。

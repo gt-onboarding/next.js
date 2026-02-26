@@ -1,0 +1,18 @@
+---
+title: allowedDevOrigins
+description: '`allowedDevOrigins` を使用して、開発サーバーへのリクエストを許可する追加のオリジンを設定します。'
+---
+
+{/* このドキュメントの内容は App Router と Pages Router の両方で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+Next.js は開発中にクロスオリジンリクエストを自動的にブロックしませんが、開発モードで利用可能な内部アセットやエンドポイントへの不正なリクエストを防ぐため、将来のメジャーバージョンの Next.js ではデフォルトでブロックするようになります。
+
+サーバーが初期化されたホスト名（デフォルトでは `localhost`）以外のオリジンからのリクエストを Next.js アプリケーションで許可するには、`allowedDevOrigins` 設定オプションを使用できます。
+
+`allowedDevOrigins` を使うと、開発モードで追加で許可するオリジンを設定できます。たとえば、`localhost` のみではなく `local-origin.dev` を使用したい場合は、`next.config.js` を開き、`allowedDevOrigins` 設定を追加します。
+
+```js filename="next.config.js"
+module.exports = {
+  allowedDevOrigins: ['local-origin.dev', '*.local-origin.dev'],
+}
+```

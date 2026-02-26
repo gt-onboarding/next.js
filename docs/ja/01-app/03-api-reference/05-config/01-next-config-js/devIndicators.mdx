@@ -1,0 +1,60 @@
+---
+title: devIndicators
+description: 開発中に現在表示しているルートに関する情報を示す画面上のインジケーターの設定オプションです。
+---
+
+`devIndicators` を使用すると、開発中に現在表示しているルートに関する情報を示す画面上のインジケーターを設定できます。
+
+```ts filename="Types"
+  devIndicators: false | {
+    position?: 'bottom-right'
+    | 'bottom-left'
+    | 'top-right'
+    | 'top-left', // デフォルトは 'bottom-left',
+  },
+```
+
+`devIndicators` を `false` に設定するとインジケーターは非表示になりますが、Next.js は検出されたビルドエラーや実行時エラーを引き続き表示します。
+
+## トラブルシューティング
+
+### インジケーターがルートを静的としてマークしない場合
+
+ルートが静的であることを想定しているにもかかわらず、インジケーターがそのルートを動的としてマークしている場合、そのルートは静的レンダリングをオプトアウトしている可能性があります。
+
+`next build --debug` を使用してアプリケーションをビルドし、ターミナルの出力を確認することで、ルートが[静的](/docs/app/guides/caching#static-rendering)か[動的](/docs/app/guides/caching#dynamic-rendering)かを確認できます。静的（または事前レンダリングされた）ルートには `○` 記号が表示され、動的ルートには `ƒ` 記号が表示されます。例えば:
+
+```bash filename="Build Output"
+Route (app)
+┌ ○ /_not-found
+└ ƒ /products/[id]
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+```
+
+<AppOnly>
+  ルートが静的レンダリングから除外される理由は 2 つあります。
+
+- 実行時の情報に依存する [Dynamic APIs](/docs/app/guides/caching#dynamic-rendering) が存在する場合。
+- ORM やデータベースドライバの呼び出しのような、[キャッシュされていないデータリクエスト](/docs/app/getting-started/fetching-data) がある場合。
+
+これらの条件にルートが当てはまるか確認し、そのルートを静的にレンダリングできない場合は、[`loading.js`](/docs/app/api-reference/file-conventions/loading) または [`<Suspense />`](https://react.dev/reference/react/Suspense) を使用して [ストリーミング](/docs/app/getting-started/linking-and-navigating#streaming) を活用することを検討してください。
+
+</AppOnly>
+
+<PagesOnly>
+  ページから
+  [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)
+  または
+  [`getInitialProps`](/docs/pages/api-reference/functions/get-initial-props)
+  をエクスポートすると、そのページは動的として扱われます。
+</PagesOnly>
+
+## バージョン履歴
+
+| バージョン | 変更点                                                                                                                                                                |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v16.0.0`  | `appIsrStatus`、`buildActivity`、`buildActivityPosition` オプションが削除されました。                                                                                 |
+| `v15.2.0`  | 新しい `position` オプションにより、画面上のインジケーターが改善されました。`appIsrStatus`、`buildActivity`、`buildActivityPosition` オプションは非推奨になりました。 |
+| `v15.0.0`  | `appIsrStatus` オプション付きの静的な画面上のインジケーターが追加されました。                                                                                         |

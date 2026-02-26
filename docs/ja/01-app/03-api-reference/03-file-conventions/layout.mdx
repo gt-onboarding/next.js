@@ -1,0 +1,681 @@
+---
+title: layout.js
+description: layout.js ファイルの API リファレンスです。
+---
+
+`layout` ファイルは、Next.js アプリケーションでレイアウトを定義するためのファイルです。
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <section>{children}</section>
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+export default function DashboardLayout({ children }) {
+  return <section>{children}</section>
+}
+```
+
+**ルートレイアウト**は、ルートの `app` ディレクトリ内にある最上位のレイアウトです。`<html>` と `<body>` タグ、およびその他のグローバルに共有される UI を定義するために使用されます。
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## リファレンス
+
+### Props（プロップス）
+
+#### `children`（必須）
+
+Layout コンポーネントは `children` プロップを受け取り、使用する必要があります。レンダリング時には、そのレイアウトがラップしているルートセグメントが `children` に渡されます。これらは主に子の [Layout](/docs/app/api-reference/file-conventions/page)（存在する場合）や [Page](/docs/app/api-reference/file-conventions/page) のコンポーネントになりますが、状況によっては [Loading](/docs/app/api-reference/file-conventions/loading) や [Error](/docs/app/getting-started/error-handling) などの他の特別なファイルになることもあります。
+
+#### `params` (optional)
+
+ルートセグメントからそのレイアウトまでの[動的ルートパラメーター](/docs/app/api-reference/file-conventions/dynamic-routes)を表すオブジェクトへと解決される `Promise`。
+
+```tsx filename="app/dashboard/[team]/layout.tsx" switcher
+export default async function Layout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ team: string }>
+}) {
+  const { team } = await params
+}
+```
+
+```jsx filename="app/dashboard/[team]/layout.js" switcher
+export default async function Layout({ children, params }) {
+  const { team } = await params
+}
+```
+
+| ルート例                          | URL            | `params`                           |
+| --------------------------------- | -------------- | ---------------------------------- |
+| `app/dashboard/[team]/layout.js`  | `/dashboard/1` | `Promise<{ team: '1' }>`           |
+| `app/shop/[tag]/[item]/layout.js` | `/shop/1/2`    | `Promise<{ tag: '1', item: '2' }>` |
+| `app/blog/[...slug]/layout.js`    | `/blog/1/2`    | `Promise<{ slug: ['1', '2'] }>`    |
+
+- `params` プロップは Promise であるため、値にアクセスするには `async/await` または React の [`use`](https://react.dev/reference/react/use) 関数を使用する必要があります。
+  - バージョン 14 以前では、`params` は同期的なプロップでした。後方互換性のため、Next.js 15 でも同期的にアクセスできますが、この動作は将来的に非推奨となる予定です。
+
+### Layout Props ヘルパー
+
+レイアウトに型を付けるには `LayoutProps` を使用します。これにより、ディレクトリ構造から推論された型安全な `params` と名前付きスロットを利用できます。`LayoutProps` はグローバルに利用可能なヘルパーです。
+
+```tsx filename="app/dashboard/layout.tsx"
+export default function Layout(props: LayoutProps<'/dashboard'>) {
+  return (
+    <section>
+      {props.children}
+      {/* app/dashboard/@analytics がある場合、型付きスロットとして表示されます: */}
+      {/* {props.analytics} */}
+    </section>
+  )
+}
+```
+
+> **補足**:
+>
+> - 型は `next dev`、`next build`、または `next typegen` の実行時に生成されます。
+> - 型生成後は、`LayoutProps` ヘルパーがグローバルに利用可能になります。インポートは不要です。
+
+### ルートレイアウト
+
+`app` ディレクトリには、ルート `app` ディレクトリ直下で最上位となる **ルートレイアウト** を **必ず** 定義する必要があります。一般的に、このルートレイアウトは `app/layout.js` です。
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+- ルートレイアウトでは、`<html>` と `<body>` タグを定義する **必要があります**。
+  - ルートレイアウトに `<title>` や `<meta>` などの `<head>` タグを手動で追加しては **いけません**。代わりに [Metadata API](/docs/app/getting-started/metadata-and-og-images) を使用してください。これは、ストリーミングや `<head>` 要素の重複排除などの高度な要件を自動的に処理します。
+- **複数のルートレイアウト** を作成できます。上位に `layout.js` が存在しないレイアウトは、すべてルートレイアウトです。一般的なアプローチとしては次のとおりです:
+  - `app/(shop)/layout.js` や `app/(marketing)/layout.js` のように [route groups](/docs/app/api-reference/file-conventions/route-groups) を使用する
+  - `app/layout.js` を作成せず、`app/dashboard/layout.js` や `app/blog/layout.js` のようなサブディレクトリ内のレイアウトを、それぞれのディレクトリに対するルートレイアウトにする
+  - **複数のルートレイアウト間をまたいで遷移** すると、（クライアントサイドナビゲーションではなく）**フルページロード** が行われます。
+- ルートレイアウトは **動的セグメント** の配下に配置することもできます。例えば、`app/[lang]/layout.js` を用いて [internationalization](/docs/app/guides/internationalization) を実装する場合などです。
+
+## 注意事項
+
+### リクエストオブジェクト
+
+レイアウトは、ナビゲーション中にクライアント側でキャッシュされ、不要なサーバーリクエストを避けます。
+
+[Layouts](/docs/app/api-reference/file-conventions/layout) は再レンダーされません。ページ間を移動する際の不要な計算を避けるためにキャッシュして再利用できます。レイアウトから生のリクエストへのアクセスを制限することで、Next.js はレイアウト内で実行され得る低速またはコストの高いユーザーコードの実行を防ぎ、パフォーマンスへの悪影響を回避できます。
+
+リクエストオブジェクトにアクセスするには、[サーバーコンポーネント](/docs/app/getting-started/server-and-client-components) や Functions 内で [`headers`](/docs/app/api-reference/functions/headers) と [`cookies`](/docs/app/api-reference/functions/cookies) の API を使用できます。
+
+```tsx filename="app/shop/layout.tsx" switcher
+import { cookies } from 'next/headers'
+
+export default async function Layout({ children }) {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')
+  return '...'
+}
+```
+
+```jsx filename="app/shop/layout.js" switcher
+import { cookies } from 'next/headers'
+
+export default async function Layout({ children }) {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')
+  return '...'
+}
+```
+
+### クエリパラメータ
+
+レイアウトはナビゲーション時に再レンダーされないため、その結果、値が更新されず古くなってしまう検索パラメータにはアクセスできません。
+
+更新されたクエリパラメータにアクセスするには、Page コンポーネントの [`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) プロップを使用するか、Client Component 内で [`useSearchParams`](/docs/app/api-reference/functions/use-search-params) フックを使って読み取ることができます。Client Components はナビゲーション時に再レンダーされるため、最新のクエリパラメータにアクセスできます。
+
+```tsx filename="app/ui/search.tsx" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function Search() {
+  const searchParams = useSearchParams()
+
+  const search = searchParams.get('search')
+
+  return '...'
+}
+```
+
+```jsx filename="app/ui/search.js" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function Search() {
+  const searchParams = useSearchParams()
+
+  const search = searchParams.get('search')
+
+  return '...'
+}
+```
+
+```tsx filename="app/shop/layout.tsx" switcher
+import Search from '@/app/ui/search'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Search />
+      {children}
+    </>
+  )
+}
+```
+
+```jsx filename="app/shop/layout.js" switcher
+import Search from '@/app/ui/search'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Search />
+      {children}
+    </>
+  )
+}
+```
+
+### パス名
+
+レイアウトはナビゲーション時に再レンダーされないため、そうでなければ古くなってしまう `pathname` にはアクセスしません。
+
+現在のパス名を取得するには、Client Component 内で [`usePathname`](/docs/app/api-reference/functions/use-pathname) フックを使って読み取ることができます。Client Component はナビゲーション中に再レンダーされるため、常に最新のパス名にアクセスできます。
+
+```tsx filename="app/ui/breadcrumbs.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+// 簡略化されたパンくずロジック
+export default function Breadcrumbs() {
+  const pathname = usePathname()
+  const segments = pathname.split('/')
+
+  return (
+    <nav>
+      {segments.map((segment, index) => (
+        <span key={index}>
+          {' > '}
+          {segment}
+        </span>
+      ))}
+    </nav>
+  )
+}
+```
+
+```jsx filename="app/ui/breadcrumbs.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+// 簡略化されたパンくずリストのロジック
+export default function Breadcrumbs() {
+  const pathname = usePathname()
+  const segments = pathname.split('/')
+
+  return (
+    <nav>
+      {segments.map((segment, index) => (
+        <span key={index}>
+          {' > '}
+          {segment}
+        </span>
+      ))}
+    </nav>
+  )
+}
+```
+
+```tsx filename="app/docs/layout.tsx" switcher
+import { Breadcrumbs } from '@/app/ui/Breadcrumbs'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Breadcrumbs />
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/docs/layout.js" switcher
+import { Breadcrumbs } from '@/app/ui/Breadcrumbs'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Breadcrumbs />
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### データの取得
+
+レイアウトはその `children` にデータを渡すことはできません。ただし、同じルート内で同じデータを複数回取得しても、React の [`cache`](https://react.dev/reference/react/cache) を使用してリクエストを重複排除すれば、パフォーマンスに影響を与えずに済みます。
+
+一方、Next.js で [`fetch`](/docs/app/api-reference/functions/fetch) を使用する場合は、リクエストは自動的に重複排除されます。
+
+```tsx filename="app/lib/data.ts" switcher
+export async function getUser(id: string) {
+  const res = await fetch(`https://.../users/${id}`)
+  return res.json()
+}
+```
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+import { getUser } from '@/app/lib/data'
+import { UserName } from '@/app/ui/user-name'
+
+export default async function Layout({ children }) {
+  const user = await getUser('1')
+
+  return (
+    <>
+      <nav>
+        {/* ... */}
+        <UserName user={user.name} />
+      </nav>
+      {children}
+    </>
+  )
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+import { getUser } from '@/app/lib/data'
+import { UserName } from '@/app/ui/user-name'
+
+export default async function Layout({ children }) {
+  const user = await getUser('1')
+
+  return (
+    <>
+      <nav>
+        {/* ... */}
+        <UserName user={user.name} />
+      </nav>
+      {children}
+    </>
+  )
+}
+```
+
+```tsx filename="app/dashboard/page.tsx" switcher
+import { getUser } from '@/app/lib/data'
+import { UserName } from '@/app/ui/user-name'
+
+export default async function Page() {
+  const user = await getUser('1')
+
+  return (
+    <div>
+      <h1>Welcome {user.name}</h1>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/dashboard/page.js" switcher
+import { getUser } from '@/app/lib/data'
+import { UserName } from '@/app/ui/user-name'
+
+export default async function Page() {
+  const user = await getUser('1')
+
+  return (
+    <div>
+      <h1>Welcome {user.name}</h1>
+    </div>
+  )
+}
+```
+
+### 子セグメントへのアクセス
+
+レイアウトは、自身の配下にあるルートセグメントへはアクセスできません。すべてのルートセグメントにアクセスするには、Client Component 内で [`useSelectedLayoutSegment`](/docs/app/api-reference/functions/use-selected-layout-segment) または [`useSelectedLayoutSegments`](/docs/app/api-reference/functions/use-selected-layout-segments) を使用できます。
+
+```tsx filename="app/ui/nav-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function NavLink({
+  slug,
+  children,
+}: {
+  slug: string
+  children: React.ReactNode
+}) {
+  const segment = useSelectedLayoutSegment()
+  const isActive = slug === segment
+
+  return (
+    <Link
+      href={`/blog/${slug}`}
+      // リンクがアクティブかどうかに応じてスタイルを変更する
+      style={{ fontWeight: isActive ? 'bold' : 'normal' }}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/ui/nav-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function NavLinks({ slug, children }) {
+  const segment = useSelectedLayoutSegment()
+  const isActive = slug === segment
+
+  return (
+    <Link
+      href={`/blog/${slug}`}
+      style={{ fontWeight: isActive ? 'bold' : 'normal' }}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```tsx filename="app/blog/layout.tsx" switcher
+import { NavLink } from './nav-link'
+import getPosts from './get-posts'
+
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const featuredPosts = await getPosts()
+  return (
+    <div>
+      {featuredPosts.map((post) => (
+        <div key={post.id}>
+          <NavLink slug={post.slug}>{post.title}</NavLink>
+        </div>
+      ))}
+      <div>{children}</div>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/blog/layout.js" switcher
+import { NavLink } from './nav-link'
+import getPosts from './get-posts'
+
+export default async function Layout({ children }) {
+  const featuredPosts = await getPosts()
+  return (
+    <div>
+      {featuredPosts.map((post) => (
+        <div key={post.id}>
+          <NavLink slug={post.slug}>{post.title}</NavLink>
+        </div>
+      ))}
+      <div>{children}</div>
+    </div>
+  )
+}
+```
+
+## 例
+
+### メタデータ
+
+[`metadata` オブジェクト](/docs/app/api-reference/functions/generate-metadata#the-metadata-object) や [`generateMetadata` 関数](/docs/app/api-reference/functions/generate-metadata#generatemetadata-function) を使用して、HTML の `<head>` 内にある `title` や `meta` などの要素を変更できます。
+
+```tsx filename="app/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Next.js',
+}
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return '...'
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export const metadata = {
+  title: 'Next.js',
+}
+
+export default function Layout({ children }) {
+  return '...'
+}
+```
+
+> **補足**: ルートレイアウトに `<title>` や `<meta>` のような `<head>` タグを手動で追加しないでください。代わりに、ストリーミングや `<head>` 要素の重複排除といった高度な要件を自動的に処理する [Metadata APIs](/docs/app/api-reference/functions/generate-metadata) を使用してください。
+
+### アクティブなナビゲーションリンク
+
+[`usePathname`](/docs/app/api-reference/functions/use-pathname) フックを使用して、ナビゲーションリンクがアクティブかどうかを判定できます。
+
+`usePathname` はクライアント用のフックなので、レイアウトからインポートできるように、ナビゲーションリンクを Client Component として切り出す必要があります。
+
+```tsx filename="app/ui/nav-links.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export function NavLinks() {
+  const pathname = usePathname()
+
+  return (
+    <nav>
+      <Link className={`link ${pathname === '/' ? 'active' : ''}`} href="/">
+        Home
+      </Link>
+
+      <Link
+        className={`link ${pathname === '/about' ? 'active' : ''}`}
+        href="/about"
+      >
+        About
+      </Link>
+    </nav>
+  )
+}
+```
+
+```jsx filename="app/ui/nav-links.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export function Links() {
+  const pathname = usePathname()
+
+  return (
+    <nav>
+      <Link className={`link ${pathname === '/' ? 'active' : ''}`} href="/">
+        Home
+      </Link>
+
+      <Link
+        className={`link ${pathname === '/about' ? 'active' : ''}`}
+        href="/about"
+      >
+        About
+      </Link>
+    </nav>
+  )
+}
+```
+
+```tsx filename="app/layout.tsx" switcher
+import { NavLinks } from '@/app/ui/nav-links'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <NavLinks />
+        <main>{children}</main>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { NavLinks } from '@/app/ui/nav-links'
+
+export default function Layout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <NavLinks />
+        <main>{children}</main>
+      </body>
+    </html>
+  )
+}
+```
+
+### `params` に基づいてコンテンツを表示する
+
+[動的ルートセグメント](/docs/app/api-reference/file-conventions/dynamic-routes) を使用すると、`params` プロップに基づいて特定のコンテンツを表示・取得できます。
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+export default async function DashboardLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ team: string }>
+}) {
+  const { team } = await params
+
+  return (
+    <section>
+      <header>
+        <h1>Welcome to {team}'s Dashboard</h1>
+      </header>
+      <main>{children}</main>
+    </section>
+  )
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+export default async function DashboardLayout({ children, params }) {
+  const { team } = await params
+
+  return (
+    <section>
+      <header>
+        <h1>Welcome to {team}'s Dashboard</h1>
+      </header>
+      <main>{children}</main>
+    </section>
+  )
+}
+```
+
+### Client Component での `params` の読み取り
+
+Client Component（`async` にできない）で `params` を使用するには、React の [`use`](https://react.dev/reference/react/use) 関数を使用して Promise を読み取ります。
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { use } from 'react'
+
+export default function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = use(params)
+}
+```
+
+```js filename="app/page.js" switcher
+'use client'
+
+import { use } from 'react'
+
+export default function Page({ params }) {
+  const { slug } = use(params)
+}
+```
+
+## バージョン履歴
+
+| バージョン   | 変更点                                                                                                |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| `v15.0.0-RC` | `params` は Promise になりました。[codemod](/docs/app/guides/upgrading/codemods#150) が利用可能です。 |
+| `v13.0.0`    | `layout` が導入されました。                                                                           |

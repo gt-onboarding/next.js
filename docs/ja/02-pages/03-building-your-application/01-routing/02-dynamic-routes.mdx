@@ -1,0 +1,64 @@
+---
+title: 動的ルート
+description: 動的ルートは、URL にカスタムのパラメーターを追加できるページです。ここから動的ルートの作成を始めて、さらに詳しく学びましょう。
+related:
+  title: 次のステップ
+  description: 次に何をすべきかの詳細については、以下のセクションを参照することをおすすめします
+  links:
+    - pages/building-your-application/routing/linking-and-navigating
+    - pages/api-reference/functions/use-router
+---
+
+事前に正確なセグメント名が分からず、動的なデータからルートを作成したい場合は、リクエスト時に値が埋め込まれるか、ビルド時に[事前レンダリング](/docs/pages/building-your-application/data-fetching/get-static-paths)される Dynamic Segments（動的セグメント）を使用できます。
+
+## 規約
+
+Dynamic Segment は、ファイル名またはフォルダ名を角括弧で囲むことで作成します: `[segmentName]`。例えば、`[id]` や `[slug]` のように指定します。
+
+Dynamic Segment は [`useRouter`](/docs/pages/api-reference/functions/use-router) から参照できます。
+
+## 例
+
+たとえば、ブログには次のようなルート `pages/blog/[slug].js` を持たせることができます。このとき `[slug]` がブログ投稿用の Dynamic Segment（動的セグメント）になります。
+
+```jsx
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+  return <p>Post: {router.query.slug}</p>
+}
+```
+
+| ルート                 | URL の例  | `params`        |
+| ---------------------- | --------- | --------------- |
+| `pages/blog/[slug].js` | `/blog/a` | `{ slug: 'a' }` |
+| `pages/blog/[slug].js` | `/blog/b` | `{ slug: 'b' }` |
+| `pages/blog/[slug].js` | `/blog/c` | `{ slug: 'c' }` |
+
+## キャッチオールセグメント
+
+動的セグメントは、角括弧内にドット3つ（`...`）を追加することで、後続の任意の数のセグメントをまとめて受け取る**キャッチオール**セグメント（`[...segmentName]`）として拡張できます。
+
+たとえば、`pages/shop/[...slug].js` は `/shop/clothes` にマッチしますが、`/shop/clothes/tops` や `/shop/clothes/tops/t-shirts` などにもマッチします。
+
+| ルート                    | URL の例      | `params`                    |
+| ------------------------- | ------------- | --------------------------- |
+| `pages/shop/[...slug].js` | `/shop/a`     | `{ slug: ['a'] }`           |
+| `pages/shop/[...slug].js` | `/shop/a/b`   | `{ slug: ['a', 'b'] }`      |
+| `pages/shop/[...slug].js` | `/shop/a/b/c` | `{ slug: ['a', 'b', 'c'] }` |
+
+## オプションのキャッチオールセグメント
+
+キャッチオールセグメントは、パラメーターを二重の角括弧で囲むことで **オプション**（任意）にできます: `[[...segmentName]]`。
+
+たとえば、`pages/shop/[[...slug]].js` は、`/shop/clothes`、`/shop/clothes/tops`、`/shop/clothes/tops/t-shirts` に加えて、`/shop` にも **マッチ** します。
+
+**キャッチオール** セグメントと **オプションのキャッチオール** セグメントの違いは、オプションの場合、パラメーターなしのルート（上記の例では `/shop`）にもマッチするという点です。
+
+| ルート                      | URL の例      | `params`                    |
+| --------------------------- | ------------- | --------------------------- |
+| `pages/shop/[[...slug]].js` | `/shop`       | `{ slug: undefined }`       |
+| `pages/shop/[[...slug]].js` | `/shop/a`     | `{ slug: ['a'] }`           |
+| `pages/shop/[[...slug]].js` | `/shop/a/b`   | `{ slug: ['a', 'b'] }`      |
+| `pages/shop/[[...slug]].js` | `/shop/a/b/c` | `{ slug: ['a', 'b', 'c'] }` |

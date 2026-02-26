@@ -1,0 +1,16 @@
+---
+title: generateEtags
+description: Next.js はデフォルトで全ページに ETag を生成します。ETag の生成を無効化する方法について説明します。
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router で共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されるコンテンツは、コンポーネントでラップしないでください。 */}
+
+Next.js はデフォルトで、すべてのページに対して [ETag](https://en.wikipedia.org/wiki/HTTP_ETag) を生成します。キャッシュ戦略によっては、HTML ページでの ETag 生成を無効化したい場合があります。
+
+`next.config.js` を開き、`generateEtags` オプションを無効にします。
+
+```js filename="next.config.js"
+module.exports = {
+  generateEtags: false,
+}
+```

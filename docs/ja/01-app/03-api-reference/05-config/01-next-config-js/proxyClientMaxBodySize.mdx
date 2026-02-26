@@ -1,0 +1,118 @@
+---
+title: proxyClientMaxBodySize
+description: プロキシ使用時の最大リクエストボディサイズを設定します。
+version: experimental
+---
+
+proxy が使用されている場合、Next.js はリクエストボディを自動的にコピーしてメモリ上にバッファリングし、proxy 側と背後のルートハンドラーの両方で複数回読み取れるようにします。過剰なメモリ使用を防ぐために、この設定オプションではバッファリングされるボディのサイズ上限を指定します。
+
+デフォルトでは、最大ボディサイズは **10MB** です。リクエストボディがこの上限を超えた場合、ボディは上限サイズまでしかバッファリングされず、どのルートが上限を超えたかを示す警告がログに記録されます。
+
+## オプション
+
+### 文字列形式（推奨）
+
+読みやすい文字列表現を使ってサイズを指定します：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: '1mb',
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: '1mb',
+  },
+}
+
+module.exports = nextConfig
+```
+
+対応している単位：`b`, `kb`, `mb`, `gb`
+
+### 数値形式
+
+または、サイズをバイト単位の数値で指定できます。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: 1048576, // 1MBをバイトで指定
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: 1048576, // 1MBをバイト単位で指定
+  },
+}
+
+module.exports = nextConfig
+```
+
+## 挙動
+
+リクエストボディが設定された上限値を超えた場合:
+
+1. Next.js は先頭の N バイト分のみ（上限値まで）をバッファします
+2. 上限値を超えたルートを示す警告がコンソールにログ出力されます
+3. リクエストは通常どおり処理を続行しますが、ボディの一部のみが利用可能です
+4. リクエストが失敗したり、クライアントにエラーが返されたりすることは **ありません**
+
+アプリケーションでリクエストボディ全体を処理する必要がある場合は、次のいずれかを行ってください:
+
+- `proxyClientMaxBodySize` の上限値を引き上げる
+- アプリケーションロジック内で部分的なボディを適切に扱う
+
+## 例
+
+```ts filename="proxy.ts"
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function proxy(request: NextRequest) {
+  // Next.js は設定されたサイズ制限に従ってボディを自動的にバッファリングします
+  // プロキシでボディを読み取ることができます...
+  const body = await request.text()
+
+  // ボディが制限を超えた場合、一部のデータのみが利用可能になります
+  console.log('Body size:', body.length)
+
+  return NextResponse.next()
+}
+```
+
+```ts filename="app/api/upload/route.ts"
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function POST(request: NextRequest) {
+  // ...ルートハンドラーでもボディは引き続き利用可能
+  const body = await request.text()
+
+  console.log('Body in route handler:', body.length)
+
+  return NextResponse.json({ received: body.length })
+}
+```
+
+## 補足
+
+- この設定は、アプリケーションで `proxy` が使用されている場合にのみ有効です
+- デフォルトの 10MB の上限は、メモリ使用量と一般的なユースケースのバランスを取るように設計されています
+- この上限は、同時処理中のすべてのリクエストを合算したものではなく、リクエストごとに適用されます
+- 大きなファイルのアップロードを扱うアプリケーションでは、必要に応じてこの上限を引き上げることを検討してください

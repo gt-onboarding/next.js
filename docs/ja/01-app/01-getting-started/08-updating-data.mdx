@@ -1,0 +1,521 @@
+---
+title: データの更新
+description: Next.js でサーバー関数と Server Actions を使ってデータを更新する方法を学びます。
+related:
+  title: API リファレンス
+  description: このページで取り上げている機能の詳細は、API リファレンスを参照してください。
+  links:
+    - app/api-reference/functions/revalidatePath
+    - app/api-reference/functions/revalidateTag
+    - app/api-reference/functions/redirect
+---
+
+Next.js では、React の[サーバー関数](https://react.dev/reference/rsc/server-functions)を使ってデータを更新できます。このページでは、サーバー関数を[作成](#creating-server-functions)し、[呼び出す](#invoking-server-functions)方法を説明します。
+
+## サーバー関数とは？
+
+**サーバー関数** は、サーバー上で実行される非同期関数です。クライアントからネットワーク経由のリクエストで呼び出されるため、非同期である必要があります。
+
+`action` やミューテーションのコンテキストでは、**Server Actions** とも呼ばれます。
+
+> **補足:** Server Action は、特定の用途（フォーム送信やミューテーションの処理）で使われるサーバー関数です。サーバー関数のほうが、より広い概念を指す用語です。
+
+慣習的に、Server Action は [`startTransition`](https://react.dev/reference/react/startTransition) とともに使用される `async` 関数です。これは、関数が次のように渡された場合に自動的にそうなります:
+
+- `action` プロパティを使って `<form>` に渡されたとき
+- `formAction` プロパティを使って `<button>` に渡されたとき
+
+Next.js では、Server Actions はフレームワークの [キャッシュ](/docs/app/guides/caching) アーキテクチャと統合されています。アクションが呼び出されると、Next.js は単一のサーバー往復で更新された UI と新しいデータの両方を返すことができます。
+
+内部的には、アクションは `POST` メソッドを使用しており、アクションを呼び出せるのはこの HTTP メソッドだけです。
+
+## サーバー関数の作成
+
+サーバー関数は、[`use server`](https://react.dev/reference/rsc/use-server) ディレクティブを使用して定義できます。**非同期**関数の先頭にこのディレクティブを記述してその関数をサーバー関数として指定するか、別のファイルの先頭に記述してそのファイルからのすべてのエクスポートをサーバー関数として指定できます。
+
+```ts filename="app/lib/actions.ts" switcher
+export async function createPost(formData: FormData) {
+  'use server'
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データを更新する
+  // キャッシュを再検証する
+}
+
+export async function deletePost(formData: FormData) {
+  'use server'
+  const id = formData.get('id')
+
+  // データを更新する
+  // キャッシュを再検証する
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+export async function createPost(formData) {
+  'use server'
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データを更新する
+  // キャッシュを再検証する
+}
+
+export async function deletePost(formData) {
+  'use server'
+  const id = formData.get('id')
+
+  // データを更新する
+  // キャッシュを再検証する
+}
+```
+
+### サーバーコンポーネント
+
+サーバー関数は、関数本体の先頭に `"use server"` ディレクティブを追加することで、サーバーコンポーネント内にインラインで定義できます。
+
+```tsx filename="app/page.tsx" switcher
+export default function Page() {
+  // サーバーアクション
+  async function createPost(formData: FormData) {
+    'use server'
+    // ...
+  }
+
+  return <></>
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default function Page() {
+  // サーバーアクション
+  async function createPost(formData: FormData) {
+    'use server'
+    // ...
+  }
+
+  return <></>
+}
+```
+
+> **補足:** サーバーコンポーネントはデフォルトでプログレッシブエンハンスメントをサポートしているため、Server Actions を呼び出すフォームは、JavaScript がまだ読み込まれていない場合や無効になっている場合でも送信可能です。
+
+### クライアントコンポーネント
+
+クライアントコンポーネントではサーバー関数を定義することはできません。ただし、先頭に `"use server"` ディレクティブが記述されたファイルからインポートすることで、クライアントコンポーネント内でサーバー関数を呼び出すことはできます。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createPost() {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createPost() {}
+```
+
+```tsx filename="app/ui/button.tsx" switcher
+'use client'
+
+import { createPost } from '@/app/actions'
+
+export function Button() {
+  return <button formAction={createPost}>Create</button>
+}
+```
+
+```jsx filename="app/ui/button.js" switcher
+'use client'
+
+import { createPost } from '@/app/actions'
+
+export function Button() {
+  return <button formAction={createPost}>Create</button>
+}
+```
+
+> **補足:** クライアントコンポーネントでは、Server Actions を呼び出すフォームは、JavaScript がまだ読み込まれていない場合、送信がキューに蓄積され、ハイドレーションが優先的に行われます。ハイドレーション後は、フォーム送信時にブラウザはページを再読み込みしません。
+
+### アクションを props として渡す
+
+アクションを Client Component に props 経由で渡すこともできます。
+
+```jsx
+<ClientComponent updateItemAction={updateItem} />
+```
+
+```tsx filename="app/client-component.tsx" switcher
+'use client'
+
+export default function ClientComponent({
+  updateItemAction,
+}: {
+  updateItemAction: (formData: FormData) => void
+}) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+```jsx filename="app/client-component.js" switcher
+'use client'
+
+export default function ClientComponent({ updateItemAction }) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+## サーバー関数の呼び出し
+
+サーバー関数を呼び出す主な方法は次の 2 つです:
+
+1. サーバーコンポーネントおよびクライアントコンポーネント内の [フォーム](#forms)
+2. クライアントコンポーネント内の [Event Handlers](#event-handlers) および [useEffect](#useeffect)
+
+> **補足:** サーバー関数はサーバーサイドのミューテーション向けに設計されています。現在、クライアントはそれらを 1 つずつディスパッチし、完了を待機します。これは実装の詳細であり、今後変更される可能性があります。データを並列に取得する必要がある場合は、サーバーコンポーネントでの [data fetching](/docs/app/getting-started/fetching-data#server-components) を使用するか、1 つのサーバー関数内、または [Route Handler](/docs/app/guides/backend-for-frontend#manipulating-data) 内で並列処理を行ってください。
+
+### フォーム
+
+React は HTML の [`<form>`](https://react.dev/reference/react-dom/components/form) 要素を拡張し、HTML の `action` プロパティで Server Function を呼び出せるようにします。
+
+フォームで呼び出されると、その関数は自動的に [`FormData`](https://developer.mozilla.org/docs/Web/API/FormData/FormData) オブジェクトを受け取ります。標準の [`FormData` メソッド](https://developer.mozilla.org/en-US/docs/Web/API/FormData#instance_methods) を使ってデータを取得できます。
+
+```tsx filename="app/ui/form.tsx" switcher
+import { createPost } from '@/app/actions'
+
+export function Form() {
+  return (
+    <form action={createPost}>
+      <input type="text" name="title" />
+      <input type="text" name="content" />
+      <button type="submit">Create</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/form.js" switcher
+import { createPost } from '@/app/actions'
+
+export function Form() {
+  return (
+    <form action={createPost}>
+      <input type="text" name="title" />
+      <input type="text" name="content" />
+      <button type="submit">Create</button>
+    </form>
+  )
+}
+```
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createPost(formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データを更新する
+  // キャッシュを再検証する
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createPost(formData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データを更新する
+  // キャッシュを再検証する
+}
+```
+
+### イベントハンドラー
+
+クライアントコンポーネントで `onClick` などのイベントハンドラーを使用して、サーバー関数を呼び出すことができます。
+
+```tsx filename="app/like-button.tsx" switcher
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }: { initialLikes: number }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+```jsx filename="app/like-button.js" switcher
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+## 例
+
+### 保留状態の表示
+
+Server Function を実行している間、React の [`useActionState`](https://react.dev/reference/react/useActionState) フックを使ってローディングインジケーターを表示できます。このフックは `pending` という boolean 値を返します。
+
+```tsx filename="app/ui/button.tsx" switcher
+'use client'
+
+import { useActionState, startTransition } from 'react'
+import { createPost } from '@/app/actions'
+import { LoadingSpinner } from '@/app/ui/loading-spinner'
+
+export function Button() {
+  const [state, action, pending] = useActionState(createPost, false)
+
+  return (
+    <button onClick={() => startTransition(action)}>
+      {pending ? <LoadingSpinner /> : 'Create Post'}
+    </button>
+  )
+}
+```
+
+```jsx filename="app/ui/button.js" switcher
+'use client'
+
+import { useActionState, startTransition } from 'react'
+import { createPost } from '@/app/actions'
+import { LoadingSpinner } from '@/app/ui/loading-spinner'
+
+export function Button() {
+  const [state, action, pending] = useActionState(createPost, false)
+
+  return (
+    <button onClick={() => startTransition(action)}>
+      {pending ? <LoadingSpinner /> : 'Create Post'}
+    </button>
+  )
+}
+```
+
+### リフレッシュ
+
+ミューテーションの後に最新のデータを表示するため、現在のページをリフレッシュしたい場合があります。これは、Server Action 内で `next/cache` から [`refresh`](/docs/app/api-reference/functions/refresh) を呼び出すことで行えます。
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function updatePost(formData: FormData) {
+  // データを更新する
+  // ...
+
+  refresh()
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function updatePost(formData) {
+  // データを更新する
+  // ...
+
+  refresh()
+}
+```
+
+これによりクライアントルーターがリフレッシュされ、UI に最新の状態が反映されます。`refresh()` 関数はタグ付きデータの再検証は行いません。タグ付きデータを再検証するには、代わりに [`updateTag`](/docs/app/api-reference/functions/updateTag) または [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) を使用してください。
+
+### 再検証
+
+更新を実行した後、Server Function 内で [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) または [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) を呼び出すことで、Next.js のキャッシュを再検証して、更新後のデータを表示できます。
+
+```ts filename="app/lib/actions.ts" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  'use server'
+  // データを更新する
+  // ...
+
+  revalidatePath('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData) {
+  'use server'
+  // データを更新する
+  // ...
+  revalidatePath('/posts')
+}
+```
+
+### リダイレクト
+
+更新処理を行ったあとに、ユーザーを別のページへリダイレクトしたい場合があります。その場合は、Server Function 内で [`redirect`](/docs/app/api-reference/functions/redirect) を呼び出します。
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  // データを更新する
+  // ...
+
+  revalidatePath('/posts')
+  redirect('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData) {
+  // データを更新する
+  // ...
+
+  revalidatePath('/posts')
+  redirect('/posts')
+}
+```
+
+`redirect` を呼び出すと、フレームワークによって処理される制御フロー用の例外が[スローされます](/docs/app/api-reference/functions/redirect#behavior)。それ以降のコードは実行されません。最新のデータが必要な場合は、事前に [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) または [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) を呼び出してください。
+
+### Cookies
+
+Server Action の中で [`cookies`](/docs/app/api-reference/functions/cookies) API を使用して、`get`、`set`、`delete` を行うことができます。
+
+Server Action 内で Cookie を[設定または削除](/docs/app/api-reference/functions/cookies#understanding-cookie-behavior-in-server-functions)すると、Next.js はサーバー上で現在のページとそのレイアウトを再レンダーし、**UI が新しい Cookie の値を反映するように**します。
+
+> **補足**: サーバー側での更新は現在の React ツリーに適用され、必要に応じてコンポーネントが再レンダー、マウント、アンマウントされます。再レンダーされたコンポーネントのクライアント側の state は保持され、依存関係が変化している場合はエフェクトが再実行されます。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  const cookieStore = await cookies()
+
+  // クッキーを取得
+  cookieStore.get('name')?.value
+
+  // クッキーを設定
+  cookieStore.set('name', 'Delba')
+
+  // クッキーを削除
+  cookieStore.delete('name')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  // クッキーを取得
+  const cookieStore = await cookies()
+
+  // クッキーを取得
+  cookieStore.get('name')?.value
+
+  // クッキーを設定
+  cookieStore.set('name', 'Delba')
+
+  // クッキーを削除
+  cookieStore.delete('name')
+}
+```
+
+### useEffect
+
+コンポーネントのマウント時や依存関係が変化したときに Server Action を呼び出すには、React の [`useEffect`](https://react.dev/reference/react/useEffect) フックを使用できます。これは、グローバルなイベントに依存するミューテーションや、自動的にトリガーする必要がある処理に便利です。たとえば、アプリのショートカット用の `onKeyDown`、無限スクロール用のインターセクションオブザーバーフック、あるいはコンポーネントのマウント時に表示回数を更新する場合などです。
+
+```tsx filename="app/view-count.tsx" switcher
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect, useTransition } from 'react'
+
+export default function ViewCount({ initialViews }: { initialViews: number }) {
+  const [views, setViews] = useState(initialViews)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    startTransition(async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    })
+  }, [])
+
+  // `isPending` を使ってユーザーにフィードバックを返すことができます
+  return <p>Total Views: {views}</p>
+}
+```
+
+```jsx filename="app/view-count.js" switcher
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect, useTransition } from 'react'
+
+export default function ViewCount({ initialViews }) {
+  const [views, setViews] = useState(initialViews)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    startTransition(async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    })
+  }, [])
+
+  // `isPending` を使用してユーザーにフィードバックを提供できます
+  return <p>Total Views: {views}</p>
+}
+```

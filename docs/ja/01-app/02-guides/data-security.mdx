@@ -1,0 +1,475 @@
+---
+title: Next.js におけるデータセキュリティの考え方
+nav_title: データセキュリティ
+description: Next.js に組み込まれているデータセキュリティ機能について学び、アプリケーションのデータを保護するためのベストプラクティスを理解しましょう。
+related:
+  title: 次のステップ
+  description: このガイドで取り上げたトピックについて、さらに詳しく学びましょう。
+  links:
+    - app/guides/authentication
+    - app/guides/content-security-policy
+    - app/guides/forms
+---
+
+[React Server Components](https://react.dev/reference/rsc/server-components) はパフォーマンスを向上させ、データ取得を簡素化しますが、同時にデータへどこでどのようにアクセスするかも変化させるため、フロントエンドアプリでデータを扱う際の従来のセキュリティに関する前提の一部が変わります。
+
+このガイドでは、Next.js におけるデータセキュリティの考え方と、ベストプラクティスの実装方法について説明します。
+
+## データ取得のアプローチ
+
+Next.js でのデータ取得方法として、プロジェクトの規模や成熟度に応じて次の 3 つの主要なアプローチを推奨します：
+
+- [HTTP APIs](#external-http-apis)：既存の大規模アプリケーションや組織向け。
+- [Data Access Layer](#data-access-layer)：新規プロジェクト向け。
+- [Component-Level Data Access](#component-level-data-access)：プロトタイプや学習用途向け。
+
+データ取得のアプローチは 1 つに統一し、混在させないことを推奨します。そうすることで、コードベースで作業する開発者やセキュリティ監査担当者にとって、何を前提にすればよいかが明確になります。
+
+### 外部 HTTP API
+
+既存のプロジェクトでサーバーコンポーネントを利用する際は、**ゼロトラストモデル**に従う必要があります。サーバーコンポーネントからは、クライアントコンポーネントと同様に、[`fetch`](/docs/app/api-reference/functions/fetch) を使用して REST や GraphQL などの既存の API エンドポイントを引き続き呼び出せます。
+
+```tsx filename="app/page.tsx"
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = cookies()
+  const token = cookieStore.get('AUTH_TOKEN')?.value
+
+  const res = await fetch('https://api.example.com/profile', {
+    headers: {
+      Cookie: `AUTH_TOKEN=${token}`,
+      // その他のヘッダー
+    },
+  })
+
+  // ....
+}
+```
+
+このアプローチは、次のような場合に有効です。
+
+- すでにセキュリティ対策や運用体制が整っている場合。
+- バックエンドチームが別に存在し、他の言語を使用している、または API を独立して管理している場合。
+
+### データアクセスレイヤー
+
+新しいプロジェクトでは、専用の **Data Access Layer (DAL)** を作成することを推奨します。これは、データをどのように・いつフェッチするか、そしてレンダーコンテキストに何を渡すかを制御する内部ライブラリです。
+
+Data Access Layer は次の要件を満たすべきです:
+
+- サーバー上でのみ実行されること。
+- 認可チェックを行うこと。
+- 安全で最小限の **Data Transfer Objects (DTOs)** を返すこと。
+
+このアプローチにより、すべてのデータアクセスロジックを一元化でき、一貫したデータアクセスを実現しやすくなり、認可まわりのバグのリスクを軽減できます。また、同一リクエスト内の異なる処理からインメモリキャッシュを共有できるという利点も得られます。
+
+```ts filename="data/auth.ts"
+import { cache } from 'react'
+import { cookies } from 'next/headers'
+
+// キャッシュされたヘルパーメソッドを使うと、手動で受け渡しすることなく
+// 多くの場所で同じ値を取得できます。Server Component から Server Component へ
+// 渡すことを抑制し、Client Component に渡すリスクを最小限に抑えます。
+export const getCurrentUser = cache(async () => {
+  const token = cookies().get('AUTH_TOKEN')
+  const decodedToken = await decryptAndValidate(token)
+  // シークレットトークンや非公開情報をパブリックフィールドに含めないでください。
+  // クラスを使用することで、オブジェクト全体を誤ってクライアントに渡すことを防げます。
+  return new User(decodedToken.id)
+})
+```
+
+```tsx filename="data/user-dto.tsx"
+import 'server-only'
+import { getCurrentUser } from './auth'
+
+function canSeeUsername(viewer: User) {
+  // 現時点では公開情報だが、変更される可能性あり
+  return true
+}
+
+function canSeePhoneNumber(viewer: User, team: string) {
+  // プライバシールール
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug: string) {
+  // 値を直接渡さず、キャッシュされた値を読み取る。コンテキストの問題も解決され、遅延評価も容易になる
+
+  // クエリの安全なテンプレート化をサポートするデータベースAPIを使用する
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`
+  const userData = rows[0]
+
+  const currentUser = await getCurrentUser()
+
+  // すべてのデータではなく、このクエリに必要なデータのみを返す
+  // <https://www.w3.org/2001/tag/doc/APIMinimization>
+  return {
+    username: canSeeUsername(currentUser) ? userData.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, userData.team)
+      ? userData.phonenumber
+      : null,
+  }
+}
+```
+
+```tsx filename="app/page.tsx"
+import { getProfile } from '../../data/user'
+
+export async function Page({ params: { slug } }) {
+  // このページは、センシティブな情報が含まれていないことを前提に、このプロフィールを安全に渡せるようになりました。
+  const profile = await getProfile(slug);
+  ...
+}
+```
+
+> **補足:** シークレットキーは環境変数として保存し、`process.env` にアクセスできるのは Data Access Layer のみに限定してください。これにより、アプリケーションの他の部分にシークレットが漏えいするのを防げます。
+
+### コンポーネントレベルのデータアクセス
+
+迅速なプロトタイプ作成や反復的な開発のために、データベースクエリをサーバーコンポーネント内に直接記述することができます。
+
+ただしこの方法では、たとえば次のように、誤って機密データをクライアントに公開してしまいやすくなります。
+
+```tsx filename="app/page.tsx"
+import Profile from './components/profile.tsx'
+
+export async function Page({ params: { slug } }) {
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`
+  const userData = rows[0]
+  // 注意: Server ComponentからClientにデータを渡しているため、
+  // userDataの全フィールドがクライアントに公開されてしまう。
+  return <Profile user={userData} />
+}
+```
+
+```tsx filename="app/ui/profile.tsx"
+'use client'
+
+// 悪い例: このpropsインターフェースは、クライアントコンポーネントが必要とする以上のデータを受け取るため、
+// サーバーコンポーネントがすべてのデータを渡してしまいがちになる。
+// より良い解決策は、プロフィールのレンダリングに必要なフィールドのみを持つ限定的なオブジェクトを受け取ることである。
+export default async function Profile({ user }: { user: User }) {
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      ...
+    </div>
+  )
+}
+```
+
+クライアントコンポーネントに渡す前にデータをサニタイズする必要があります。
+
+```ts filename="data/user.ts"
+import { sql } from './db'
+
+export async function getUser(slug: string) {
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`
+  const user = rows[0]
+
+  // 公開フィールドのみを返す
+  return {
+    name: user.name,
+  }
+}
+```
+
+```tsx filename="app/page.tsx"
+import { getUser } from '../data/user'
+import Profile from './ui/profile'
+
+export default async function Page({
+  params: { slug },
+}: {
+  params: { slug: string }
+}) {
+  const publicProfile = await getUser(slug)
+  return <Profile user={publicProfile} />
+}
+```
+
+## データの読み込み
+
+### サーバーからクライアントへのデータの受け渡し
+
+初回ロード時には、サーバーコンポーネントとクライアントコンポーネントの両方がサーバー上で実行され、HTML を生成します。ただし、それぞれは互いに分離されたモジュールシステム内で実行されます。これにより、サーバーコンポーネントはプライベートなデータや API にアクセスできる一方で、クライアントコンポーネントはアクセスできないことが保証されます。
+
+**サーバーコンポーネント:**
+
+- サーバー上でのみ実行されます。
+- 環境変数、シークレット、データベース、および内部 API に安全にアクセスできます。
+
+**クライアントコンポーネント:**
+
+- プリレンダリング中はサーバー上で実行されますが、ブラウザで動作するコードと同じセキュリティ上の前提に従わなければなりません。
+- 特権的なデータやサーバー専用モジュールにアクセスしてはなりません。
+
+これによりアプリケーションはデフォルトで安全になりますが、データの取得方法やコンポーネントへの受け渡し方によっては、誤ってプライベートデータを公開してしまう可能性があります。
+
+### テイント (Tainting)
+
+機密データが誤ってクライアントに送信されるのを防ぐために、React の Taint API を使用できます。
+
+- データオブジェクト用の [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference)
+- 特定の値用の [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue)
+
+`next.config.js` 内の [`experimental.taint`](/docs/app/api-reference/config/next-config-js/taint) オプションを有効にすると、Next.js アプリで利用できるようになります。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+}
+```
+
+これにより、汚染されたオブジェクトや値がクライアントに渡されるのを防げます。ただし、これはあくまで追加の保護レイヤーに過ぎないため、依然として React のレンダーコンテキストに渡す前に [DAL](#data-access-layer) でデータをフィルタリングし、サニタイズする必要があります。
+
+> **補足:**
+>
+> - デフォルトでは、環境変数はサーバー側でのみ利用可能です。Next.js は、`NEXT_PUBLIC_` で始まる環境変数をクライアントに公開します。[詳細はこちら](/docs/app/guides/environment-variables)。
+> - 関数とクラスは、デフォルトでクライアントコンポーネントに渡されないよう、すでにブロックされています。
+
+### サーバー専用コードのクライアント側での実行を防ぐ
+
+サーバー専用コードがクライアント側で実行されないようにするには、モジュールを [`server-only`](https://www.npmjs.com/package/server-only) パッケージでマークできます。
+
+```bash package="npm"
+npm install server-only
+```
+
+```bash package="yarn"
+yarn add server-only
+```
+
+```bash package="pnpm"
+pnpm add server-only
+```
+
+```bash package="bun"
+bun add server-only
+```
+
+```ts filename="lib/data.ts"
+import 'server-only'
+
+//...
+```
+
+これにより、クライアント環境でそのモジュールがインポートされた場合にビルドエラーが発生し、プロプライエタリなコードや内部のビジネスロジックがサーバー上にとどまることが保証されます。
+
+## データの変更
+
+Next.js は [Server Actions](https://react.dev/reference/rsc/server-functions) を使ってデータの変更を処理します。
+
+### 組み込みの Server Actions セキュリティ機能
+
+デフォルトでは、Server Action を作成して export すると公開 HTTP エンドポイントが作成されるため、それと同じ前提でセキュリティや認可チェックを行う必要があります。つまり、ある Server Action やユーティリティ関数がコード内のどこからも import されていなくても、依然として外部からアクセス可能な状態です。
+
+セキュリティ向上のために、Next.js には次の組み込み機能があります:
+
+- **安全なアクション ID:** Next.js は、クライアントが Server Action を参照・呼び出せるように、暗号化された非決定的な ID を作成します。これらの ID は、セキュリティ強化のためにビルド間で定期的に再計算されます。
+- **デッドコード削除:** 使用されていない Server Action（その ID で参照されていないもの）は、クライアントバンドルから削除され、公開されないようにします。
+
+> **補足**:
+>
+> ID はコンパイル時に作成され、最大 14 日間キャッシュされます。新しいビルドが開始されたとき、またはビルドキャッシュが無効化されたときに再生成されます。
+> このセキュリティ機能によって、認証レイヤーが存在しない場合のリスクが軽減されます。ただし、それでも Server Actions は公開 HTTP エンドポイントと同様に扱う必要があります。
+
+```jsx
+// app/actions.js
+'use server'
+
+// このアクションがアプリケーションで**使用されている**場合、Next.js は
+// クライアントが参照して Server Action を呼び出せるよう
+// セキュアな ID を生成します。
+export async function updateUserAction(formData) {}
+
+// このアクションがアプリケーションで**使用されていない**場合、Next.js は
+// `next build` 時にこのコードを自動的に削除し、
+// パブリックエンドポイントを作成しません。
+export async function deleteUserAction(formData) {}
+```
+
+### クライアント入力の検証
+
+クライアントから送信される入力は必ず検証してください。フォームデータ、URL パラメーター、ヘッダー、`searchParams` などは簡単に書き換えられる可能性があります。
+
+```tsx filename="app/page.tsx"
+// 悪い例: searchParams を直接信頼する
+export default async function Page({ searchParams }) {
+  const isAdmin = searchParams.get('isAdmin')
+  if (isAdmin === 'true') {
+    // 脆弱性あり: 信頼できないクライアントデータに依存している
+    return <AdminPanel />
+  }
+}
+
+// 良い例: 毎回再検証する
+import { cookies } from 'next/headers'
+import { verifyAdmin } from './auth'
+
+export default async function Page() {
+  const token = cookies().get('AUTH_TOKEN')
+  const isAdmin = await verifyAdmin(token)
+
+  if (isAdmin) {
+    return <AdminPanel />
+  }
+}
+```
+
+### 認証と認可
+
+ユーザーが特定のアクションを実行する権限を持っているかどうかを、常に確認してください。例えば、次のような場合です。
+
+```tsx filename="app/actions.ts"
+'use server'
+
+import { auth } from './lib'
+
+export function addItem() {
+  const { user } = auth()
+  if (!user) {
+    throw new Error('You must be signed in to perform this action')
+  }
+
+  // ...
+}
+```
+
+Next.js における認証の詳細については、[認証](/docs/app/guides/authentication)を参照してください。
+
+### クロージャと暗号化
+
+コンポーネント内で Server Action を定義すると、[クロージャ](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures) が生成され、そのアクションは外側の関数スコープにアクセスできるようになります。たとえば、`publish` アクションは `publishVersion` 変数にアクセスできます。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const publishVersion = await getLatestVersion();
+
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('公開ボタンを押してからバージョンが変更されました');
+    }
+    ...
+  }
+
+  return (
+    <form>
+      <button formAction={publish}>Publish</button>
+    </form>
+  );
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const publishVersion = await getLatestVersion();
+
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('公開ボタンを押してからバージョンが変更されました');
+    }
+    ...
+  }
+
+  return (
+    <form>
+      <button formAction={publish}>Publish</button>
+    </form>
+  );
+}
+```
+
+クロージャは、後でアクションが呼び出されたときに使用できるよう、レンダー時点でのデータの*スナップショット*（例: `publishVersion`）をキャプチャする必要がある場合に便利です。
+
+しかし、これを実現するには、キャプチャされた変数が、アクションの呼び出し時にクライアントへ送信され、さらにサーバーへ戻される必要があります。クライアント側に機密データが露出するのを防ぐため、Next.js はクロージャに閉じ込められた変数を自動的に暗号化します。Next.js アプリケーションがビルドされるたびに、各アクション用に新しい秘密鍵が生成されます。これは、アクションが特定のビルドに対してのみ呼び出せることを意味します。
+
+> **補足:** 機密な値がクライアントに露出するのを防ぐ手段として、暗号化だけに依存することは推奨しません。
+
+### 暗号鍵の上書き（上級）
+
+Next.js アプリケーションを **セルフホスト** して複数のサーバーで運用している場合、各サーバーインスタンスで異なる暗号鍵が生成されてしまい、不整合が発生する可能性があります。
+
+これを防ぐために、`process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` 環境変数を使用して暗号鍵を上書きできます。この変数を指定することで、ビルドをまたいで暗号鍵が維持され、すべてのサーバーインスタンスで同じ鍵を使用できるようになります。
+
+この鍵は、デコード後の長さが有効な AES 鍵サイズ（16、24、32 バイト）のいずれかと一致する Base64 エンコード済みの値である必要があります。Next.js はデフォルトで 32 バイトの鍵を生成します。プラットフォームの暗号関連ツールを使用して、次のように互換性のある鍵を生成できます。
+
+```bash
+openssl rand -base64 32
+```
+
+これは、複数のデプロイ間で暗号化の動作を一貫させることがアプリケーションにとって重要となる、高度なユースケースです。キーのローテーションや署名など、標準的なセキュリティプラクティスに従ってください。デプロイ固有の考慮事項については、[セルフホスティングガイド](/docs/app/guides/self-hosting#server-functions-encryption-key)を参照してください。
+
+### 許可されるオリジン（高度な設定）
+
+Server Actions は `<form>` 要素から呼び出すことができるため、[CSRF 攻撃](https://developer.mozilla.org/en-US/docs/Glossary/CSRF)にさらされる可能性があります。
+
+内部的には、Server Actions は `POST` メソッドを使用しており、この HTTP メソッドのみが Server Actions の呼び出しに許可されています。これにより、特に [SameSite クッキー](https://web.dev/articles/samesite-cookies-explained) がデフォルトとなっているモダンブラウザでは、ほとんどの CSRF 脆弱性が防止されます。
+
+追加の保護として、Next.js の Server Actions は [Origin ヘッダー](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin) と [Host ヘッダー](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host)（または `X-Forwarded-Host`）も比較します。これらが一致しない場合、リクエストは破棄されます。言い換えると、Server Actions は、それをホストしているページと同じホスト上でのみ呼び出すことができます。
+
+リバースプロキシや多層バックエンドアーキテクチャ（サーバーの API ドメインが本番ドメインと異なる場合）を利用する大規模アプリケーションでは、安全なオリジンのリストを指定するために、設定オプション [`serverActions.allowedOrigins`](/docs/app/api-reference/config/next-config-js/serverActions) を使用することを推奨します。このオプションは文字列の配列を受け取ります。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+module.exports = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['my-proxy.com', '*.my-proxy.com'],
+    },
+  },
+}
+```
+
+詳しくはブログ記事 [Security and Server Actions](https://nextjs.org/blog/security-nextjs-server-components-actions) を参照してください。
+
+### レンダリング中の副作用の回避
+
+ミューテーション（例: ユーザーのログアウト、データベースの更新、キャッシュの無効化）は、サーバーコンポーネントでもクライアントコンポーネントでも、レンダーの副作用として発生してはなりません。Next.js は、意図しない副作用を防ぐため、render メソッド内での Cookie の設定やキャッシュ再検証の実行を明示的に禁止しています。
+
+```tsx filename="app/page.tsx"
+// 悪い例: レンダリング中にミューテーションをトリガーする
+export default async function Page({ searchParams }) {
+  if (searchParams.get('logout')) {
+    cookies().delete('AUTH_TOKEN')
+  }
+
+  return <UserProfile />
+}
+```
+
+代わりに、ミューテーションの処理には Server Actions を使用してください。
+
+```tsx filename="app/page.tsx"
+// 良い例: Server Actions を使用してミューテーションを処理する
+import { logout } from './actions'
+
+export default function Page() {
+  return (
+    <>
+      <UserProfile />
+      <form action={logout}>
+        <button type="submit">Logout</button>
+      </form>
+    </>
+  )
+}
+```
+
+> **補足:** Next.js はデータの変更処理に `POST` リクエストを使用します。これにより、`GET` リクエストからの意図しない副作用を防ぎ、Cross-Site Request Forgery (CSRF) のリスクを軽減できます。
+
+## 監査
+
+Next.js プロジェクトのセキュリティ監査を行う場合、特に次の点を重点的に確認することをおすすめします:
+
+- **データアクセスレイヤー:** 分離されたデータアクセスレイヤーに関する運用プラクティスは確立されていますか？データベース関連のパッケージや環境変数が、データアクセスレイヤー以外から `import` されていないことを確認してください。
+- **`"use client"` ファイル:** コンポーネントの props が秘匿データを前提にしていませんか？型シグネチャが必要以上に広すぎませんか？
+- **`"use server"` ファイル:** Action の引数は、Action 内またはデータアクセスレイヤー内でバリデーションされていますか？ユーザーは Action 内で再度認可されていますか？
+- **`/[param]/.`** 角括弧付きフォルダの値はユーザー入力に由来します。`params` はバリデーションされていますか？
+- **`proxy.ts` と `route.ts`:** 非常に強力なファイルです。これらについては、従来のセキュリティテスト手法を用いて時間をかけて監査してください。ペネトレーションテストや脆弱性スキャンを、定期的に、あるいはチームのソフトウェア開発ライフサイクルに合わせて実施してください。

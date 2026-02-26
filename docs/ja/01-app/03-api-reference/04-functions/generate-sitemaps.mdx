@@ -1,0 +1,81 @@
+---
+title: generateSitemaps
+nav_title: generateSitemaps
+description: generateSiteMaps 関数を使用して、アプリケーションのために複数のサイトマップを生成する方法を学びます。
+related:
+  title: 次のステップ
+  description: Next.js アプリケーションのサイトマップを作成する方法を学びます。
+  links:
+    - app/api-reference/file-conventions/metadata/sitemap
+---
+
+`generateSitemaps` 関数を使用して、アプリケーションのために複数のサイトマップを生成できます。
+
+## 戻り値
+
+`generateSitemaps` は、`id` プロパティを持つオブジェクトの配列を返します。
+
+## URL
+
+生成されたサイトマップは `/.../sitemap/[id].xml` で公開されます。例えば、`/product/sitemap/1.xml` です。
+
+## 例
+
+たとえば、`generateSitemaps` を使ってサイトマップを分割するには、サイトマップの `id` を持つオブジェクトの配列を返します。次に、その `id` を使って一意のサイトマップを生成します。
+
+```ts filename="app/product/sitemap.ts" switcher
+import type { MetadataRoute } from 'next'
+import { BASE_URL } from '@/app/lib/constants'
+
+export async function generateSitemaps() {
+  // 商品の総数を取得し、必要なサイトマップの数を計算する
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }]
+}
+
+export default async function sitemap(props: {
+  id: Promise<string>
+}): Promise<MetadataRoute.Sitemap> {
+  const id = await props.id
+  // Googleのサイトマップあたりの上限は50,000 URL
+  const start = id * 50000
+  const end = start + 50000
+  const products = await getProducts(
+    `SELECT id, date FROM products WHERE id BETWEEN ${start} AND ${end}`
+  )
+  return products.map((product) => ({
+    url: `${BASE_URL}/product/${product.id}`,
+    lastModified: product.date,
+  }))
+}
+```
+
+```js filename="app/product/sitemap.js" switcher
+import { BASE_URL } from '@/app/lib/constants'
+
+export async function generateSitemaps() {
+  // 商品の総数を取得し、必要なサイトマップの数を計算する
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }]
+}
+
+export default async function sitemap(props) {
+  const id = await props.id
+  // Googleのサイトマップあたりの上限は50,000 URL
+  const start = id * 50000
+  const end = start + 50000
+  const products = await getProducts(
+    `SELECT id, date FROM products WHERE id BETWEEN ${start} AND ${end}`
+  )
+  return products.map((product) => ({
+    url: `${BASE_URL}/product/${product.id}`,
+    lastModified: product.date,
+  }))
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                                                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v16.0.0`  | `generateSitemaps` から返される `id` の値が、文字列（`string`）へと解決される Promise としてサイトマップ関数に渡されるようになりました。            |
+| `v15.0.0`  | `generateSitemaps` が開発環境と本番環境の両方で一貫した URL を生成するようになりました。                                                            |
+| `v13.3.2`  | `generateSitemaps` が導入されました。開発環境では、`/.../sitemap.xml/[id]` で生成されたサイトマップを表示できます（例: `/product/sitemap.xml/1`）。 |

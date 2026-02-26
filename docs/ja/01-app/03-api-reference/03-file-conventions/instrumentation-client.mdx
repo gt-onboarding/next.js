@@ -1,0 +1,224 @@
+---
+title: instrumentation-client.js
+description: Next.js アプリケーションのフロントエンド パフォーマンスを追跡・監視するために、クライアントサイドのインストルメンテーションを追加する方法について説明します。
+---
+
+`instrumentation-client.js|ts` ファイルを使用すると、アプリケーションがインタラクティブになる前に実行されるモニタリングやアナリティクスコード、その他の処理を追加できます。これは、パフォーマンスの計測、エラー監視、ポリフィル、その他のクライアントサイドのオブザーバビリティツールをセットアップするのに役立ちます。
+
+これを使用するには、ファイルをアプリケーションの**ルート**または `src` フォルダ内に配置します。
+
+## 使用方法
+
+[サーバー側インストルメンテーション](/docs/app/guides/instrumentation) とは異なり、特定の関数を export する必要はありません。監視用コードをファイルに直接記述できます。
+
+```ts filename="instrumentation-client.ts" switcher
+// パフォーマンスモニタリングを設定する
+performance.mark('app-init')
+
+// アナリティクスを初期化する
+console.log('Analytics initialized')
+
+// エラートラッキングを設定する
+window.addEventListener('error', (event) => {
+  // エラートラッキングサービスに送信する
+  reportError(event.error)
+})
+```
+
+```js filename="instrumentation-client.js" switcher
+// パフォーマンスモニタリングを設定する
+performance.mark('app-init')
+
+// アナリティクスを初期化する
+console.log('Analytics initialized')
+
+// エラートラッキングを設定する
+window.addEventListener('error', (event) => {
+  // エラートラッキングサービスに送信する
+  reportError(event.error)
+})
+```
+
+**エラー処理:** インストルメンテーションコードの周囲に try-catch ブロックを実装して、モニタリングを堅牢に保ってください。これにより、個々のトラッキング処理の失敗が、他のインストルメンテーション機能に影響するのを防げます。
+
+## ルーター遷移の追跡
+
+ナビゲーションが開始されたときに通知を受け取るには、`onRouterTransitionStart` 関数をエクスポートできます。
+
+```ts filename="instrumentation-client.ts" switcher
+performance.mark('app-init')
+
+export function onRouterTransitionStart(
+  url: string,
+  navigationType: 'push' | 'replace' | 'traverse'
+) {
+  console.log(`Navigation started: ${navigationType} to ${url}`)
+  performance.mark(`nav-start-${Date.now()}`)
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+performance.mark('app-init')
+
+export function onRouterTransitionStart(url, navigationType) {
+  console.log(`Navigation started: ${navigationType} to ${url}`)
+  performance.mark(`nav-start-${Date.now()}`)
+}
+```
+
+`onRouterTransitionStart` 関数は 2 つの引数を受け取ります：
+
+- `url: string` - 遷移先の URL
+- `navigationType: 'push' | 'replace' | 'traverse'` - ナビゲーションの種類
+
+## パフォーマンス上の考慮事項
+
+インストルメンテーションのコードは軽量に保ってください。
+
+Next.js は開発環境で初期化にかかる時間を監視しており、16ms を超えると警告をログに出力します。これはページ読み込みのスムーズさに影響する可能性があります。
+
+## 実行タイミング
+
+`instrumentation-client.js` ファイルは、アプリケーションのライフサイクルの特定のタイミングで実行されます：
+
+1. HTML ドキュメントの読み込みが完了した**後**
+2. React のハイドレーションが開始される**前**
+3. ユーザーが操作できるようになる**前**
+
+このタイミングは、アプリケーションのライフサイクル初期のイベントを取得する必要があるエラー追跡、アナリティクス、パフォーマンス監視をセットアップするのに最適です。
+
+## 使用例
+
+### エラー追跡
+
+React が起動する前にエラー追跡を初期化し、よりよいデバッグコンテキストのためにナビゲーションのパンくずリストを追加します。
+
+```ts filename="instrumentation-client.ts" switcher
+import Monitor from './lib/monitoring'
+
+Monitor.initialize()
+
+export function onRouterTransitionStart(url: string) {
+  Monitor.pushEvent({
+    message: `Navigation to ${url}`,
+    category: 'navigation',
+  })
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+import Monitor from './lib/monitoring'
+
+Monitor.initialize()
+
+export function onRouterTransitionStart(url) {
+  Monitor.pushEvent({
+    message: `Navigation to ${url}`,
+    category: 'navigation',
+  })
+}
+```
+
+### アナリティクスのトラッキング
+
+アナリティクスを初期化し、ユーザー行動を分析するために、詳細なメタデータとともにナビゲーションイベントを計測します。
+
+```ts filename="instrumentation-client.ts" switcher
+import { analytics } from './lib/analytics'
+
+analytics.init()
+
+export function onRouterTransitionStart(url: string, navigationType: string) {
+  analytics.track('page_navigation', {
+    url,
+    type: navigationType,
+    timestamp: Date.now(),
+  })
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+import { analytics } from './lib/analytics'
+
+analytics.init()
+
+export function onRouterTransitionStart(url, navigationType) {
+  analytics.track('page_navigation', {
+    url,
+    type: navigationType,
+    timestamp: Date.now(),
+  })
+}
+```
+
+### パフォーマンス監視
+
+Performance Observer API とパフォーマンスマークを使用して、Time to Interactive やナビゲーション時のパフォーマンスを計測します。
+
+```ts filename="instrumentation-client.ts" switcher
+const startTime = performance.now()
+
+const observer = new PerformanceObserver(
+  (list: PerformanceObserverEntryList) => {
+    for (const entry of list.getEntries()) {
+      if (entry instanceof PerformanceNavigationTiming) {
+        console.log('Time to Interactive:', entry.loadEventEnd - startTime)
+      }
+    }
+  }
+)
+
+observer.observe({ entryTypes: ['navigation'] })
+
+export function onRouterTransitionStart(url: string) {
+  performance.mark(`nav-start-${url}`)
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+const startTime = performance.now()
+
+const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    if (entry instanceof PerformanceNavigationTiming) {
+      console.log('Time to Interactive:', entry.loadEventEnd - startTime)
+    }
+  }
+})
+
+observer.observe({ entryTypes: ['navigation'] })
+
+export function onRouterTransitionStart(url) {
+  performance.mark(`nav-start-${url}`)
+}
+```
+
+### ポリフィル
+
+アプリケーションコードの実行前にポリフィルを読み込みます。即時に読み込む場合は静的インポートを使用し、feature detection に基づいて条件付きで読み込む場合は動的インポートを使用します。
+
+```ts filename="instrumentation-client.ts" switcher
+import './lib/polyfills'
+
+if (!window.ResizeObserver) {
+  import('./lib/polyfills/resize-observer').then((mod) => {
+    window.ResizeObserver = mod.default
+  })
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+import './lib/polyfills'
+
+if (!window.ResizeObserver) {
+  import('./lib/polyfills/resize-observer').then((mod) => {
+    window.ResizeObserver = mod.default
+  })
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                        |
+| ---------- | ------------------------------- |
+| `v15.3`    | `instrumentation-client` を導入 |

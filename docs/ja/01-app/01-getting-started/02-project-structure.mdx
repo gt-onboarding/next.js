@@ -1,0 +1,419 @@
+---
+title: プロジェクト構造と整理
+nav_title: プロジェクト構造
+description: Next.js のフォルダとファイルに関する規約、およびプロジェクトの構成方法について学びます。
+---
+
+このページでは、Next.js におけるフォルダとファイルに関する**すべての**規約の概要と、プロジェクト構成のための推奨事項を説明します。
+
+## フォルダとファイルの規約
+
+### トップレベルのフォルダー
+
+トップレベルのフォルダーは、アプリケーションのコードや静的アセットを整理するために使われます。
+
+<Image
+  alt="ルートセグメントとパスセグメントの対応"
+  srcLight="/docs/light/top-level-folders.png"
+  srcDark="/docs/dark/top-level-folders.png"
+  width="1600"
+  height="525"
+/>
+
+|                                                                    |                                          |
+| ------------------------------------------------------------------ | ---------------------------------------- |
+| [`app`](/docs/app)                                                 | App Router                               |
+| [`pages`](/docs/pages/building-your-application/routing)           | Pages Router                             |
+| [`public`](/docs/app/api-reference/file-conventions/public-folder) | 配信される静的アセット                   |
+| [`src`](/docs/app/api-reference/file-conventions/src-folder)       | 任意のアプリケーション用ソースフォルダー |
+
+### トップレベルのファイル
+
+トップレベルのファイルは、アプリケーションの設定、依存関係の管理、プロキシの実行、モニタリングツールの統合、および環境変数の定義に使用されます。
+
+|                                                                              |                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **Next.js**                                                                  |                                                                                |
+| [`next.config.js`](/docs/app/api-reference/config/next-config-js)            | Next.js の設定ファイル                                                         |
+| [`package.json`](/docs/app/getting-started/installation#manual-installation) | プロジェクトの依存関係とスクリプト                                             |
+| [`instrumentation.ts`](/docs/app/guides/instrumentation)                     | OpenTelemetry およびインストルメンテーションのためのファイル                   |
+| [`proxy.ts`](/docs/app/api-reference/file-conventions/proxy)                 | Next.js のリクエストプロキシ                                                   |
+| [`.env`](/docs/app/guides/environment-variables)                             | 環境変数（バージョン管理には含めないでください）                               |
+| [`.env.local`](/docs/app/guides/environment-variables)                       | ローカル環境変数（バージョン管理には含めないでください）                       |
+| [`.env.production`](/docs/app/guides/environment-variables)                  | 本番環境の環境変数（バージョン管理には含めないでください）                     |
+| [`.env.development`](/docs/app/guides/environment-variables)                 | 開発環境の環境変数（バージョン管理には含めないでください）                     |
+| [`eslint.config.mjs`](/docs/app/api-reference/config/eslint)                 | ESLint の設定ファイル                                                          |
+| `.gitignore`                                                                 | Git によって無視されるファイルやフォルダー                                     |
+| [`next-env.d.ts`](/docs/app/api-reference/config/typescript#next-envdts)     | Next.js 用の TypeScript 型定義ファイル（バージョン管理には含めないでください） |
+| `tsconfig.json`                                                              | TypeScript の設定ファイル                                                      |
+| `jsconfig.json`                                                              | JavaScript の設定ファイル                                                      |
+
+<AppOnly>
+  ### ルーティングファイル
+
+ルートを公開するには `page`、ヘッダー・ナビゲーション・フッターなどの共有UIには `layout`、スケルトン表示には `loading`、エラーバウンダリには `error`、APIには `route` を追加します。
+
+|                                                                               |                     |                                    |
+| ----------------------------------------------------------------------------- | ------------------- | ---------------------------------- |
+| [`layout`](/docs/app/api-reference/file-conventions/layout)                   | `.js` `.jsx` `.tsx` | レイアウト                         |
+| [`page`](/docs/app/api-reference/file-conventions/page)                       | `.js` `.jsx` `.tsx` | ページ                             |
+| [`loading`](/docs/app/api-reference/file-conventions/loading)                 | `.js` `.jsx` `.tsx` | ローディング UI                    |
+| [`not-found`](/docs/app/api-reference/file-conventions/not-found)             | `.js` `.jsx` `.tsx` | 404 ページ用 UI                    |
+| [`error`](/docs/app/api-reference/file-conventions/error)                     | `.js` `.jsx` `.tsx` | エラー UI                          |
+| [`global-error`](/docs/app/api-reference/file-conventions/error#global-error) | `.js` `.jsx` `.tsx` | グローバルエラー UI                |
+| [`route`](/docs/app/api-reference/file-conventions/route)                     | `.js` `.ts`         | API エンドポイント                 |
+| [`template`](/docs/app/api-reference/file-conventions/template)               | `.js` `.jsx` `.tsx` | 再レンダリングされるレイアウト     |
+| [`default`](/docs/app/api-reference/file-conventions/default)                 | `.js` `.jsx` `.tsx` | 並列ルート用のフォールバックページ |
+
+### ネストされたルート
+
+フォルダはURLセグメントを定義します。フォルダをネストするとセグメントもネストされます。任意の階層のレイアウトは、その子セグメントをラップします。`page`または`route`ファイルが存在する場合、そのルートは公開されます。
+
+| パス                        | URL パターン    | 備考                                           |
+| --------------------------- | --------------- | ---------------------------------------------- |
+| `app/layout.tsx`            | —               | ルートレイアウトはすべてのルートに適用されます |
+| `app/blog/layout.tsx`       | —               | `/blog` 以下のルートをラップする               |
+| `app/page.tsx`              | `/`             | 公開ルート                                     |
+| `app/blog/page.tsx`         | `/blog`         | 公開ルート                                     |
+| `app/blog/authors/page.tsx` | `/blog/authors` | 公開ルート                                     |
+
+### 動的ルート
+
+角括弧を使ってセグメントをパラメータ化します。単一のパラメータには `[segment]`、キャッチオールには `[...segment]`、オプションのキャッチオールには `[[...segment]]` を使用します。値には [`params`](/docs/app/api-reference/file-conventions/page#params-optional) prop 経由でアクセスします。
+
+| パス                            | URL パターン                                                         |
+| ------------------------------- | -------------------------------------------------------------------- |
+| `app/blog/[slug]/page.tsx`      | `/blog/my-first-post`                                                |
+| `app/shop/[...slug]/page.tsx`   | `/shop/clothing`, `/shop/clothing/shirts`                            |
+| `app/docs/[[...slug]]/page.tsx` | `/docs`, `/docs/layouts-and-pages`, `/docs/api-reference/use-router` |
+
+### ルートグループとプライベートフォルダ
+
+ルートグループ [`(group)`](/docs/app/api-reference/file-conventions/route-groups#convention) を使用してURLを変更せずにコードを整理し、プライベートフォルダ [`_folder`](#private-folders) を使用してルーティング対象外のファイルをまとめて配置できます。
+
+| パス                            | URL パターン | 備考                                                                |
+| ------------------------------- | ------------ | ------------------------------------------------------------------- |
+| `app/(marketing)/page.tsx`      | `/`          | グループは URL には現れない                                         |
+| `app/(shop)/cart/page.tsx`      | `/cart`      | `(shop)` グループ内でレイアウトを共有                               |
+| `app/blog/_components/Post.tsx` | —            | ルーティング対象外。UI 専用ユーティリティを配置するための安全な場所 |
+| `app/blog/_lib/data.ts`         | —            | ルーティング対象外。ユーティリティを配置するための安全な場所        |
+
+### 並列ルートとインターセプトルート
+
+これらの機能は、スロットベースのレイアウトやモーダルルーティングなど、特定のUIパターン向けに用意されています。
+
+`@slot` は親レイアウトによってレンダリングされる名前付きスロットに使用します。インターセプトパターンを使用すると、URLを変更せずに現在のレイアウト内で別のルートをレンダリングできます。たとえば、リスト上にモーダルとして詳細ビューを表示する場合などに使用します。
+
+| パターン（ドキュメント）                                                                    | 概要                                   | 典型的な利用例                             |
+| ------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------ |
+| [`@folder`](/docs/app/api-reference/file-conventions/parallel-routes#slots)                 | 名前付きスロット                       | サイドバーとメインコンテンツ               |
+| [`(.)folder`](/docs/app/api-reference/file-conventions/intercepting-routes#convention)      | 同階層のルートをインターセプトする     | モーダル内で同階層のルートをプレビューする |
+| [`(..)folder`](/docs/app/api-reference/file-conventions/intercepting-routes#convention)     | 親ルートをインターセプトする           | 親の子ルートをオーバーレイとして開く       |
+| [`(..)(..)folder`](/docs/app/api-reference/file-conventions/intercepting-routes#convention) | 2階層上のルートをインターセプトする    | より深くネストされたオーバーレイを表示する |
+| [`(...)folder`](/docs/app/api-reference/file-conventions/intercepting-routes#convention)    | ルート（最上位）からインターセプトする | 現在のビューに任意のルートを表示する       |
+
+### メタデータファイルの規則
+
+#### アプリアイコン
+
+|                                                                                                                 |                                     |                                   |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------- |
+| [`favicon`](/docs/app/api-reference/file-conventions/metadata/app-icons#favicon)                                | `.ico`                              | ファビコン用ファイル              |
+| [`icon`](/docs/app/api-reference/file-conventions/metadata/app-icons#icon)                                      | `.ico` `.jpg` `.jpeg` `.png` `.svg` | アプリアイコン用ファイル          |
+| [`icon`](/docs/app/api-reference/file-conventions/metadata/app-icons#generate-icons-using-code-js-ts-tsx)       | `.js` `.ts` `.tsx`                  | 生成されたアプリアイコン          |
+| [`apple-icon`](/docs/app/api-reference/file-conventions/metadata/app-icons#apple-icon)                          | `.jpg` `.jpeg`, `.png`              | Apple 用アプリアイコンファイル    |
+| [`apple-icon`](/docs/app/api-reference/file-conventions/metadata/app-icons#generate-icons-using-code-js-ts-tsx) | `.js` `.ts` `.tsx`                  | 生成された Apple 用アプリアイコン |
+
+#### Open GraphとTwitterの画像
+
+|                                                                                                                             |                              |                            |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------------------------- |
+| [`opengraph-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image#opengraph-image)                      | `.jpg` `.jpeg` `.png` `.gif` | Open Graph 画像ファイル    |
+| [`opengraph-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image#generate-images-using-code-js-ts-tsx) | `.js` `.ts` `.tsx`           | 生成された Open Graph 画像 |
+| [`twitter-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image#twitter-image)                          | `.jpg` `.jpeg` `.png` `.gif` | Twitter 画像ファイル       |
+| [`twitter-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image#generate-images-using-code-js-ts-tsx)   | `.js` `.ts` `.tsx`           | 生成された Twitter 画像    |
+
+#### SEO
+
+|                                                                                                              |             |                          |
+| ------------------------------------------------------------------------------------------------------------ | ----------- | ------------------------ |
+| [`sitemap`](/docs/app/api-reference/file-conventions/metadata/sitemap#sitemap-files-xml)                     | `.xml`      | サイトマップファイル     |
+| [`sitemap`](/docs/app/api-reference/file-conventions/metadata/sitemap#generating-a-sitemap-using-code-js-ts) | `.js` `.ts` | 生成されたサイトマップ   |
+| [`robots`](/docs/app/api-reference/file-conventions/metadata/robots#static-robotstxt)                        | `.txt`      | robotsファイル           |
+| [`robots`](/docs/app/api-reference/file-conventions/metadata/robots#generate-a-robots-file)                  | `.js` `.ts` | 生成されたrobotsファイル |
+
+</AppOnly>
+
+<PagesOnly>
+
+### ファイル規約
+
+|                                                                                                             |                     |                      |
+| ----------------------------------------------------------------------------------------------------------- | ------------------- | -------------------- |
+| [`_app`](/docs/pages/building-your-application/routing/custom-app)                                          | `.js` `.jsx` `.tsx` | カスタム App         |
+| [`_document`](/docs/pages/building-your-application/routing/custom-document)                                | `.js` `.jsx` `.tsx` | カスタム Document    |
+| [`_error`](/docs/pages/building-your-application/routing/custom-error#more-advanced-error-page-customizing) | `.js` `.jsx` `.tsx` | カスタムエラーページ |
+| [`404`](/docs/pages/building-your-application/routing/custom-error#404-page)                                | `.js` `.jsx` `.tsx` | 404 エラーページ     |
+| [`500`](/docs/pages/building-your-application/routing/custom-error#500-page)                                | `.js` `.jsx` `.tsx` | 500 エラーページ     |
+
+### ルート
+
+|                                                                                                |                     |                    |
+| ---------------------------------------------------------------------------------------------- | ------------------- | ------------------ |
+| **フォルダー規約**                                                                             |                     |                    |
+| [`index`](/docs/pages/building-your-application/routing/pages-and-layouts#index-routes)        | `.js` `.jsx` `.tsx` | ホームページ       |
+| [`folder/index`](/docs/pages/building-your-application/routing/pages-and-layouts#index-routes) | `.js` `.jsx` `.tsx` | ネストされたページ |
+| **ファイル規約**                                                                               |                     |                    |
+| [`index`](/docs/pages/building-your-application/routing/pages-and-layouts#index-routes)        | `.js` `.jsx` `.tsx` | ホームページ       |
+| [`file`](/docs/pages/building-your-application/routing/pages-and-layouts)                      | `.js` `.jsx` `.tsx` | ネストされたページ |
+
+### 動的ルート
+
+|                                                                                                                   |                     |                                              |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------- |
+| **フォルダー規約**                                                                                                |                     |                                              |
+| [`[folder]/index`](/docs/pages/building-your-application/routing/dynamic-routes)                                  | `.js` `.jsx` `.tsx` | 動的ルートセグメント                         |
+| [`[...folder]/index`](/docs/pages/building-your-application/routing/dynamic-routes#catch-all-segments)            | `.js` `.jsx` `.tsx` | キャッチオールルート用セグメント             |
+| [`[[...folder]]/index`](/docs/pages/building-your-application/routing/dynamic-routes#optional-catch-all-segments) | `.js` `.jsx` `.tsx` | オプションのキャッチオールルート用セグメント |
+| **ファイル規約**                                                                                                  |                     |                                              |
+| [`[file]`](/docs/pages/building-your-application/routing/dynamic-routes)                                          | `.js` `.jsx` `.tsx` | 動的ルートセグメント                         |
+| [`[...file]`](/docs/pages/building-your-application/routing/dynamic-routes#catch-all-segments)                    | `.js` `.jsx` `.tsx` | キャッチオールルート用セグメント             |
+| [`[[...file]]`](/docs/pages/building-your-application/routing/dynamic-routes#optional-catch-all-segments)         | `.js` `.jsx` `.tsx` | オプションのキャッチオールルート用セグメント |
+
+</PagesOnly>
+
+<AppOnly>
+  ## プロジェクトの構成
+
+Next.js はプロジェクトファイルの整理やコロケーションの方法について**特定の規約を設けていません**。ただし、プロジェクトを整理するためのいくつかの機能を提供しています。
+
+### コンポーネント階層
+
+特殊ファイルで定義されたコンポーネントは、特定の階層でレンダリングされます：
+
+- `layout.js`
+- `template.js`
+- `error.js`（React のエラーバウンダリ）
+- `loading.js`（React Suspense バウンダリ）
+- `not-found.js`（「Not Found」UI のための React エラーバウンダリ）
+- `page.js` またはネストされた `layout.js`
+
+<Image
+  alt="ファイル規約におけるコンポーネントの階層"
+  srcLight="/docs/light/file-conventions-component-hierarchy.png"
+  srcDark="/docs/dark/file-conventions-component-hierarchy.png"
+  width="1600"
+  height="643"
+/>
+
+コンポーネントはネストされたルート内で再帰的にレンダリングされます。つまり、あるルートセグメントのコンポーネントは、親セグメントのコンポーネントの**内側**にネストされます。
+
+<Image
+  alt="ネストされたファイル規約とコンポーネントの階層構造"
+  srcLight="/docs/light/nested-file-conventions-component-hierarchy.png"
+  srcDark="/docs/dark/nested-file-conventions-component-hierarchy.png"
+  width="1600"
+  height="863"
+/>
+
+### コロケーション
+
+`app` ディレクトリでは、ネストされたフォルダがルート構造を定義します。各フォルダは、URLパスの対応するセグメントにマッピングされるルートセグメントを表します。
+
+ただし、ルート構造はフォルダによって定義されますが、ルートセグメントに `page.js` または `route.js` ファイルが追加されるまで、そのルートは**一般公開されません**。
+
+<Image
+  alt="page.js または route.js ファイルがルートセグメントに追加されるまで、そのルートが公開されずアクセスできないことを示す図。"
+  srcLight="/docs/light/project-organization-not-routable.png"
+  srcDark="/docs/dark/project-organization-not-routable.png"
+  width="1600"
+  height="444"
+/>
+
+また、ルートが公開アクセス可能な場合でも、クライアントに送信されるのは `page.js` または `route.js` が**返すコンテンツ**のみです。
+
+<Image
+  alt="page.js と route.js ファイルによってルートがどのように公開され、外部からアクセス可能になるかを示す図。"
+  srcLight="/docs/light/project-organization-routable.png"
+  srcDark="/docs/dark/project-organization-routable.png"
+  width="1600"
+  height="687"
+/>
+
+つまり、**プロジェクトファイル**を `app` ディレクトリ内のルートセグメントに**安全に配置**しても、意図せずルーティング対象になることはありません。
+
+<Image
+  alt="セグメント内に page.js または route.js ファイルが存在していても、同じ場所に配置されたプロジェクトファイルはルーティングの対象にならないことを示す図。"
+  srcLight="/docs/light/project-organization-colocation.png"
+  srcDark="/docs/dark/project-organization-colocation.png"
+  width="1600"
+  height="1011"
+/>
+
+> **補足**: プロジェクトのファイルを `app` 内に配置することも**できます**が、必ずしもそうする**必要はありません**。お好みで、[それらを `app` ディレクトリの外に置く](#store-project-files-outside-of-app)こともできます。
+
+### プライベートフォルダ
+
+フォルダ名の先頭にアンダースコアを付けることで、プライベートフォルダを作成できます: `_folderName`
+
+これは、フォルダがプライベートな実装の詳細であり、ルーティングシステムの対象外とすべきであることを示します。これにより、**そのフォルダとすべてのサブフォルダ**がルーティングから除外されます。
+
+<Image
+  alt="プライベートフォルダーを含むフォルダー構成例"
+  srcLight="/docs/light/project-organization-private-folders.png"
+  srcDark="/docs/dark/project-organization-private-folders.png"
+  width="1600"
+  height="849"
+/>
+
+`app` ディレクトリ内のファイルは[デフォルトで安全にコロケーション可能](#colocation)なため、コロケーションにプライベートフォルダーは必須ではありません。ただし、次のような用途に活用できます：
+
+- UI ロジックをルーティングロジックから分離する。
+- プロジェクト全体および Next.js エコシステム全体で、内部ファイルの構成を一貫させる。
+- コードエディターでのファイルの並び替えとグループ化。
+- 将来の Next.js のファイル命名規則と名前が衝突する可能性を避ける。
+
+> **補足**：
+>
+> - フレームワークの公式な規約ではありませんが、同じアンダースコアパターンを使って、プライベートフォルダ外のファイルも「プライベート」として扱うことを検討してもよいでしょう。
+> - フォルダ名の前に `%5F`（アンダースコアを URL エンコードした形式）を付けることで、アンダースコアで始まる URL セグメントを作成できます: `%5FfolderName`。
+> - プライベートフォルダを使用しない場合は、予期しない名前の競合を防ぐために、Next.js の[特殊なファイルの規約](/docs/app/getting-started/project-structure#routing-files)を把握しておくと役立ちます。
+
+### ルートグループ
+
+ルートグループは、フォルダー名を括弧で囲むことで作成できます: `(folderName)`
+
+これは、フォルダが整理用であり、ルートのURLパスに**含まれない**ことを示します。
+
+<Image
+  alt="ルートグループを使用したフォルダ構造の例"
+  srcLight="/docs/light/project-organization-route-groups.png"
+  srcDark="/docs/dark/project-organization-route-groups.png"
+  width="1600"
+  height="849"
+/>
+
+ルートグループは以下の用途に役立ちます：
+
+- サイトのセクション、用途、担当チームごとにルートを整理します。例: マーケティングページ、管理ページなど。
+- 同じルートセグメント階層内でネストされたレイアウトを有効化する：
+  - [同一セグメント内で複数のネストされたレイアウト（複数のルートレイアウトを含む）を作成する](#creating-multiple-root-layouts)
+  - [共通のセグメント内の特定のルートにのみレイアウトを追加する](#opting-specific-segments-into-a-layout)
+
+### `src` フォルダ
+
+Next.js は、アプリケーションコード（`app` を含む）をオプションの [`src` フォルダ](/docs/app/api-reference/file-conventions/src-folder)内に配置することをサポートしています。これにより、アプリケーションコードと、主にプロジェクトのルートに存在するプロジェクト設定ファイルを分離できます。
+
+<Image
+  alt="`src` フォルダーを含むフォルダー構成の例"
+  srcLight="/docs/light/project-organization-src-directory.png"
+  srcDark="/docs/dark/project-organization-src-directory.png"
+  width="1600"
+  height="687"
+/>
+
+## 例
+
+以下のセクションでは、一般的な戦略の概要を簡単に説明します。最も重要なポイントは、自分とチームに合った戦略を選び、プロジェクト全体で一貫して使用することです。
+
+> **補足**: 以下の例では、`components` フォルダーと `lib` フォルダーを一般的なプレースホルダーとして使用しています。これらの名前自体にはフレームワーク特有の意味はなく、プロジェクトによっては `ui`、`utils`、`hooks`、`styles` など、別のフォルダーを使用しても問題ありません。
+
+### プロジェクトファイルを`app`の外に配置する
+
+この方法では、すべてのアプリケーションコードを**プロジェクトのルート**にある共有フォルダに格納し、`app` ディレクトリはルーティング専用として使用します。
+
+<Image
+  alt="app ディレクトリの外にプロジェクトファイルを配置した場合のフォルダ構成例"
+  srcLight="/docs/light/project-organization-project-root.png"
+  srcDark="/docs/dark/project-organization-project-root.png"
+  width="1600"
+  height="849"
+/>
+
+### `app`内のトップレベルフォルダにプロジェクトファイルを保存する
+
+この方法では、すべてのアプリケーションコードを**`app`ディレクトリのルート**にある共有フォルダに格納します。
+
+<Image
+  alt="app ディレクトリ内のプロジェクトファイルを含むフォルダ構成の例"
+  srcLight="/docs/light/project-organization-app-root.png"
+  srcDark="/docs/dark/project-organization-app-root.png"
+  width="1600"
+  height="849"
+/>
+
+### 機能またはルートごとにプロジェクトファイルを分割する
+
+この戦略では、グローバルに共有されるアプリケーションコードをルートの `app` ディレクトリに格納し、より固有のアプリケーションコードはそれを使用するルートセグメントに**分割**して配置します。
+
+<Image
+  alt="機能別またはルート別にプロジェクトファイルを整理したフォルダ構成の例"
+  srcLight="/docs/light/project-organization-app-root-split.png"
+  srcDark="/docs/dark/project-organization-app-root-split.png"
+  width="1600"
+  height="1011"
+/>
+
+### URLパスに影響を与えずにルートを整理する
+
+URLに影響を与えずにルートを整理するには、関連するルートをまとめるグループを作成します。括弧で囲まれたフォルダはURLから除外されます（例：`(marketing)` や `(shop)`）。
+
+<Image
+  alt="ルートグループを使ったルートの整理"
+  srcLight="/docs/light/route-group-organisation.png"
+  srcDark="/docs/dark/route-group-organisation.png"
+  width="1600"
+  height="930"
+/>
+
+`(marketing)` と `(shop)` 内のルートは同じURL階層を共有していますが、それぞれのフォルダ内に `layout.js` ファイルを追加することで、グループごとに異なるレイアウトを作成できます。
+
+<Image
+  alt="複数のレイアウトを使用するルートグループ"
+  srcLight="/docs/light/route-group-multiple-layouts.png"
+  srcDark="/docs/dark/route-group-multiple-layouts.png"
+  width="1600"
+  height="768"
+/>
+
+### 特定のセグメントをレイアウトに組み込む
+
+特定のルートをレイアウトに含めるには、新しいルートグループ（例：`(shop)`）を作成し、同じレイアウトを共有するルート（例：`account` と `cart`）をそのグループに移動します。グループ外のルートはそのレイアウトを共有しません（例：`checkout`）。
+
+<Image
+  alt="オプトイン可能なレイアウトを持つルートグループ"
+  srcLight="/docs/light/route-group-opt-in-layouts.png"
+  srcDark="/docs/dark/route-group-opt-in-layouts.png"
+  width="1600"
+  height="930"
+/>
+
+### 特定のルートでローディングスケルトンを使用する
+
+`loading.js` ファイルを使って特定のルートに[ローディングスケルトン](/docs/app/api-reference/file-conventions/loading)を適用するには、新しいルートグループ（例：`/(overview)`）を作成し、`loading.tsx` をそのルートグループ内に移動します。
+
+<Image
+  alt="ルートグループ内の loading.tsx と page.tsx を示すフォルダー構造"
+  srcLight="/docs/light/route-group-loading.png"
+  srcDark="/docs/dark/route-group-loading.png"
+  width="1600"
+  height="444"
+/>
+
+これにより、`loading.tsx` ファイルはURLパス構造に影響を与えることなく、すべてのダッシュボードページではなくダッシュボード → 概要ページにのみ適用されます。
+
+### 複数のルートレイアウトを作成する
+
+複数の[ルートレイアウト](/docs/app/api-reference/file-conventions/layout#root-layout)を作成するには、トップレベルの`layout.js`ファイルを削除し、各ルートグループ内に`layout.js`ファイルを追加します。これは、アプリケーションをまったく異なるUIやエクスペリエンスを持つセクションに分割する際に便利です。各ルートレイアウトには`<html>`タグと`<body>`タグを追加する必要があります。
+
+<Image
+  alt="複数のルートレイアウトを使用するルートグループ"
+  srcLight="/docs/light/route-group-multiple-root-layouts.png"
+  srcDark="/docs/dark/route-group-multiple-root-layouts.png"
+  width="1600"
+  height="687"
+/>
+
+上記の例では、`(marketing)` と `(shop)` はそれぞれ独自のルートレイアウトを持っています。
+
+</AppOnly>

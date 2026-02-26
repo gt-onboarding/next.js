@@ -1,0 +1,81 @@
+---
+title: cacheLife
+description: Next.js での cacheLife の設定方法について学びます。
+related:
+  title: 関連
+  description: 関連する API リファレンスを表示します。
+  links:
+    - app/api-reference/directives/use-cache
+    - app/api-reference/config/next-config-js/cacheHandlers
+    - app/api-reference/functions/cacheLife
+---
+
+`cacheLife` オプションを使用すると、コンポーネントや関数内で [`cacheLife`](/docs/app/api-reference/functions/cacheLife) 関数を利用する場合や、[`use cache` ディレクティブ](/docs/app/api-reference/directives/use-cache) のスコープ内で、**カスタムキャッシュプロファイル**を定義できます。
+
+## 使用方法
+
+プロファイルを定義するには、[`cacheComponents` フラグ](/docs/app/api-reference/config/next-config-js/cacheComponents) を有効にし、`next.config.js` ファイル内の `cacheLife` オブジェクトにキャッシュプロファイルを追加します。たとえば、`blog` というプロファイルは次のようになります。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    blog: {
+      stale: 3600, // 1時間
+      revalidate: 900, // 15分
+      expire: 86400, // 1日
+    },
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  cacheComponents: true,
+  cacheLife: {
+    blog: {
+      stale: 3600, // 1時間
+      revalidate: 900, // 15分
+      expire: 86400, // 1日
+    },
+  },
+}
+```
+
+このカスタム `blog` 設定は、コンポーネントや関数内で次のように使用できます。
+
+```tsx filename="app/actions.ts" highlight={4,5} switcher
+import { cacheLife } from 'next/cache'
+
+export async function getCachedData() {
+  'use cache'
+  cacheLife('blog')
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+```jsx filename="app/actions.js" highlight={4,5} switcher
+import { cacheLife } from 'next/cache'
+
+export async function getCachedData() {
+  'use cache'
+  cacheLife('blog')
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+## リファレンス
+
+設定オブジェクトのキーと値は、次の形式で指定します:
+
+| **プロパティ** | **値**   | **説明**                                                                                 | **要件**                                     |
+| -------------- | -------- | ---------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `stale`        | `number` | クライアントがサーバーに問い合わせずに値をキャッシュしておく期間。                       | 任意                                         |
+| `revalidate`   | `number` | キャッシュをサーバー側で更新する頻度。再検証中は、ステールな値が返される場合があります。 | 任意                                         |
+| `expire`       | `number` | 値がステールのままでいられる最大期間。この時間を過ぎると動的モードに切り替わります。     | 任意 - `revalidate` より長くなければならない |

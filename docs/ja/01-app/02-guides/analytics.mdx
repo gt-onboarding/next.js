@@ -1,0 +1,234 @@
+---
+title: Next.js アプリケーションにアナリティクスを追加する方法
+nav_title: アナリティクス
+description: Next.js Speed Insights を使用してページのパフォーマンスを計測・追跡する
+---
+
+{/* このドキュメントの内容は App Router と Pages Router の両方で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントで囲まないでください。 */}
+
+Next.js には、パフォーマンスメトリクスの計測とレポートを行うための機能が標準で用意されています。[`useReportWebVitals`](/docs/app/api-reference/functions/use-report-web-vitals) フックを使って自分でレポート処理を管理することもできますし、代わりに Vercel が提供する [マネージドサービス](https://vercel.com/analytics?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) を利用して、メトリクスを自動的に収集・可視化することもできます。
+
+## クライアント計測
+
+より高度な分析やモニタリングが必要な場合、Next.js ではアプリケーションのフロントエンドコードが実行される前に動作する `instrumentation-client.js|ts` ファイルを提供しています。これは、グローバルなアナリティクス、エラートラッキング、パフォーマンスモニタリングツールなどをセットアップするのに最適です。
+
+使用するには、アプリケーションのルートディレクトリに `instrumentation-client.js` または `instrumentation-client.ts` ファイルを作成します。
+
+```js filename="instrumentation-client.js"
+// アプリ起動前にアナリティクスを初期化する
+console.log('Analytics initialized')
+
+// グローバルエラートラッキングを設定する
+window.addEventListener('error', (event) => {
+  // エラートラッキングサービスに送信する
+  reportError(event.error)
+})
+```
+
+## 独自の実装
+
+<PagesOnly>
+
+```jsx filename="pages/_app.js"
+import { useReportWebVitals } from 'next/web-vitals'
+
+function MyApp({ Component, pageProps }) {
+  useReportWebVitals((metric) => {
+    console.log(metric)
+  })
+
+  return <Component {...pageProps} />
+}
+```
+
+詳細については [API リファレンス](/docs/pages/api-reference/functions/use-report-web-vitals) を参照してください。
+
+</PagesOnly>
+
+<AppOnly>
+
+```jsx filename="app/_components/web-vitals.js"
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    console.log(metric)
+  })
+}
+```
+
+```jsx filename="app/layout.js"
+import { WebVitals } from './_components/web-vitals'
+
+export default function Layout({ children }) {
+  return (
+    <html>
+      <body>
+        <WebVitals />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+> `useReportWebVitals` フックは `'use client'` ディレクティブを必要とするため、最もパフォーマンスに優れた方法は、ルートレイアウトからインポートされる別コンポーネントを作成することです。これにより、クライアントコンポーネントの境界は `WebVitals` コンポーネントのみに限定されます。
+
+詳細については [API リファレンス](/docs/app/api-reference/functions/use-report-web-vitals) を参照してください。
+
+</AppOnly>
+
+## Web Vitals
+
+[Web Vitals](https://web.dev/vitals/) は、ウェブページにおけるユーザー体験を把握するための有用な一連の指標です。次の Web Vitals がすべて含まれます:
+
+- [Time to First Byte](https://developer.mozilla.org/docs/Glossary/Time_to_first_byte) (TTFB)
+- [First Contentful Paint](https://developer.mozilla.org/docs/Glossary/First_contentful_paint) (FCP)
+- [Largest Contentful Paint](https://web.dev/lcp/) (LCP)
+- [First Input Delay](https://web.dev/fid/) (FID)
+- [Cumulative Layout Shift](https://web.dev/cls/) (CLS)
+- [Interaction to Next Paint](https://web.dev/inp/) (INP)
+
+これらの指標の結果はすべて、`name` プロパティを用いて処理できます。
+
+<PagesOnly>
+
+```jsx filename="pages/_app.js"
+import { useReportWebVitals } from 'next/web-vitals'
+
+function MyApp({ Component, pageProps }) {
+  useReportWebVitals((metric) => {
+    switch (metric.name) {
+      case 'FCP': {
+        // FCP の結果を処理します
+      }
+      case 'LCP': {
+        // LCP の結果を処理します
+      }
+      // ...
+    }
+  })
+
+  return <Component {...pageProps} />
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+```tsx filename="app/_components/web-vitals.tsx" switcher
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    switch (metric.name) {
+      case 'FCP': {
+        // FCP の結果を処理します
+      }
+      case 'LCP': {
+        // LCP の結果を処理します
+      }
+      // ...
+    }
+  })
+}
+```
+
+```jsx filename="app/_components/web-vitals.js" switcher
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    switch (metric.name) {
+      case 'FCP': {
+        // FCP の結果を処理します
+      }
+      case 'LCP': {
+        // LCP の結果を処理します
+      }
+      // ...
+    }
+  })
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+## カスタムメトリクス
+
+上記のコア指標に加えて、ページがハイドレーションおよびレンダリングされるまでの時間を計測する、いくつかのカスタム指標があります:
+
+- `Next.js-hydration`: ページのハイドレーションが開始してから完了するまでに要する時間 (ミリ秒)
+- `Next.js-route-change-to-render`: ルート変更後、ページのレンダリングが開始されるまでに要する時間 (ミリ秒)
+- `Next.js-render`: ルート変更後、ページのレンダリングが完了するまでに要する時間 (ミリ秒)
+
+これらの指標の結果は、それぞれ個別に処理できます:
+
+```js
+export function reportWebVitals(metric) {
+  switch (metric.name) {
+    case 'Next.js-hydration':
+      // hydration の結果を処理
+      break
+    case 'Next.js-route-change-to-render':
+      // route-change から render までの結果を処理
+      break
+    case 'Next.js-render':
+      // render の結果を処理
+      break
+    default:
+      break
+  }
+}
+```
+
+これらの指標は、[User Timing API](https://caniuse.com/#feat=user-timing) をサポートするすべてのブラウザで動作します。
+
+</PagesOnly>
+
+## 外部システムへの結果送信
+
+サイトの実ユーザーのパフォーマンスを計測・追跡するために、任意のエンドポイントへ結果を送信できます。例えば、次のようにします。
+
+```js
+useReportWebVitals((metric) => {
+  const body = JSON.stringify(metric)
+  const url = 'https://example.com/analytics'
+
+  // 利用可能であれば `navigator.sendBeacon()` を使用し、そうでなければ `fetch()` にフォールバックする。
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url, body)
+  } else {
+    fetch(url, { body, method: 'POST', keepalive: true })
+  }
+})
+```
+
+> **補足**: [Google Analytics](https://analytics.google.com/analytics/web/) を使用している場合、
+> `id` の値を使うことで、メトリクスの分布を手動で構成できます（パーセンタイルを計算する
+> など）。
+
+> ```js
+> useReportWebVitals((metric) => {
+>   // 次の例のように Google Analytics を初期化している場合は `window.gtag` を使用します:
+>   // https://github.com/vercel/next.js/blob/canary/examples/with-google-analytics
+>   window.gtag('event', metric.name, {
+>     value: Math.round(
+>       metric.name === 'CLS' ? metric.value * 1000 : metric.value
+>     ), // 値は整数である必要があります
+>     event_label: metric.id, // 現在のページロードに固有の id
+>     non_interaction: true, // 直帰率に影響を与えないようにします。
+>   })
+> })
+> ```
+>
+> [Google Analytics への結果送信](https://github.com/GoogleChrome/web-vitals#send-the-results-to-google-analytics)についての詳細は、こちらを参照してください。

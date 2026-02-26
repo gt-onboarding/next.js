@@ -1,0 +1,58 @@
+---
+title: connection
+description: connection 関数の API リファレンス。
+---
+
+`connection()` 関数を使うと、レンダリングを続行する前に、受信するユーザーリクエストが来るまで待機させることができます。
+
+これは、コンポーネントが [Dynamic APIs](/docs/app/guides/caching#dynamic-rendering) を使用していないものの、ビルド時の静的レンダリングではなく、実行時の動的レンダリングにしたい場合に便利です。これは通常、`Math.random()` や `new Date()` のように、レンダリング結果を意図的に変化させたい外部の情報にアクセスする場合に発生します。
+
+```ts filename="app/page.tsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  await connection()
+  // 以下はすべてプリレンダリングから除外されます
+  const rand = Math.random()
+  return <span>{rand}</span>
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  await connection()
+  // 以下はすべてプリレンダリングから除外されます
+  const rand = Math.random()
+  return <span>{rand}</span>
+}
+```
+
+## リファレンス
+
+### 型
+
+```jsx
+function connection(): Promise<void>
+```
+
+### パラメータ
+
+- この関数は引数を取りません。
+
+### 戻り値
+
+- この関数は `void` の Promise を返します。呼び出し側で結果を利用することは想定されていません。
+
+## 補足
+
+- `connection` は、Next.js の今後の方向性とより整合するように、[`unstable_noStore`](/docs/app/api-reference/functions/unstable_noStore) の後継となるものです。
+- この関数が必要になるのは、動的レンダリングが必要で、一般的な Dynamic API を利用していない場合のみです。
+
+### バージョン履歴
+
+| バージョン   | 変更内容                          |
+| ------------ | --------------------------------- |
+| `v15.0.0`    | `connection` が安定化されました。 |
+| `v15.0.0-RC` | `connection` が導入されました。   |

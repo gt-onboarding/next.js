@@ -1,0 +1,572 @@
+---
+title: adapterPath
+description: modifyConfig と onBuildComplete コールバックを使って、ビルドプロセスにフックするためのカスタムアダプターを Next.js 向けに設定します。
+version: experimental
+---
+
+Next.js には、ビルドプロセスにフックするカスタムアダプターを作成できる実験的な API が用意されています。これは、Next.js の設定を変更したり、ビルド出力を処理したりする必要があるデプロイプラットフォームやカスタムビルド連携に役立ちます。
+
+完全なリファレンス実装については、[`nextjs/adapter-vercel`](https://github.com/nextjs/adapter-vercel) を参照してください。
+
+## 設定
+
+アダプターを使用するには、`experimental.adapterPath` にアダプターモジュールへのパスを指定します。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    adapterPath: require.resolve('./my-adapter.js'),
+  },
+}
+
+module.exports = nextConfig
+```
+
+## アダプターの作成
+
+アダプターとは、`NextAdapter` インターフェースを実装したオブジェクトをエクスポートするモジュールです。
+
+```typescript
+type Route = {
+  source?: string
+  sourceRegex: string
+  destination?: string
+  headers?: Record<string, string>
+  has?: RouteHas[]
+  missing?: RouteHas[]
+  status?: number
+  priority?: boolean
+}
+
+export interface AdapterOutputs {
+  pages: Array<AdapterOutput['PAGES']>
+  middleware?: AdapterOutput['MIDDLEWARE']
+  appPages: Array<AdapterOutput['APP_PAGE']>
+  pagesApi: Array<AdapterOutput['PAGES_API']>
+  appRoutes: Array<AdapterOutput['APP_ROUTE']>
+  prerenders: Array<AdapterOutput['PRERENDER']>
+  staticFiles: Array<AdapterOutput['STATIC_FILE']>
+}
+
+export interface NextAdapter {
+  name: string
+  modifyConfig?: (
+    config: NextConfigComplete,
+    ctx: {
+      phase: PHASE_TYPE
+    }
+  ) => Promise<NextConfigComplete> | NextConfigComplete
+  onBuildComplete?: (ctx: {
+    routing: {
+      beforeMiddleware: Array<Route>
+      beforeFiles: Array<Route>
+      afterFiles: Array<Route>
+      dynamicRoutes: Array<Route>
+      onMatch: Array<Route>
+      fallback: Array<Route>
+      shouldNormalizeNextData: boolean
+      rsc: RoutesManifest['rsc']
+    }
+    outputs: AdapterOutputs
+    projectDir: string
+    repoRoot: string
+    distDir: string
+    config: NextConfigComplete
+    nextVersion: string
+    buildId: string
+  }) => Promise<void> | void
+}
+```
+
+### 基本的なアダプター構造
+
+最小構成のアダプター例は次のとおりです。
+
+```js filename="my-adapter.js"
+/** @type {import('next').NextAdapter} */
+const adapter = {
+  name: 'my-custom-adapter',
+
+  async modifyConfig(config, { phase }) {
+    // ビルドフェーズに基づいてNext.jsの設定を変更する
+    if (phase === 'phase-production-build') {
+      return {
+        ...config,
+        // 変更を追加する
+      }
+    }
+    return config
+  },
+
+  async onBuildComplete({
+    routing,
+    outputs,
+    projectDir,
+    repoRoot,
+    distDir,
+    config,
+    nextVersion,
+    buildId,
+  }) {
+    // ビルド出力を処理する
+    console.log('Build completed with', outputs.pages.length, 'pages')
+    console.log('Build ID:', buildId)
+    console.log('Dynamic routes:', routing.dynamicRoutes.length)
+
+    // 出力エントリにアクセスする
+    for (const page of outputs.pages) {
+      console.log('Page:', page.pathname, 'at', page.filePath)
+    }
+
+    for (const apiRoute of outputs.pagesApi) {
+      console.log('API Route:', apiRoute.pathname, 'at', apiRoute.filePath)
+    }
+
+    for (const appPage of outputs.appPages) {
+      console.log('App Page:', appPage.pathname, 'at', appPage.filePath)
+    }
+
+    for (const prerender of outputs.prerenders) {
+      console.log('Prerendered:', prerender.pathname)
+    }
+  },
+}
+
+module.exports = adapter
+```
+
+## API リファレンス
+
+### `modifyConfig(config, context)`
+
+next.config を読み込む任意の CLI コマンドに対して呼び出され、設定を変更できるようにします。
+
+**パラメーター:**
+
+- `config`: Next.js の設定オブジェクト全体
+- `context.phase`: 現在のビルドフェーズ（[phases](/docs/app/api-reference/config/next-config-js#phase) を参照）
+
+**戻り値:** 変更後の設定オブジェクト（非同期でも可）
+
+### `onBuildComplete(context)`
+
+ビルドプロセスが完了した後に呼び出され、ルートや出力に関する詳細情報が渡されます。
+
+**パラメーター:**
+
+- `routing`: Next.js のルーティングフェーズとメタデータを含むオブジェクト
+  - `routing.beforeMiddleware`: ミドルウェアより前に実行されるルート（ヘッダーとリダイレクト処理を含む）
+  - `routing.beforeFiles`: ファイルシステムルートのマッチングより前にチェックされるリライトルート
+  - `routing.afterFiles`: ファイルシステムルートのマッチングの後にチェックされるリライトルート
+  - `routing.dynamicRoutes`: 動的ルートのマッチングテーブル
+  - `routing.onMatch`: マッチに成功した後に適用されるルート（例: イミュータブルな静的アセットのキャッシュヘッダー）
+  - `routing.fallback`: 最終的なリライトルート用のフォールバック
+  - `routing.shouldNormalizeNextData`: マッチング時に `/_next/data/<buildId>/...` の URL を正規化するかどうか
+  - `routing.rsc`: React サーバーコンポーネントのルーティング挙動に使用されるルートメタデータ
+- `outputs`: すべてのビルド出力について、種類ごとに整理された詳細情報
+- `projectDir`: Next.js プロジェクトディレクトリへの絶対パス
+- `repoRoot`: 検出されたリポジトリルートへの絶対パス
+- `distDir`: ビルド出力ディレクトリへの絶対パス
+- `config`: 最終的な Next.js 設定（`modifyConfig` が適用されたもの）
+- `nextVersion`: 使用されている Next.js のバージョン
+- `buildId`: 現在のビルドを一意に識別する ID
+
+## `@next/routing` を使ったルーティング
+
+[`@next/routing`](https://www.npmjs.com/package/@next/routing) を使用して、`onBuildComplete` のデータを使い、Next.js のルートマッチング動作を再現できます。
+
+> [!NOTE]
+> `@next/routing` は現在実験的な機能であり、adapters API とともに安定化される予定です。
+
+```typescript
+import { resolveRoutes } from '@next/routing'
+
+const pathnames = [
+  ...outputs.pages,
+  ...outputs.pagesApi,
+  ...outputs.appPages,
+  ...outputs.appRoutes,
+  ...outputs.staticFiles,
+].map((output) => output.pathname)
+
+const result = await resolveRoutes({
+  url: requestUrl,
+  buildId,
+  basePath: config.basePath || '',
+  i18n: config.i18n,
+  headers: requestHeaders,
+  requestBody,
+  pathnames,
+  routes: routing,
+  invokeMiddleware: async (ctx) => {
+    // プラットフォーム固有のミドルウェア呼び出し
+    return {}
+  },
+})
+```
+
+## アダプターでの PPR の実装
+
+部分的にプリレンダーされた app ルートでは、`onBuildComplete` によって、PPR をシードして再開するために必要なデータが提供されます:
+
+- `outputs.prerenders[].fallback.filePath`: 生成されたフォールバックシェル（例: HTML）のパス
+- `outputs.prerenders[].fallback.postponedState`: レンダリング再開に使用される、postponed state のシリアライズ済みデータ
+
+### 1. ビルド時のシードシェル＋保留状態
+
+```ts filename="my-adapter.ts"
+import { readFile } from 'node:fs/promises'
+
+async function seedPprEntries(outputs: AdapterOutputs) {
+  for (const prerender of outputs.prerenders) {
+    const fallback = prerender.fallback
+    if (!fallback?.filePath || !fallback.postponedState) continue
+
+    const shell = await readFile(fallback.filePath, 'utf8')
+    await platformCache.set(prerender.pathname, {
+      shell,
+      postponedState: fallback.postponedState,
+      initialHeaders: fallback.initialHeaders,
+      initialStatus: fallback.initialStatus,
+      initialRevalidate: fallback.initialRevalidate,
+      initialExpiration: fallback.initialExpiration,
+    })
+  }
+}
+```
+
+### 2. ランタイムのフロー: キャッシュ済みシェルを返し、バックグラウンドで再開する
+
+リクエスト時には、次を連結した単一のレスポンスとしてストリーミングできます:
+
+1. キャッシュされた HTML シェルのストリーム
+2. （postponed 状態を渡して `handler` を呼び出した後に生成される）再開されたレンダリングストリーム
+
+```text
+Client
+  | GET /ppr-route
+  v
+Adapter Router
+  |
+  |-- read cached shell + postponedState ---> Platform Cache
+  |<------------- cache hit -----------------|
+  |
+  |-- create responseStream = concat(shellStream, resumedStream)
+  |
+  |-- start piping shellStream ------------> Client (first bytes)
+  |
+  |-- invoke handler(req, res, { requestMeta: { postponed } })
+  |   -------------------------------------> Entrypoint (handler)
+  |   <------------------------------------- resumed chunks/cache entry
+  |
+  |-- append resumed chunks to resumedStream
+  |
+  '-- client receives one HTTP response:
+      [shell bytes........][resumed bytes........]
+```
+
+### 3. `requestMeta.onCacheEntryV2` でキャッシュを更新する
+
+`requestMeta.onCacheEntryV2` は、レスポンスキャッシュエントリが検索または生成されるときに呼び出されます。これを使用して、更新されたシェル／postponed データを永続化します。
+
+> [!NOTE]
+>
+> - `requestMeta.onCacheEntry` も動作しますが、非推奨です。
+> - 代わりに `requestMeta.onCacheEntryV2` を優先して使用してください。
+> - アダプターで内部的に `onCacheCallback` という抽象化を使用している場合は、それを `requestMeta.onCacheEntryV2` に紐付けてください。
+
+```ts filename="my-adapter.ts"
+await handler(req, res, {
+  waitUntil,
+  requestMeta: {
+    postponed: cachedPprEntry?.postponedState,
+    onCacheEntryV2: async (cacheEntry, meta) => {
+      if (cacheEntry.value?.kind === 'APP_PAGE') {
+        const html =
+          cacheEntry.value.html &&
+          typeof cacheEntry.value.html.toUnchunkedString === 'function'
+            ? cacheEntry.value.html.toUnchunkedString()
+            : null
+
+        await platformCache.set(meta.url || req.url || '/', {
+          shell: html,
+          postponedState: cacheEntry.value.postponed,
+          headers: cacheEntry.value.headers,
+          status: cacheEntry.value.status,
+          cacheControl: cacheEntry.cacheControl,
+        })
+      }
+
+      // アダプターがレスポンスを自ら書き込んだ場合のみ true を返す。
+      return false
+    },
+  },
+})
+```
+
+```text
+Entrypoint (handler)
+  | onCacheEntryV2(cacheEntry, { url })
+  v
+requestMeta.onCacheEntryV2 callback
+  |
+  |-- if APP_PAGE ---> persist html + postponedState + headers ---> Platform Cache
+  |
+  '-- return false: continue normal Next.js response flow
+      return true:  adapter already handled response (short-circuit)
+```
+
+## エントリーポイントの呼び出し
+
+ビルド出力のエントリーポイントでは、ランタイム固有のリクエスト／レスポンス型を持つ `handler(..., ctx)` インターフェースを使用します。
+
+### Node.js ランタイム (`runtime: 'nodejs'`)
+
+Node.js エントリポイント（`packages/next/src/build/templates/app-page.ts`、`packages/next/src/build/templates/app-route.ts`、および `packages/next/src/build/templates/pages-api.ts` を参照）は次を使用します：
+
+```typescript
+handler(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: {
+    waitUntil?: (prom: Promise<void>) => void
+    requestMeta?: RequestMeta
+  }
+): Promise<void>
+```
+
+### Edge runtime (`runtime: 'edge'`)
+
+Edge エントリーポイント（`packages/next/src/build/templates/edge-ssr.ts`、`packages/next/src/build/templates/edge-app-route.ts`、`packages/next/src/build/templates/pages-edge-api.ts`、および `packages/next/src/build/templates/middleware.ts` を参照）は次を使用します：
+
+```typescript
+handler(
+  request: Request,
+  ctx: {
+    waitUntil?: (prom: Promise<void>) => void
+    signal?: AbortSignal
+    requestMeta?: RequestMeta
+  }
+): Promise<Response>
+```
+
+形は `handler(..., ctx)` を中心に統一されていますが、Node ランタイムと Edge ランタイムとでは使用するリクエスト／レスポンスのプリミティブが異なります。
+
+## 出力タイプ
+
+`outputs` オブジェクトには、さまざまな種類の出力を表す配列が含まれます。
+
+### Pages (`outputs.pages`)
+
+`pages/` ディレクトリ内の React ページ:
+
+```typescript
+{
+  type: 'PAGES'
+  id: string           // ルート識別子
+  filePath: string     // ビルドされたファイルへのパス
+  pathname: string     // URL パス名
+  sourcePage: string   // pages/ ディレクトリ内の元のソースファイルパス
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>  // トレースされた依存関係（key: リポジトリルートからの相対パス、value: 絶対パス）
+  wasmAssets?: Record<string, string>  // バンドルされた wasm ファイル（key: 名前、value: 絶対パス）
+  config: {
+    maxDuration?: number
+    preferredRegion?: string | string[]
+    env?: Record<string, string>  // 環境変数（Edge ランタイムのみ）
+  }
+}
+```
+
+### API Routes (`outputs.pagesApi`)
+
+`pages/api/` 内の API ルート：
+
+```typescript
+{
+  type: 'PAGES_API'
+  id: string
+  filePath: string
+  pathname: string
+  sourcePage: string   // 元の相対ソースファイルパス
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>
+  wasmAssets?: Record<string, string>
+  config: {
+    maxDuration?: number
+    preferredRegion?: string | string[]
+    env?: Record<string, string>
+  }
+}
+```
+
+### App Pages (`outputs.appPages`)
+
+`app/` ディレクトリ内の `page.{js,ts,jsx,tsx}` ファイルから生成される React ページ:
+
+```typescript
+{
+  type: 'APP_PAGE'
+  id: string
+  filePath: string
+  pathname: string     // RSCルートには.rscサフィックスが付く
+  sourcePage: string   // 元のソースファイルの相対パス
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>
+  wasmAssets?: Record<string, string>
+  config: {
+    maxDuration?: number
+    preferredRegion?: string | string[]
+    env?: Record<string, string>
+  }
+}
+```
+
+### App Routes (`outputs.appRoutes`)
+
+`app/` ディレクトリ内の `route.{js,ts,jsx,tsx}` から生成される API ルートおよびメタデータ ルート:
+
+```typescript
+{
+  type: 'APP_ROUTE'
+  id: string
+  filePath: string
+  pathname: string
+  sourcePage: string
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>
+  wasmAssets?: Record<string, string>
+  config: {
+    maxDuration?: number
+    preferredRegion?: string | string[]
+    env?: Record<string, string>
+  }
+}
+```
+
+### 事前レンダリング (`outputs.prerenders`)
+
+ISR が有効なルートと静的事前レンダリング：
+
+```typescript
+{
+  type: 'PRERENDER'
+  id: string
+  pathname: string
+  parentOutputId: string  // ソースページ/ルートのID
+  groupId: number        // 再検証グループの識別子（同じgroupIdを持つプリレンダーは同時に再検証される）
+  pprChain?: {
+    headers: Record<string, string>  // PPRチェーンヘッダー（例: 'x-nextjs-resume': '1'）
+  }
+  parentFallbackMode?: DynamicPrerenderManifestRoute['fallback']
+  fallback?: {
+    filePath: string | undefined
+    initialStatus?: number
+    initialHeaders?: Record<string, string | string[]>
+    initialExpiration?: number
+    initialRevalidate?: number
+    postponedState: string | undefined
+  }
+  config: {
+    allowQuery?: string[]     // 許可するクエリパラメーター
+    allowHeader?: string[]    // ISRで許可するヘッダー
+    bypassFor?: RouteHas[]    // キャッシュバイパスの条件
+    renderingMode?: RenderingMode
+    bypassToken?: string
+  }
+}
+```
+
+### 静的ファイル (`outputs.staticFiles`)
+
+静的アセットおよび自動的に静的最適化されたページ：
+
+```typescript
+{
+  type: 'STATIC_FILE'
+  id: string
+  filePath: string
+  pathname: string
+}
+```
+
+### Middleware (`outputs.middleware`)
+
+Middleware 関数（存在する場合）:
+
+```typescript
+{
+  type: 'MIDDLEWARE'
+  id: string
+  filePath: string
+  pathname: string      // 常に '/_middleware'
+  sourcePage: string    // 常に 'middleware'
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>
+  wasmAssets?: Record<string, string>
+  config: {
+    maxDuration?: number
+    preferredRegion?: string | string[]
+    env?: Record<string, string>
+    matchers?: Array<{
+      source: string
+      sourceRegex: string
+      has: RouteHas[] | undefined
+      missing: RouteHas[] | undefined
+    }>
+  }
+}
+```
+
+## ルーティング情報
+
+`onBuildComplete` 内の `routing` オブジェクトは、デプロイ用に処理されたパターンを含む完全なルーティング情報を提供します。
+
+### `routing.beforeMiddleware`
+
+ミドルウェアの実行前に適用されるルーティング情報です。ここには、生成されたヘッダーやリダイレクトの設定が含まれます。
+
+### `routing.beforeFiles`
+
+ファイルシステムによるルートマッチングより前に評価される書き換えルート。
+
+### `routing.afterFiles`
+
+ファイルシステムルートのマッチング後に評価される書き換えルートを定義します。
+
+### `routing.dynamicRoutes`
+
+`[slug]` などのルートセグメントやキャッチオール ルートから生成される動的マッチャー。
+
+### `routing.onMatch`
+
+ハッシュ付き静的アセットに対するイミュータブルなキャッシュヘッダーなど、マッチに成功した後に適用されるルート設定。
+
+### `routing.fallback`
+
+前のフェーズで一致するルートが見つからなかった場合に、最後に評価される書き換えルートです。
+
+### 共通のルートフィールド
+
+各ルートエントリには次の項目を含めることができます:
+
+- `source`: 元のルートパターン（内部ルールの自動生成時は省略可能）
+- `sourceRegex`: リクエストをマッチさせるためにコンパイルされた正規表現
+- `destination`: 内部の宛先またはリダイレクト先
+- `headers`: 適用するヘッダー
+- `has`: 正のマッチ条件
+- `missing`: 負のマッチ条件
+- `status`: リダイレクトのステータスコード
+- `priority`: 内部ルートの優先度フラグ
+
+## ユースケース
+
+Adapter の一般的なユースケースには次のようなものがあります:
+
+- **デプロイプラットフォーム統合**: 特定のホスティングプラットフォーム向けにビルド出力を自動的に設定する
+- **アセット処理**: ビルド出力を変換または最適化する
+- **モニタリング統合**: ビルドメトリクスやルート情報を収集する
+- **カスタムバンドル**: プラットフォーム固有の形式で出力をパッケージ化する
+- **ビルド検証**: 出力が特定の要件を満たしていることを保証する
+- **ルート生成**: 処理済みのルート情報を使用してプラットフォーム固有のルーティング設定を生成する

@@ -1,0 +1,233 @@
+---
+title: not-found.js
+description: not-found.js ファイルの API リファレンス。
+---
+
+Next.js には、コンテンツが見つからない場合を処理するための 2 つの規約があります。
+
+- **`not-found.js`**: 各ルートセグメントで [`notFound`](/docs/app/api-reference/functions/not-found) 関数を呼び出したときに使用されます。
+- **`global-not-found.js`**: アプリ全体で、どのルートにもマッチしない場合のグローバルな 404 ページを定義するために使用されます。これはルーティングレベルで処理され、レイアウトやページのレンダリングには依存しません。
+
+## `not-found.js`
+
+**not-found** ファイルは、ルートセグメント内で [`notFound`](/docs/app/api-reference/functions/not-found) 関数がスローされたときに UI をレンダリングするために使用されます。カスタム UI を提供することに加えて、Next.js はストリーミングレスポンスに対しては `200` の HTTP ステータスコードを返し、非ストリーミングレスポンスに対しては `404` を返します（SEO の詳細については [Status Codes](/docs/app/api-reference/file-conventions/loading#status-codes) を参照してください）。
+
+```tsx filename="app/not-found.tsx" switcher
+import Link from 'next/link'
+
+export default function NotFound() {
+  return (
+    <div>
+      <h2>Not Found</h2>
+      <p>Could not find requested resource</p>
+      <Link href="/">Return Home</Link>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/blog/not-found.js" switcher
+import Link from 'next/link'
+
+export default function NotFound() {
+  return (
+    <div>
+      <h2>Not Found</h2>
+      <p>Could not find requested resource</p>
+      <Link href="/">Return Home</Link>
+    </div>
+  )
+}
+```
+
+## `global-not-found.js` (実験的)
+
+`global-not-found.js` ファイルを使用すると、アプリケーション全体で共通の 404 ページを定義できます。ルート単位で動作する `not-found.js` と異なり、これはリクエストされた URL がどのルートにもマッチしない場合に使用されます。このとき Next.js は **レンダリングをスキップ** し、このグローバルページを直接返します。
+
+`global-not-found.js` ファイルはアプリの通常のレンダリング処理をバイパスするため、404 ページで必要となるグローバルスタイル、フォント、その他の依存関係はすべてインポートする必要があります。
+
+> **補足**: このページのパフォーマンスを向上させるには、グローバルスタイルをより軽量にし、フォントファミリーもよりシンプルなものにするとよい場合があります。
+
+`global-not-found.js` は、`layout.js` と `not-found.js` の組み合わせで 404 ページを構成できない場合に役立ちます。これは次の 2 つのケースで発生する可能性があります:
+
+- アプリが複数のルートレイアウトを持っている場合 (例: `app/(admin)/layout.tsx` と `app/(shop)/layout.tsx`)、グローバルな 404 を構成するための単一のレイアウトが存在しない。
+- ルートレイアウトがトップレベルの動的セグメントを使って定義されている場合 (例: `app/[country]/layout.tsx`)、一貫した 404 ページを構成するのが難しくなる。
+
+これを有効にするには、`next.config.ts` に `globalNotFound` フラグを追加します:
+
+```tsx filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    globalNotFound: true,
+  },
+}
+
+export default nextConfig
+```
+
+次に、`app` ディレクトリ直下に `app/global-not-found.js` ファイルを作成します。
+
+```tsx filename="app/global-not-found.tsx" switcher
+// グローバルスタイルとフォントをインポート
+import './globals.css'
+import { Inter } from 'next/font/google'
+import type { Metadata } from 'next'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: '404 - Page Not Found',
+  description: 'The page you are looking for does not exist.',
+}
+
+export default function GlobalNotFound() {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>
+        <h1>404 - Page Not Found</h1>
+        <p>This page does not exist.</p>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/global-not-found.js" switcher
+// グローバルスタイルとフォントをインポート
+import './globals.css'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+  title: '404 - Page Not Found',
+  description: 'The page you are looking for does not exist.',
+}
+
+export default function GlobalNotFound() {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>
+        <h1>404 - Page Not Found</h1>
+        <p>This page does not exist.</p>
+      </body>
+    </html>
+  )
+}
+```
+
+`not-found.js` とは異なり、このファイルは `<html>` および `<body>` タグを含む完全な HTML ドキュメントを返す必要があります。
+
+## リファレンス
+
+### Props
+
+`not-found.js` または `global-not-found.js` コンポーネントは、props を一切受け取りません。
+
+> **補足**: 想定された `notFound()` エラーを捕捉することに加えて、ルートの `app/not-found.js` と `app/global-not-found.js` ファイルは、アプリケーション全体でどのルートにもマッチしない URL も処理します。つまり、アプリで処理されていない URL にアクセスしたユーザーには、これらのファイルからエクスポートされた UI が表示されます。
+
+## 例
+
+### データ取得
+
+デフォルトでは、`not-found` は Server Component です。データを取得して表示するために、`async` に指定できます。
+
+```tsx filename="app/not-found.tsx" switcher
+import Link from 'next/link'
+import { headers } from 'next/headers'
+
+export default async function NotFound() {
+  const headersList = await headers()
+  const domain = headersList.get('host')
+  const data = await getSiteData(domain)
+  return (
+    <div>
+      <h2>Not Found: {data.name}</h2>
+      <p>Could not find requested resource</p>
+      <p>
+        View <Link href="/blog">all posts</Link>
+      </p>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/not-found.jsx" switcher
+import Link from 'next/link'
+import { headers } from 'next/headers'
+
+export default async function NotFound() {
+  const headersList = await headers()
+  const domain = headersList.get('host')
+  const data = await getSiteData(domain)
+  return (
+    <div>
+      <h2>Not Found: {data.name}</h2>
+      <p>Could not find requested resource</p>
+      <p>
+        View <Link href="/blog">all posts</Link>
+      </p>
+    </div>
+  )
+}
+```
+
+`usePathname` のようなクライアントコンポーネントのフックを使用してパスに基づいてコンテンツを表示する必要がある場合は、代わりにクライアント側でデータをフェッチする必要があります。
+
+### メタデータ
+
+`global-not-found.js` では、`metadata` オブジェクトや [`generateMetadata`](/docs/app/api-reference/functions/generate-metadata) 関数をエクスポートして、404 ページ用の `<title>`、`<meta>`、その他の head タグをカスタマイズできます:
+
+> **補足**: Next.js は、`global-not-found.js` ページを含む 404 ステータスコードを返すページに対して、自動的に `<meta name="robots" content="noindex" />` を挿入します。
+
+```tsx filename="app/global-not-found.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Not Found',
+  description: 'The page you are looking for does not exist.',
+}
+
+export default function GlobalNotFound() {
+  return (
+    <html lang="en">
+      <body>
+        <div>
+          <h1>Not Found</h1>
+          <p>The page you are looking for does not exist.</p>
+        </div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/global-not-found.js" switcher
+export const metadata = {
+  title: 'Not Found',
+  description: 'The page you are looking for does not exist.',
+}
+
+export default function GlobalNotFound() {
+  return (
+    <html lang="en">
+      <body>
+        <div>
+          <h1>Not Found</h1>
+          <p>The page you are looking for does not exist.</p>
+        </div>
+      </body>
+    </html>
+  )
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                         |
+| ---------- | ---------------------------------------------------------------- |
+| `v15.4.0`  | `global-not-found.js` が導入されました（実験的機能）。           |
+| `v13.3.0`  | ルート `app/not-found` がグローバルな未マッチ URL を処理します。 |
+| `v13.0.0`  | `not-found` が導入されました。                                   |

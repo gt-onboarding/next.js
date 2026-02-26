@@ -1,0 +1,39 @@
+---
+title: notFound
+description: notFound 関数の API リファレンス。
+---
+
+`notFound` 関数を使うと、ルート セグメント内で [`not-found` ファイル](/docs/app/api-reference/file-conventions/not-found) をレンダーできるほか、検索エンジンに対して [`<meta name="robots" content="noindex" />`](/docs/app/api-reference/file-conventions/loading#status-codes) タグを挿入できます。
+
+## `notFound()`
+
+`notFound()` 関数を呼び出すと、`NEXT_HTTP_ERROR_FALLBACK;404` エラーがスローされ、そのルートセグメントのレンダリングが終了します。[**not-found** ファイル](/docs/app/api-reference/file-conventions/not-found) を指定すると、そのセグメント内で Not Found UI をレンダリングすることで、このようなエラーを適切に処理できます。
+
+```jsx filename="app/user/[id]/page.js"
+import { notFound } from 'next/navigation'
+
+async function fetchUser(id) {
+  const res = await fetch('https://...')
+  if (!res.ok) return undefined
+  return res.json()
+}
+
+export default async function Profile({ params }) {
+  const { id } = await params
+  const user = await fetchUser(id)
+
+  if (!user) {
+    notFound()
+  }
+
+  // ...
+}
+```
+
+> **補足**: TypeScript の [`never`](https://www.typescriptlang.org/docs/handbook/2/functions.html#never) 型を使用しているため、`notFound()` を呼び出す際に `return notFound()` と書く必要はありません。
+
+## バージョン履歴
+
+| バージョン | 変更内容                      |
+| ---------- | ----------------------------- |
+| `v13.0.0`  | `notFound` が追加されました。 |

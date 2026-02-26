@@ -1,0 +1,744 @@
+---
+title: proxy.js
+description: proxy.js ファイルの API リファレンス。
+related:
+  title: Proxy についてさらに学ぶ
+  links:
+    - app/api-reference/functions/next-request
+    - app/api-reference/functions/next-response
+---
+
+> **注意:** `middleware` ファイル規約は非推奨となり、`proxy` に名称変更されました。詳しくは [Migration to Proxy](#migration-to-proxy) を参照してください。
+
+`proxy.js|ts` ファイルは、[Proxy](/docs/app/getting-started/proxy) を実装し、リクエストが完了する前にサーバー上でコードを実行するために使用されます。その後、受信したリクエストに基づき、リライトやリダイレクト、リクエストまたはレスポンスヘッダーの変更、あるいは直接レスポンスを返すことでレスポンスを変更できます。
+
+Proxy はルートがレンダリングされる前に実行されます。認証、ロギング、リダイレクト処理など、カスタムのサーバーサイドロジックを実装するのに特に有用です。
+
+> **補足**:
+>
+> Proxy はレンダー用コードとは独立して呼び出されることを想定しており、最適化されたケースでは CDN にデプロイされて高速なリダイレクト／リライト処理を行います。そのため、共有モジュールやグローバル変数に依存しないようにしてください。
+>
+> Proxy からアプリケーションに情報を渡すには、[headers](#setting-headers)、[cookies](#using-cookies)、[rewrites](/docs/app/api-reference/functions/next-response#rewrite)、[redirects](/docs/app/api-reference/functions/next-response#redirect)、または URL を使用してください。
+
+プロジェクトルート、または該当する場合は `src` ディレクトリ内に `proxy.ts`（または `.js`）ファイルを作成し、`pages` や `app` と同じ階層に配置します。
+
+[`pageExtensions`](/docs/app/api-reference/config/next-config-js/pageExtensions) を `.page.ts` や `.page.js` のようにカスタマイズしている場合は、それに合わせてファイル名を `proxy.page.ts` や `proxy.page.js` にしてください。
+
+```tsx filename="proxy.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+
+// この関数は内部で `await` を使用する場合、`async` にできます
+export function proxy(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+// この関数は内部で `await` を使用する場合、`async` にできます
+export function proxy(request) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+## エクスポート
+
+### Proxy 関数
+
+ファイルは、デフォルトエクスポートまたは `proxy` という名前付きエクスポートとして、単一の関数のみをエクスポートする必要があります。同じファイルから複数の `proxy` 関数をエクスポートすることはサポートされない点に注意してください。
+
+```js filename="proxy.js"
+// デフォルトエクスポートの例
+export default function proxy(request) {
+  // プロキシのロジック
+}
+```
+
+### Config オブジェクト（オプション）
+
+任意で、`Proxy` 関数と一緒に config オブジェクトをエクスポートできます。このオブジェクトには、Proxy を適用するパスを指定するための [matcher](#matcher) が含まれます。
+
+### Matcher
+
+`matcher` オプションを使用すると、Proxy を適用するパスを絞り込んで指定できます。これらのパスは、いくつかの方法で指定できます。
+
+- 単一のパスの場合: `'/about'` のように、文字列を直接使用してパスを定義します。
+- 複数のパスの場合: 配列を使用して複数のパスを指定します。例えば `matcher: ['/about', '/contact']` のように指定すると、Proxy は `/about` と `/contact` の両方に適用されます。
+
+```js filename="proxy.js"
+export const config = {
+  matcher: ['/about/:path*', '/dashboard/:path*'],
+}
+```
+
+さらに、`matcher` オプションは正規表現を使った複雑なパス指定もサポートします。たとえば、正規表現を用いた matcher で特定のパスを除外できます。
+
+```js filename="proxy.js"
+export const config = {
+  matcher: [
+    // APIルート、静的ファイル、画像最適化、.pngファイルを除外
+    '/((?!api|_next/static|_next/image|.*\\.png$).*)',
+  ],
+}
+```
+
+これにより、含めるパスと除外するパスをきめ細かく制御できます。
+
+`matcher` オプションは、次のキーを持つオブジェクトの配列を受け取ります:
+
+- `source`: リクエストパスにマッチさせるために使用するパスまたはパターン。特定のパスに直接マッチさせる場合は文字列、より複雑なマッチングにはパターンを指定します。
+- `locale` (optional): `false` に設定した場合、パスのマッチング時にロケールベースのルーティングを無視するかどうかを示す boolean 値。
+- `has` (optional): ヘッダー、クエリパラメータ、クッキーなど、特定のリクエスト要素が存在することに基づく条件を指定します。
+- `missing` (optional): ヘッダーやクッキーが存在しない場合など、特定のリクエスト要素が欠如している場合の条件を指定します。
+
+```js filename="proxy.js"
+export const config = {
+  matcher: [
+    {
+      source: '/api/:path*',
+      locale: false,
+      has: [
+        { type: 'header', key: 'Authorization', value: 'Bearer Token' },
+        { type: 'query', key: 'userId', value: '123' },
+      ],
+      missing: [{ type: 'cookie', key: 'session', value: 'active' }],
+    },
+  ],
+}
+```
+
+`source` のパスパターン:
+
+1. 必ず `/` から始まる必要があります
+2. 名前付きパラメータを含めることができます: `/about/:path` は `/about/a` と `/about/b` にはマッチしますが、`/about/a/c` にはマッチしません
+3. 名前付きパラメータ（`:` で始まる）に修飾子を付けることができます: `/about/:path*` は、`*` が _0 回以上_ を意味するため `/about/a/b/c` にマッチします。`?` は _0 回または 1 回_、`+` は _1 回以上_ を意味します
+4. 括弧で囲んだ正規表現を使用できます: `/about/(.*)` は `/about/:path*` と同じです
+5. パスの先頭にアンカーされています: `/about` は `/about` および `/about/team` にはマッチしますが、`/blog/about` にはマッチしません
+
+より詳しくは [path-to-regexp](https://github.com/pillarjs/path-to-regexp#path-to-regexp-1) のドキュメントを参照してください。
+
+> **補足**:
+>
+> - `matcher` の値はビルド時に静的解析できるよう、定数である必要があります。変数などの動的な値は無視されます。
+> - 後方互換性のため、Next.js は常に `/public` を `/public/index` とみなします。そのため、`/public/:path` という matcher はマッチします。
+
+## パラメータ
+
+### `request`
+
+Proxy を定義する際、デフォルトエクスポート関数は 1 つのパラメータ `request` を受け取ります。このパラメータは `NextRequest` のインスタンスであり、受信される HTTP リクエストを表します。
+
+```tsx filename="proxy.ts" switcher
+import type { NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  // プロキシのロジックをここに記述
+}
+```
+
+```js filename="proxy.js" switcher
+export function proxy(request) {
+  // プロキシのロジックをここに記述
+}
+```
+
+> **補足**:
+>
+> - `NextRequest` は Next.js Proxy における受信 HTTP リクエストを表す型であり、[`NextResponse`](#nextresponse) は HTTP レスポンスを生成・操作して返すためのクラスです。
+
+## NextResponse
+
+`NextResponse` API を使用すると、次のことができます:
+
+- 受信リクエストを別の URL に `redirect` する
+- 指定した URL の内容を表示するようにレスポンスを `rewrite` する
+- API ルート、`getServerSideProps`、および `rewrite` の書き換え先に対してリクエストヘッダーを設定する
+- レスポンスの Cookie を設定する
+- レスポンスヘッダーを設定する
+
+<AppOnly>
+
+Proxy からレスポンスを生成するには、次のいずれかの方法を使用できます:
+
+1. レスポンスを生成するルート（[Page](/docs/app/api-reference/file-conventions/page) または [Route Handler](/docs/app/api-reference/file-conventions/route)）に `rewrite` する
+2. `NextResponse` を直接返す。詳細は [Producing a Response](#producing-a-response) を参照してください
+
+> **補足**: リダイレクトには、`NextResponse.redirect` の代わりに `Response.redirect` を使用することもできます。
+
+</AppOnly>
+
+<PagesOnly>
+
+Proxy からレスポンスを生成するには、次のいずれかの方法を使用できます:
+
+1. レスポンスを生成するルート（[Page](/docs/pages/building-your-application/routing/pages-and-layouts) または [Edge API Route](/docs/pages/building-your-application/routing/api-routes)）に `rewrite` する
+2. `NextResponse` を直接返す。詳細は [Producing a Response](#producing-a-response) を参照してください
+
+</PagesOnly>
+
+## 実行順序
+
+Proxy は**プロジェクト内のすべてのルート**に対して呼び出されます。そのため、特定のルートを正確に対象にしたり除外したりするために [matchers](#matcher) を使用することが重要です。実行順序は次のとおりです。
+
+1. `next.config.js` の `headers`
+2. `next.config.js` の `redirects`
+3. Proxy（`rewrites`、`redirects` など）
+4. `next.config.js` の `beforeFiles`（`rewrites`）
+5. ファイルシステムルート（`public/`、`_next/static/`、`pages/`、`app/` など）
+6. `next.config.js` の `afterFiles`（`rewrites`）
+7. 動的ルート（`/blog/[slug]`）
+8. `next.config.js` の `fallback`（`rewrites`）
+
+## ランタイム
+
+Proxy はデフォルトで Node.js ランタイムを使用します。Proxy ファイルでは [`runtime`](/docs/app/api-reference/file-conventions/route-segment-config#runtime) 設定オプションは使用できません。Proxy で `runtime` 設定オプションを指定するとエラーがスローされます。
+
+## 高度な Proxy フラグ
+
+Next.js の `v13.1` では、プロキシ用に高度なユースケースに対応するための追加フラグ `skipMiddlewareUrlNormalize` と `skipTrailingSlashRedirect` が導入されました。
+
+`skipTrailingSlashRedirect` は、末尾のスラッシュを追加または削除するための Next.js のリダイレクトを無効にします。これにより、プロキシ内で一部のパスでは末尾のスラッシュを維持し、別のパスでは維持しないといったカスタム処理が可能になり、段階的な移行を容易にします。
+
+```js filename="next.config.js"
+module.exports = {
+  skipTrailingSlashRedirect: true,
+}
+```
+
+```js filename="proxy.js"
+const legacyPrefixes = ['/docs', '/blog']
+
+export default async function proxy(req) {
+  const { pathname } = req.nextUrl
+
+  if (legacyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
+  // 末尾スラッシュの処理を適用する
+  if (
+    !pathname.endsWith('/') &&
+    !pathname.match(/((?!\.well-known(?:\/.*)?)(?:[^/]+\/)*[^/]+\.\w+)/)
+  ) {
+    return NextResponse.redirect(
+      new URL(`${req.nextUrl.pathname}/`, req.nextUrl)
+    )
+  }
+}
+```
+
+`skipMiddlewareUrlNormalize` は、Next.js における URL 正規化を無効化して、直接アクセスとクライアント側でのページ遷移の扱いを同一にするためのオプションです。より高度なケースでは、このオプションを使うことで、元の URL を利用して挙動を完全に制御できます。
+
+```js filename="next.config.js"
+module.exports = {
+  skipMiddlewareUrlNormalize: true,
+}
+```
+
+```js filename="proxy.js"
+export default async function proxy(req) {
+  const { pathname } = req.nextUrl
+
+  // GET /_next/data/build-id/hello.json
+
+  console.log(pathname)
+  // フラグあり: /_next/data/build-id/hello.json のまま
+  // フラグなし: /hello に正規化される
+}
+```
+
+## 例
+
+### 条件分岐
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+### Cookie の使用
+
+Cookie は一般的なヘッダーです。`Request` では `Cookie` ヘッダーに保存され、`Response` では `Set-Cookie` ヘッダーに含まれます。Next.js では、`NextRequest` と `NextResponse` の `cookies` 拡張を通じて、これらの Cookie に便利にアクセス・操作できます。
+
+1. 受信リクエストの場合、`cookies` には `get`、`getAll`、`set`、`delete` の各メソッドが用意されています。`has` で特定の Cookie の存在を確認したり、`clear` ですべての Cookie を削除したりできます。
+2. 送信するレスポンスの場合、`cookies` には `get`、`getAll`、`set`、`delete` の各メソッドがあります。
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  // 受信リクエストに "Cookie:nextjs=fast" ヘッダーが存在すると仮定する
+  // `RequestCookies` API を使用してリクエストからクッキーを取得する
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // `ResponseCookies` API を使用してレスポンスにクッキーを設定する
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // 送信レスポンスには `Set-Cookie:vercel=fast;path=/` ヘッダーが含まれる。
+
+  return response
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  // 受信リクエストに "Cookie:nextjs=fast" ヘッダーが存在すると仮定する
+  // `RequestCookies` API を使用してリクエストからクッキーを取得する
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // `ResponseCookies` API を使用してレスポンスにクッキーを設定する
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // 送信レスポンスには `Set-Cookie:vercel=fast;path=/` ヘッダーが含まれる。
+
+  return response
+}
+```
+
+### ヘッダーの設定
+
+`NextResponse` API を使用して、リクエストヘッダーとレスポンスヘッダーを設定できます（_request_ ヘッダーの設定は Next.js v13.0.0 から利用可能です）。
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  // リクエストヘッダーをクローンし、新しいヘッダー `x-hello-from-proxy1` を設定する
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-proxy1', 'hello')
+
+  // NextResponse.next でリクエストヘッダーを設定することもできる
+  const response = NextResponse.next({
+    request: {
+      // 新しいリクエストヘッダー
+      headers: requestHeaders,
+    },
+  })
+
+  // 新しいレスポンスヘッダー `x-hello-from-proxy2` を設定する
+  response.headers.set('x-hello-from-proxy2', 'hello')
+  return response
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  // リクエストヘッダーをクローンし、新しいヘッダー `x-hello-from-proxy1` を設定する
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-proxy1', 'hello')
+
+  // NextResponse.next でリクエストヘッダーを設定することもできる
+  const response = NextResponse.next({
+    request: {
+      // 新しいリクエストヘッダー
+      headers: requestHeaders,
+    },
+  })
+
+  // 新しいレスポンスヘッダー `x-hello-from-proxy2` を設定する
+  response.headers.set('x-hello-from-proxy2', 'hello')
+  return response
+}
+```
+
+このスニペットでは次の点に注意してください:
+
+- `requestHeaders` を上流に渡すために `NextResponse.next({ request: { headers: requestHeaders } })` を使用しています
+- `requestHeaders` をクライアントに渡すことになる `NextResponse.next({ headers: requestHeaders })` は **使用していません**
+
+詳しくは、[Proxy での NextResponse の headers](/docs/app/api-reference/functions/next-response#next) を参照してください。
+
+> **補足**: サイズの大きなヘッダーを設定するのは避けてください。バックエンドの Web サーバーの設定によっては、[431 Request Header Fields Too Large](https://developer.mozilla.org/docs/Web/HTTP/Status/431) エラーが発生する可能性があります。
+
+### CORS
+
+Proxy で CORS ヘッダーを設定して、[simple](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests) リクエストや [preflighted](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#preflighted_requests) リクエストを含むクロスオリジンリクエストを許可できます。
+
+```tsx filename="proxy.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+const allowedOrigins = ['https://acme.com', 'https://my-app.org']
+
+const corsOptions = {
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export function proxy(request: NextRequest) {
+  // リクエストからオリジンを確認する
+  const origin = request.headers.get('origin') ?? ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+
+  // プリフライトリクエストを処理する
+  const isPreflight = request.method === 'OPTIONS'
+
+  if (isPreflight) {
+    const preflightHeaders = {
+      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...corsOptions,
+    }
+    return NextResponse.json({}, { headers: preflightHeaders })
+  }
+
+  // シンプルリクエストを処理する
+  const response = NextResponse.next()
+
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+
+  Object.entries(corsOptions).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  return response
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}
+```
+
+```jsx filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+const allowedOrigins = ['https://acme.com', 'https://my-app.org']
+
+const corsOptions = {
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export function proxy(request) {
+  // リクエストのオリジンを確認する
+  const origin = request.headers.get('origin') ?? ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+
+  // プリフライトリクエストを処理する
+  const isPreflight = request.method === 'OPTIONS'
+
+  if (isPreflight) {
+    const preflightHeaders = {
+      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...corsOptions,
+    }
+    return NextResponse.json({}, { headers: preflightHeaders })
+  }
+
+  // シンプルリクエストを処理する
+  const response = NextResponse.next()
+
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+
+  Object.entries(corsOptions).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  return response
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}
+```
+
+<AppOnly>
+  > **補足:** 各ルートごとの CORS ヘッダーは、[Route
+  Handlers](/docs/app/api-reference/file-conventions/route#cors)
+  で設定できます。
+</AppOnly>
+
+### レスポンスの生成
+
+`Response` または `NextResponse` インスタンスを返すことで、Proxy から直接レスポンスを生成できます。（これは [Next.js v13.1.0](https://nextjs.org/blog/next-13-1#nextjs-advanced-proxy) 以降で利用可能です）
+
+```ts filename="proxy.ts" switcher
+import type { NextRequest } from 'next/server'
+import { isAuthenticated } from '@lib/auth'
+
+// プロキシを `/api/` で始まるパスに制限する
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request: NextRequest) {
+  // 認証関数を呼び出してリクエストを検証する
+  if (!isAuthenticated(request)) {
+    // エラーメッセージを含む JSON を返す
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+// プロキシを `/api/` で始まるパスに制限する
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request) {
+  // 認証関数を呼び出してリクエストを検証する
+  if (!isAuthenticated(request)) {
+    // エラーメッセージをJSONで返す
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+### 否定マッチング
+
+`matcher` の設定では完全な正規表現が利用できるため、否定の先読みや文字単位でのマッチングなどがサポートされています。特定のパス以外のすべてにマッチさせる否定の先読みの例は、次のとおりです。
+
+```js filename="proxy.js"
+export const config = {
+  matcher: [
+    /*
+     * 以下で始まるパスを除く、すべてのリクエストパスにマッチ:
+     * - api (APIルート)
+     * - _next/static (静的ファイル)
+     * - _next/image (画像最適化ファイル)
+     * - favicon.ico, sitemap.xml, robots.txt (メタデータファイル)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+  ],
+}
+```
+
+`missing` 配列や `has` 配列、またはそれらを組み合わせて使用することで、特定のリクエストでは Proxy をバイパスすることもできます。
+
+```js filename="proxy.js"
+export const config = {
+  matcher: [
+    /*
+     * 以下で始まるパスを除く、すべてのリクエストパスにマッチ:
+     * - api (APIルート)
+     * - _next/static (静的ファイル)
+     * - _next/image (画像最適化ファイル)
+     * - favicon.ico, sitemap.xml, robots.txt (メタデータファイル)
+     */
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      has: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      has: [{ type: 'header', key: 'x-present' }],
+      missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
+    },
+  ],
+}
+```
+
+> **補足**:
+>
+> `_next/data` を否定マッチパターンで除外している場合でも、`_next/data` のルートには引き続きプロキシが適用されます。これは意図的な挙動であり、ページ本体は保護していても、対応するデータルートの保護を失念してしまうことで発生しうるセキュリティ問題を防ぐためのものです。
+
+```js filename="proxy.js"
+export const config = {
+  matcher:
+    '/((?!api|_next/data|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+}
+
+// 除外されていても、Proxyは/_next/data/*ルートに対して引き続き実行されます
+```
+
+### `waitUntil` と `NextFetchEvent`
+
+`NextFetchEvent` オブジェクトはネイティブの [`FetchEvent`](https://developer.mozilla.org/docs/Web/API/FetchEvent) オブジェクトを拡張し、[`waitUntil()`](https://developer.mozilla.org/docs/Web/API/ExtendableEvent/waitUntil) メソッドを提供します。
+
+`waitUntil()` メソッドは引数として Promise を受け取り、その Promise が解決または拒否されるまで Proxy の存続期間を延長します。これはバックグラウンドで処理を行う際に便利です。
+
+```ts filename="proxy.ts"
+import { NextResponse } from 'next/server'
+import type { NextFetchEvent, NextRequest } from 'next/server'
+
+export function proxy(req: NextRequest, event: NextFetchEvent) {
+  event.waitUntil(
+    fetch('https://my-analytics-platform.com', {
+      method: 'POST',
+      body: JSON.stringify({ pathname: req.nextUrl.pathname }),
+    })
+  )
+
+  return NextResponse.next()
+}
+```
+
+### ユニットテスト（実験的）
+
+Next.js 15.1 から、`next/experimental/testing/server` パッケージにプロキシファイルのユニットテストを支援するユーティリティが含まれています。プロキシのユニットテストを行うことで、意図したパスでのみ実行されることや、コードが本番環境に到達する前にカスタムルーティングロジックが意図したとおりに動作していることを確認できます。
+
+`unstable_doesProxyMatch` 関数を使用すると、指定した URL、ヘッダー、Cookie に対してプロキシが実行されるかどうかをアサートできます。
+
+```js
+import { unstable_doesProxyMatch } from 'next/experimental/testing/server'
+
+expect(
+  unstable_doesProxyMatch({
+    config,
+    nextConfig,
+    url: '/test',
+  })
+).toEqual(false)
+```
+
+プロキシ関数全体をテストすることもできます。
+
+```js
+import { isRewrite, getRewrittenUrl } from 'next/experimental/testing/server'
+
+const request = new NextRequest('https://nextjs.org/docs')
+const response = await proxy(request)
+expect(isRewrite(response)).toEqual(true)
+expect(getRewrittenUrl(response)).toEqual('https://other-domain.com/docs')
+// レスポンスがリダイレクトの場合は getRedirectUrl も使用できます
+```
+
+## プラットフォーム対応状況
+
+| デプロイオプション                                                  | サポート             |
+| ------------------------------------------------------------------- | -------------------- |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | サポートあり         |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | サポートあり         |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | サポートなし         |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | プラットフォーム依存 |
+
+Next.js をセルフホストする場合の [Proxy の設定方法](/docs/app/guides/self-hosting#proxy) については、こちらを参照してください。
+
+## プロキシへの移行
+
+### なぜ変更したのか
+
+`middleware` の名称変更の理由は、「middleware」という用語が Express.js の middleware としばしば混同され、その目的が誤解されやすいためです。また、middleware は非常に高機能であるがゆえに、安易な利用を助長してしまいますが、この機能はあくまで最後の手段としての利用が推奨されています。
+
+Next.js は、開発者が middleware に依存せずに目的を達成できるよう、より扱いやすく、より良い API を提供していく方向へと進んでいます。これが、`middleware` という名称を変更した理由です。
+
+### なぜ「Proxy」なのか
+
+「Proxy」という名称は、Middleware が何を実現できるのかをより明確にします。「プロキシ」という用語は、アプリの前段にネットワーク境界が置かれていることを意味しており、これは Middleware の動作と一致します。また、Middleware はデフォルトで [Edge Runtime](/docs/app/api-reference/edge) 上で実行され、アプリのリージョンとは分離されてクライアントにより近い場所で動作させることができます。これらの挙動は「プロキシ」という用語の意味合いとより整合しており、この機能の目的をより明確に示します。
+
+### 移行方法
+
+他の選択肢がない場合を除き、Middleware に依存することは可能な限り避けてください。目的は、ユーザーが Middleware を使わずに目的を達成できるよう、より扱いやすい API を提供することです。
+
+「middleware」という用語は、Express.js の middleware と混同されることが多く、誤用を招く可能性があります。この方向性を明確にするため、ファイルの命名規則の名称を「proxy」に変更します。これにより、Middleware から離れ、その過剰に詰め込まれた機能を分解し、proxy の役割と目的を明確にするという意図を強調します。
+
+Next.js には、`middleware.ts` から `proxy.ts` への移行を行う codemod が用意されています。次のコマンドを実行すると移行できます:
+
+```bash
+npx @next/codemod@canary middleware-to-proxy .
+```
+
+codemod はファイルおよび関数の名前を `middleware` から `proxy` に変更します。
+
+```diff
+// middleware.ts -> proxy.ts
+
+- export function middleware() {
++ export function proxy() {
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `v16.0.0`  | Middleware は非推奨となり、Proxy にリネームされました                                                               |
+| `v15.5.0`  | Middleware で Node.js ランタイムを使用できるようになりました（安定版）                                              |
+| `v15.2.0`  | Middleware で Node.js ランタイムを使用できるようになりました（実験的）                                              |
+| `v13.1.0`  | Advanced Middleware 用フラグが追加されました                                                                        |
+| `v13.0.0`  | Middleware でリクエストヘッダーとレスポンスヘッダーの変更、およびレスポンスの送信が行えるようになりました           |
+| `v12.2.0`  | Middleware が安定版になりました。[アップグレードガイド](/docs/messages/middleware-upgrade-guide) を参照してください |
+| `v12.0.9`  | Edge Runtime で絶対 URL の使用が必須になりました（[PR](https://github.com/vercel/next.js/pull/33410)）              |
+| `v12.0.0`  | Middleware（ベータ版）が追加されました                                                                              |

@@ -1,0 +1,610 @@
+---
+title: 'use cache: remote'
+description: '永続的かつ共有可能なキャッシュのためにリモートキャッシュハンドラーを使用する "use cache: remote" ディレクティブの使い方を説明します。'
+related:
+  title: 関連
+  description: 関連する API リファレンスを表示します。
+  links:
+    - app/api-reference/directives/use-cache
+    - app/api-reference/directives/use-cache-private
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/config/next-config-js/cacheHandlers
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/connection
+---
+
+`use cache` ディレクティブはほとんどのアプリケーションのニーズには十分ですが、キャッシュされた処理が想定より頻繁に再実行されていたり、アップストリームのサービス（CMS、データベース、外部 API）が想定以上に呼び出されていることに気付くかもしれません。これは、`use cache` がエントリをメモリ内に保存しており、そこに固有の制限があるために発生する可能性があります。
+
+- 新しいエントリのために既存のキャッシュエントリが削除される
+- デプロイ環境のメモリ制約
+- リクエスト間やサーバー再起動後にキャッシュが永続化されない
+
+`use cache` はサーバーサイドキャッシュ以上の価値も提供する点に注意してください。Next.js に対して、何をプリフェッチできるか、またクライアントサイドナビゲーション用の stale time（古くなるまでの時間）をどのように定義するかを知らせます。
+
+`'use cache: remote'` ディレクティブを使用すると、キャッシュされた出力をメモリ内ではなくリモートキャッシュに保存するよう宣言的に指定でき、すべてのサーバーインスタンス間で共有される耐久性の高いキャッシュを提供できます。これには、インフラストラクチャコストやキャッシュ参照時のネットワークレイテンシといったトレードオフが伴います。
+
+## 使用方法
+
+`'use cache: remote'` を使用するには、`next.config.ts` ファイルで [`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) フラグを有効にします。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+その後、リモートキャッシュの利用が適切だと判断した関数またはコンポーネントに `'use cache: remote'` を追加します。ハンドラーの実装は [`cacheHandlers`](/docs/app/api-reference/config/next-config-js/cacheHandlers) を通して設定しますが、多くの場合はホスティングプロバイダ側で自動的に設定されます。セルフホストしている場合は、キャッシュストレージをセットアップするために `cacheHandlers` の設定リファレンスを参照してください。
+
+### リモートキャッシュを避けるべき場合
+
+- すでにデータレイヤーの前段にサーバーサイドのキャッシュ用キーバリューストアがある場合は、`use cache` を使うだけで、別のキャッシュレイヤーを追加せずにデータを静的シェルに含められる可能性があります
+- 近接性やローカルアクセスにより、すでに処理が高速（< 50ms）な場合、リモートキャッシュの参照によってパフォーマンスが向上しない可能性があります
+- キャッシュキーがリクエストごとにほぼ一意の値（検索フィルター、価格帯、ユーザー固有パラメータなど）を取る場合、キャッシュの有効活用はほぼできません
+- データが頻繁（数秒〜数分単位）に更新される場合、キャッシュヒットはすぐに古くなり、キャッシュミスが頻発して上流側での再検証待ちが増加します
+
+### リモートキャッシュが適しているケース
+
+リモートキャッシュは、コンテンツがリクエスト時点（静的シェルの外側）まで延期される場合に、最も大きな価値を発揮します。これは通常、コンポーネントが [`cookies()`](/docs/app/api-reference/functions/cookies)、[`headers()`](/docs/app/api-reference/functions/headers)、[`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) のようなリクエスト値へアクセスし、それを Suspense の境界内に配置するときに発生します。このような場合は次のようになります:
+
+- 各リクエストごとにコンポーネントが実行され、キャッシュが参照される
+- サーバーレス環境では、各インスタンスがそれぞれ短命な一時メモリを持ち、キャッシュヒット率が低くなる
+- リモートキャッシュは全インスタンス間で共有キャッシュを提供し、ヒット率を向上させてバックエンド負荷を低減する
+
+`'use cache: remote'` が有効な代表的なシナリオ:
+
+- **レート制限された API**: 上流サービスにレート制限やリクエストクォータがあり、その上限に達するリスクがある場合
+- **遅いバックエンドの保護**: 高負荷時にデータベースや API がボトルネックになる場合
+- **高コストな処理**: 繰り返し実行するとコストが高いデータベースクエリや計算処理
+- **不安定または信頼性の低いサービス**: ときどき失敗したり可用性に問題がある外部サービス
+
+これらのケースでは、より悪い結果（レート制限エラー、バックエンドの過負荷、高額なコンピュートコスト、ユーザー体験の低下）を避けられるため、リモートキャッシュのコストとレイテンシは正当化されます。
+
+静的シェルコンテンツの場合、通常は `use cache` で十分です。上流のソースが同時実行される再検証リクエストを処理しきれない場合（レート制限のある CMS など）、`use cache: remote` は共有キャッシュレイヤーとして機能します。これは、データベースの前段にキーバリューストアを置くのと同じパターンですが、それをコードで宣言しているだけです。
+
+### `use cache: remote` が `use cache` および `use cache: private` と異なる点
+
+Next.js には 3 つのキャッシュディレクティブがあり、それぞれ異なるユースケース向けに設計されています:
+
+| 機能                                    | `use cache`                        | `'use cache: remote'`                      | `'use cache: private'`       |
+| --------------------------------------- | ---------------------------------- | ------------------------------------------ | ---------------------------- |
+| **サーバー側キャッシュ**                | インメモリまたはキャッシュハンドラ | リモートキャッシュハンドラ                 | なし                         |
+| **キャッシュのスコープ**                | すべてのユーザー間で共有           | すべてのユーザー間で共有                   | クライアント（ブラウザ）ごと |
+| **Cookie/ヘッダーに直接アクセス可能か** | いいえ（引数として渡す必要あり）   | いいえ（引数として渡す必要あり）           | はい                         |
+| **サーバーキャッシュの活用度**          | static shell 外では低くなり得る    | 高い（インスタンス間で共有される）         | 該当なし                     |
+| **追加コスト**                          | なし                               | インフラコスト（ストレージ、ネットワーク） | なし                         |
+| **レイテンシへの影響**                  | なし                               | キャッシュハンドラのルックアップ           | なし                         |
+
+### ランタイムデータを用いたキャッシュ
+
+`use cache` と `'use cache: remote'` の両方は、Cookie や検索パラメータなどのランタイム値に直接アクセスすることはできません。これらの値を抽出し、キャッシュされた関数に引数として渡すことができます。このパターンについては [with runtime data](/docs/app/getting-started/cache-components#with-runtime-data) を参照してください。
+
+> **補足**: `use cache` はエントリをメモリ内に保存します。サーバーレス環境では、メモリはインスタンス間で共有されず、通常はリクエスト処理後に破棄されるため、ランタイムキャッシュではキャッシュミスが頻発しがちです。
+
+### キャッシュキーに関する考慮事項
+
+キャッシュキーにどの値を含めるかは慎重に選択してください。値が一意になるたびに別のキャッシュエントリが作成され、その分キャッシュの利用効率が下がります。検索フィルターを使った次の例を考えてみましょう。
+
+```tsx filename="app/products/[category]/page.tsx"
+import { Suspense } from 'react'
+
+export default async function ProductsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ category: string }>
+  searchParams: Promise<{ minPrice?: string }>
+}) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProductList params={params} searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function ProductList({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ category: string }>
+  searchParams: Promise<{ minPrice?: string }>
+}) {
+  const { category } = await params
+
+  const { minPrice } = await searchParams
+
+  // カテゴリのみでキャッシュ（ユニーク値が少ない）
+  // 価格フィルターは含めない（ユニーク値が多い）
+  const products = await getProductsByCategory(category)
+
+  // 価格ごとにキャッシュエントリを作成する代わりに
+  // メモリ内で価格をフィルタリングする
+  const filtered = minPrice
+    ? products.filter((p) => p.price >= parseFloat(minPrice))
+    : products
+
+  return <div>{/* フィルタリングされた商品をレンダリング */}</div>
+}
+
+async function getProductsByCategory(category: string) {
+  'use cache: remote'
+  // キャッシュキーにはカテゴリのみを使用
+  // 価格フィルター値ごとにキャッシュするよりもはるかに効率的
+  return db.products.findByCategory(category)
+}
+```
+
+この例では、リモートハンドラーはキャッシュエントリごとにより多くのデータ（あるカテゴリ内のすべての商品）を保存することで、キャッシュヒット率を高めています。バックエンドにアクセスするキャッシュミスのコストが、大きなエントリを保存するストレージコストを上回る場合には、この方法を取る価値があります。
+
+同じ原則はユーザー固有データにも適用できます。ユーザー単位のデータを直接キャッシュするのではなく、ユーザー設定を利用して、どの共有データをキャッシュするかを決定します。
+
+たとえば、ユーザーのセッション内に言語設定がある場合、その設定を取り出して、共有コンテンツをキャッシュする際に利用します：
+
+- ユーザーごとに 1 つのエントリを作成してしまう `getUserProfile(sessionID)` をリモートキャッシュするのではなく
+- 言語ごとに 1 つのエントリを作成する `getCMSContent(language)` をリモートキャッシュする
+
+```tsx filename="app/components/welcome-message.tsx"
+import { cookies } from 'next/headers'
+import { cacheLife } from 'next/cache'
+
+export async function WelcomeMessage() {
+  // 言語設定を取得する（ユーザーごとに固有ではない）
+  const language = (await cookies()).get('language')?.value || 'en'
+
+  // 言語に基づいてキャッシュする（固有の値が少ない: en, es, fr, de など）
+  // 'en' を選択しているすべてのユーザーが同じキャッシュエントリを共有する
+  const content = await getCMSContent(language)
+
+  return <div>{content.welcomeMessage}</div>
+}
+
+async function getCMSContent(language: string) {
+  'use cache: remote'
+  cacheLife({ expire: 3600 })
+  // ユーザーごとに1件で数千件になる代わりに、
+  // 言語ごとに1件で約10〜50件のキャッシュエントリを作成する
+  return cms.getHomeContent(language)
+}
+```
+
+このようにすることで、同じ言語を好むすべてのユーザーが同じキャッシュエントリを共有でき、キャッシュの利用効率が向上し、CMS への負荷を軽減できます。
+
+どちらの例でもパターンは同じです。ユニークな値が少ない方の次元（category と price、language と user ID など）を見つけ、その次元でキャッシュし、残りはメモリ内でフィルタリングまたは選択します。
+
+もし `getUserProfile` が利用するサービスがフロントエンドの負荷に合わせてスケールできない場合でも、メモリ内キャッシュのために短い `cacheLife` を指定した `use cache` ディレクティブを使用できる可能性があります。ただし、多くのユーザーデータについては、（上記のガイドラインで述べたように既に key/value ストアでラップされている可能性のある）元のソースから直接フェッチするのが望ましいでしょう。
+
+コンプライアンス要件がある場合、またはランタイムデータを引数として渡すようにリファクタリングできない場合にのみ、[`'use cache: private'`](/docs/app/api-reference/directives/use-cache-private) を使用してください。
+
+### ネストのルール
+
+Remote cache にはネストに関する特定のルールがあります：
+
+- Remote cache は、別の remote cache（`'use cache: remote'`）の中にネスト **できます**
+- Remote cache は、通常の cache（`'use cache'`）の中にネスト **できます**
+- Remote cache は、private cache（`'use cache: private'`）の中にネスト **できません**
+- Private cache は、remote cache の中にネスト **できません**
+
+```tsx
+// 有効: リモートの中にリモート
+async function outerRemote() {
+  'use cache: remote'
+  const result = await innerRemote()
+  return result
+}
+
+async function innerRemote() {
+  'use cache: remote'
+  return getData()
+}
+
+// 有効: 通常キャッシュの中にリモート
+async function outerCache() {
+  'use cache'
+  // 内側のリモートキャッシュはリクエスト時に遅延された場合に機能する
+  const result = await innerRemote()
+  return result
+}
+
+async function innerRemote() {
+  'use cache: remote'
+  return getData()
+}
+
+// 無効: プライベートの中にリモート
+async function outerPrivate() {
+  'use cache: private'
+  const result = await innerRemote() // エラー!
+  return result
+}
+
+async function innerRemote() {
+  'use cache: remote'
+  return getData()
+}
+
+// 無効: リモートの中にプライベート
+async function outerRemote() {
+  'use cache: remote'
+  const result = await innerPrivate() // エラー!
+  return result
+}
+
+async function innerPrivate() {
+  'use cache: private'
+  return getData()
+}
+```
+
+## 例
+
+次の例は、'use cache: remote' を使用する際によく見られるパターンを示しています。`cacheLife` のパラメータ（`stale`、`revalidate`、`expire`）の詳細については、[`cacheLife` API リファレンス](/docs/app/api-reference/functions/cacheLife)を参照してください。
+
+### ユーザー設定がある場合
+
+ユーザーの通貨設定に基づいて商品価格をキャッシュします。通貨は Cookie に保存されているため、このコンポーネントはリクエスト時にレンダリングされます。リモートキャッシュを利用すると、同じ通貨を使用するすべてのユーザーがキャッシュされた価格を共有でき、さらにサーバーレス環境ではすべてのインスタンスが同じリモートキャッシュを共有できるため、有効です。
+
+```tsx filename="app/product/[id]/page.tsx" switcher
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheTag, cacheLife } from 'next/cache'
+
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
+  return (
+    <div>
+      <ProductDetails id={id} />
+      <Suspense fallback={<div>Loading price...</div>}>
+        <ProductPrice productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductDetails({ id }: { id: string }) {
+  return <div>Product: {id}</div>
+}
+
+async function ProductPrice({ productId }: { productId: string }) {
+  // クッキーの読み取りにより、このコンポーネントはリクエスト時に実行される
+  const currency = (await cookies()).get('currency')?.value ?? 'USD'
+
+  // 商品と通貨の組み合わせごとに価格をキャッシュする
+  // 同じ通貨を使用するすべてのユーザーがこのキャッシュエントリを共有する
+  const price = await getProductPrice(productId, currency)
+
+  return (
+    <div>
+      Price: {price} {currency}
+    </div>
+  )
+}
+
+async function getProductPrice(productId: string, currency: string) {
+  'use cache: remote'
+  cacheTag(`product-price-${productId}`)
+  cacheLife({ expire: 3600 }) // 1時間
+
+  // (productId, currency) ごとにキャッシュ - 通貨の種類が少ないほどキャッシュヒット率が高くなる
+  return db.products.getPrice(productId, currency)
+}
+```
+
+```jsx filename="app/product/[id]/page.js" switcher
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheTag, cacheLife } from 'next/cache'
+
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+export default async function ProductPage({ params }) {
+  const { id } = await params
+
+  return (
+    <div>
+      <ProductDetails id={id} />
+      <Suspense fallback={<div>Loading price...</div>}>
+        <ProductPrice productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductDetails({ id }) {
+  return <div>Product: {id}</div>
+}
+
+async function ProductPrice({ productId }) {
+  // クッキーの読み取りにより、このコンポーネントはリクエスト時に実行される
+  const currency = (await cookies()).get('currency')?.value ?? 'USD'
+
+  // 商品と通貨の組み合わせごとに価格をキャッシュする
+  // 同じ通貨を使用するすべてのユーザーがこのキャッシュエントリを共有する
+  const price = await getProductPrice(productId, currency)
+
+  return (
+    <div>
+      Price: {price} {currency}
+    </div>
+  )
+}
+
+async function getProductPrice(productId, currency) {
+  'use cache: remote'
+  cacheTag(`product-price-${productId}`)
+  cacheLife({ expire: 3600 }) // 1時間
+
+  // (productId, currency) ごとにキャッシュ - 通貨の種類が少ないほどキャッシュヒット率が高くなる
+  return db.products.getPrice(productId, currency)
+}
+```
+
+### データベース負荷の削減
+
+コストの高いデータベースクエリをキャッシュして、データベースへの負荷を減らします。この例では、`cookies()`、`headers()`、`searchParams` にはアクセスしません。もしこれらの統計情報を静的シェルに含めないという要件がある場合は、[`connection()`](/docs/app/api-reference/functions/connection) を使って、明示的にリクエスト時に実行されるよう処理を遅延させることができます。
+
+```tsx filename="app/dashboard/page.tsx"
+import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { cacheLife, cacheTag } from 'next/cache'
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div>Loading stats...</div>}>
+      <DashboardStats />
+    </Suspense>
+  )
+}
+
+async function DashboardStats() {
+  // リクエスト時まで遅延する
+  await connection()
+
+  const stats = await getGlobalStats()
+
+  return <StatsDisplay stats={stats} />
+}
+
+async function getGlobalStats() {
+  'use cache: remote'
+  cacheTag('global-stats')
+  cacheLife({ expire: 60 }) // 1分
+
+  // このコストの高いデータベースクエリはキャッシュされ、全ユーザー間で共有されるため、
+  // データベースへの負荷を軽減できる
+  const stats = await db.analytics.aggregate({
+    total_users: 'count',
+    active_sessions: 'count',
+    revenue: 'sum',
+  })
+
+  return stats
+}
+```
+
+このセットアップにより、ダッシュボードに何人のユーザーがアクセスしても、アップストリームのデータベースが受け取るリクエストは最大でも 1 分あたり 1 件だけです。
+
+### ストリーミングコンテキストでの API レスポンス
+
+ストリーミング中や動的な処理の後に取得される API レスポンスをキャッシュします。
+
+```tsx filename="app/feed/page.tsx"
+import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { cacheLife, cacheTag } from 'next/cache'
+
+export default async function FeedPage() {
+  return (
+    <div>
+      <Suspense fallback={<Skeleton />}>
+        <FeedItems />
+      </Suspense>
+    </div>
+  )
+}
+
+async function FeedItems() {
+  // リクエスト時まで遅延
+  await connection()
+
+  const items = await getFeedItems()
+
+  return items.map((item) => <FeedItem key={item.id} item={item} />)
+}
+
+async function getFeedItems() {
+  'use cache: remote'
+  cacheTag('feed-items')
+  cacheLife({ expire: 120 }) // 2分
+
+  // このAPIコールはキャッシュされ、外部サービスへのリクエスト数を削減します
+  const response = await fetch('https://api.example.com/feed')
+  return response.json()
+}
+```
+
+### 動的チェック後の計算済みデータ
+
+動的なセキュリティチェックや機能チェックの後に実行される高コストな計算処理の結果をキャッシュします:
+
+```tsx filename="app/reports/page.tsx"
+import { connection } from 'next/server'
+import { cacheLife } from 'next/cache'
+
+export default async function ReportsPage() {
+  // リクエスト時まで遅延（セキュリティチェックのため）
+  await connection()
+
+  const report = await generateReport()
+
+  return <ReportViewer report={report} />
+}
+
+async function generateReport() {
+  'use cache: remote'
+  cacheLife({ expire: 3600 }) // 1時間
+
+  // このコストの高い計算はキャッシュされ、すべての認証済みユーザー間で共有されるため、
+  // 重複した計算を回避できる
+  const data = await db.transactions.findMany()
+
+  return {
+    totalRevenue: calculateRevenue(data),
+    topProducts: analyzeProducts(data),
+    trends: calculateTrends(data),
+  }
+}
+```
+
+### 複合的なキャッシュ戦略
+
+最適なパフォーマンスを実現するために、静的キャッシュ、リモートキャッシュ、プライベートキャッシュを組み合わせます。
+
+```tsx filename="app/product/[id]/page.tsx"
+import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { cookies } from 'next/headers'
+import { cacheLife, cacheTag } from 'next/cache'
+
+// 静的な商品データ - ビルド時にプリレンダリング
+async function getProduct(id: string) {
+  'use cache'
+  cacheTag(`product-${id}`)
+
+  // ビルド時にキャッシュされ、全ユーザーで共有される
+  return db.products.find({ where: { id } })
+}
+
+// 共有価格データ - リモートハンドラーでランタイム時にキャッシュ
+async function getProductPrice(id: string) {
+  'use cache: remote'
+  cacheTag(`product-price-${id}`)
+  cacheLife({ expire: 300 }) // 5分
+
+  // ランタイム時にキャッシュされ、全ユーザーで共有される
+  return db.products.getPrice({ where: { id } })
+}
+
+// ユーザー固有のレコメンデーション - ユーザーごとのプライベートキャッシュ
+async function getRecommendations(productId: string) {
+  'use cache: private'
+  cacheLife({ expire: 60 }) // 1分
+
+  const sessionId = (await cookies()).get('session-id')?.value
+
+  // ユーザーごとにキャッシュされ、共有されない
+  return db.recommendations.findMany({
+    where: { productId, sessionId },
+  })
+}
+
+export default async function ProductPage({ params }) {
+  const { id } = await params
+
+  // 静的な商品データ
+  const product = await getProduct(id)
+
+  return (
+    <div>
+      <ProductDetails product={product} />
+
+      {/* 動的な共有価格 */}
+      <Suspense fallback={<PriceSkeleton />}>
+        <ProductPriceComponent productId={id} />
+      </Suspense>
+
+      {/* 動的なパーソナライズされたレコメンデーション */}
+      <Suspense fallback={<RecommendationsSkeleton />}>
+        <ProductRecommendations productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductDetails({ product }) {
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>{product.description}</p>
+    </div>
+  )
+}
+
+async function ProductPriceComponent({ productId }) {
+  // リクエスト時まで遅延
+  await connection()
+
+  const price = await getProductPrice(productId)
+  return <div>Price: ${price}</div>
+}
+
+async function ProductRecommendations({ productId }) {
+  const recommendations = await getRecommendations(productId)
+  return <RecommendationsList items={recommendations} />
+}
+
+function PriceSkeleton() {
+  return <div>Loading price...</div>
+}
+
+function RecommendationsSkeleton() {
+  return <div>Loading recommendations...</div>
+}
+
+function RecommendationsList({ items }) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={item.id}>{item.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> **補足**:
+>
+> - リモートキャッシュはサーバー側のキャッシュハンドラーに保存され、すべてのユーザー間で共有されます
+> - `'use cache: remote'` は、[`use cache`](/docs/app/api-reference/directives/use-cache) ではサーバー側のキャッシュヒットが得られない場合がある静的シェルの外側でも動作します
+> - [`cacheTag()`](/docs/app/api-reference/functions/cacheTag) と [`revalidateTag()`](/docs/app/api-reference/functions/revalidateTag) を使用して、必要に応じてリモートキャッシュを無効化します
+> - [`cacheLife()`](/docs/app/api-reference/functions/cacheLife) を使用してキャッシュの有効期限を設定します
+> - ユーザーごとのデータには、`'use cache: remote'` の代わりに [`'use cache: private'`](/docs/app/api-reference/directives/use-cache-private) を使用してください
+> - リモートキャッシュは、計算結果や取得したデータをサーバー側に保存することでオリジンへの負荷を軽減します
+
+## プラットフォームサポート
+
+| デプロイオプション                                                  | サポート状況 |
+| ------------------------------------------------------------------- | ------------ |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | あり         |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | あり         |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | なし         |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | あり         |
+
+## バージョン履歴
+
+| バージョン | 変更点                                                                 |
+| ---------- | ---------------------------------------------------------------------- |
+| `v16.0.0`  | `"use cache: remote"` が Cache Components 機能で利用可能になりました。 |

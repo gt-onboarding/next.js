@@ -1,0 +1,360 @@
+---
+title: レイアウトとページ
+description: 最初のページとレイアウトを作成し、Link コンポーネントを使ってそれらをリンクする方法を学びます。
+related:
+  title: API リファレンス
+  description: このページで言及されている機能については、API リファレンスを参照してさらに詳しく学びましょう。
+  links:
+    - app/getting-started/linking-and-navigating
+    - app/api-reference/file-conventions/layout
+    - app/api-reference/file-conventions/page
+    - app/api-reference/components/link
+    - app/api-reference/file-conventions/dynamic-routes
+---
+
+Next.js は **ファイルシステムベースのルーティング** を採用しており、フォルダとファイルを使ってルートを定義できます。このページでは、レイアウトとページの作成方法と、それらの間を Link コンポーネントでリンクする方法を説明します。
+
+## ページの作成
+
+**ページ**とは、特定のルートでレンダーされる UI のことです。ページを作成するには、`app` ディレクトリ内に [`page` ファイル](/docs/app/api-reference/file-conventions/page) を追加し、React コンポーネントをデフォルトエクスポートします。たとえば、ルート `/` のインデックスページを作成するには次のようにします。
+
+<Image
+  alt="page.js special file"
+  srcLight="/docs/light/page-special-file.png"
+  srcDark="/docs/dark/page-special-file.png"
+  width="1600"
+  height="282"
+/>
+
+```tsx filename="app/page.tsx" switcher
+export default function Page() {
+  return <h1>Hello Next.js!</h1>
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default function Page() {
+  return <h1>Hello Next.js!</h1>
+}
+```
+
+## レイアウトの作成
+
+レイアウトは、複数のページ間で**共有**される UI です。ナビゲーション時にもレイアウトは状態を保持し、インタラクティブなままで、再レンダーされません。
+
+[`layout` ファイル](/docs/app/api-reference/file-conventions/layout)から React コンポーネントをデフォルトエクスポートすることでレイアウトを定義できます。コンポーネントは、ページまたは別の[レイアウト](#nesting-layouts)を表す `children` プロップを受け取る必要があります。
+
+例えば、インデックスページを子として受け取るレイアウトを作成するには、`app` ディレクトリ内に `layout` ファイルを追加します。
+
+<Image
+  alt="layout.js special file"
+  srcLight="/docs/light/layout-special-file.png"
+  srcDark="/docs/dark/layout-special-file.png"
+  width="1600"
+  height="363"
+/>
+
+```tsx filename="app/layout.tsx" switcher
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        {/* レイアウト UI */}
+        {/* ページまたはネストされたレイアウトをレンダリングしたい場所に children を配置 */}
+        <main>{children}</main>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function DashboardLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {/* レイアウトUI */}
+        {/* ページまたはネストされたレイアウトをレンダリングしたい場所にchildrenを配置 */}
+        <main>{children}</main>
+      </body>
+    </html>
+  )
+}
+```
+
+上記のレイアウトは、`app` ディレクトリ直下で定義されているため、[ルートレイアウト](/docs/app/api-reference/file-conventions/layout#root-layout) と呼ばれます。ルートレイアウトは**必須**であり、`html` と `body` タグを含める必要があります。
+
+## ネストされたルートの作成
+
+ネストされたルートとは、複数の URL セグメントで構成されるルートのことです。たとえば、`/blog/[slug]` ルートは次の 3 つのセグメントで構成されます:
+
+- `/`（ルートセグメント）
+- `blog`（セグメント）
+- `[slug]`（リーフセグメント）
+
+Next.js では次のように扱います:
+
+- **フォルダ**は、URL セグメントにマッピングされるルートセグメントを定義するために使用します。
+- **ファイル**（`page` や `layout` など）は、セグメントに対して表示される UI を作成するために使用します。
+
+ネストされたルートを作成するには、フォルダを入れ子（階層）にします。たとえば、`/blog` のルートを追加するには、`app` ディレクトリ内に `blog` フォルダを作成します。次に、`/blog` にブラウザから直接アクセスできるようにするために、`page.tsx` ファイルを追加します:
+
+<Image
+  alt="blog フォルダと page.tsx ファイルを示すファイル階層"
+  srcLight="/docs/light/blog-nested-route.png"
+  srcDark="/docs/dark/blog-nested-route.png"
+  width="1600"
+  height="525"
+/>
+
+```tsx filename="app/blog/page.tsx" switcher
+// ダミーインポート
+import { getPosts } from '@/lib/posts'
+import { Post } from '@/ui/post'
+
+export default async function Page() {
+  const posts = await getPosts()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <Post key={post.id} post={post} />
+      ))}
+    </ul>
+  )
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+// ダミーのインポート
+import { getPosts } from '@/lib/posts'
+import { Post } from '@/ui/post'
+
+export default async function Page() {
+  const posts = await getPosts()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <Post key={post.id} post={post} />
+      ))}
+    </ul>
+  )
+}
+```
+
+フォルダをさらにネストして、入れ子のルートを作成できます。たとえば、特定のブログ記事用のルートを作成するには、`blog` フォルダ内に新しい `[slug]` フォルダを作成し、`page` ファイルを追加します。
+
+<Image
+  alt="blog フォルダ内にネストされた slug フォルダと page.js ファイルを含むファイル階層"
+  srcLight="/docs/light/blog-post-nested-route.png"
+  srcDark="/docs/dark/blog-post-nested-route.png"
+  width="1600"
+  height="687"
+/>
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+function generateStaticParams() {}
+
+export default function Page() {
+  return <h1>Hello, Blog Post Page!</h1>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+function generateStaticParams() {}
+
+export default function Page() {
+  return <h1>Hello, Blog Post Page!</h1>
+}
+```
+
+フォルダ名を角括弧で囲む（例: `[slug]`）と、データに基づいて複数のページ（ブログ記事、商品ページなど）を生成するために使用される[動的ルートセグメント](/docs/app/api-reference/file-conventions/dynamic-routes)が作成されます。
+
+## レイアウトのネスト
+
+デフォルトでは、フォルダー階層内のレイアウトもネストされており、その `children` プロップを通して子レイアウトをラップします。特定のルートセグメント（フォルダー）内に `layout` を追加することで、レイアウトをネストできます。
+
+たとえば、`/blog` ルート用のレイアウトを作成するには、`blog` フォルダー内に新しい `layout` ファイルを追加します。
+
+<Image
+  alt="ルートレイアウトがブログレイアウトをラップしていることを示すファイル階層"
+  srcLight="/docs/light/nested-layouts.png"
+  srcDark="/docs/dark/nested-layouts.png"
+  width="1600"
+  height="768"
+/>
+
+```tsx filename="app/blog/layout.tsx" switcher
+export default function BlogLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <section>{children}</section>
+}
+```
+
+```jsx filename="app/blog/layout.js" switcher
+export default function BlogLayout({ children }) {
+  return <section>{children}</section>
+}
+```
+
+上記の2つのレイアウトを組み合わせると、ルートレイアウト (`app/layout.js`) がブログレイアウト (`app/blog/layout.js`) を包み、そのブログレイアウトがブログ (`app/blog/page.js`) とブログ投稿ページ (`app/blog/[slug]/page.js`) を包む構造になります。
+
+## 動的セグメントの作成
+
+[動的セグメント](/docs/app/api-reference/file-conventions/dynamic-routes)を使用すると、データに基づいて生成されるルートを作成できます。たとえば、個々のブログ投稿ごとにルートを手動で作成する代わりに、ブログ投稿データに基づいてルートを生成する動的セグメントを作成できます。
+
+動的セグメントを作成するには、セグメント（フォルダー）名を角かっこで囲みます: `[segmentName]`。たとえば、`app/blog/[slug]/page.tsx` というルートでは、`[slug]` が動的セグメントです。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export default async function BlogPostPage({ params }) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  )
+}
+```
+
+[動的セグメント](/docs/app/api-reference/file-conventions/dynamic-routes) と [`params`](/docs/app/api-reference/file-conventions/page#params-optional) プロップについて、詳しくはこちらをご覧ください。
+
+ネストされた [動的セグメント内のレイアウト](/docs/app/api-reference/file-conventions/layout#params-optional) も、`params` プロップにアクセスできます。
+
+## 検索パラメータを使ったレンダリング
+
+サーバーコンポーネントの **page** では、[`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) prop を使用して検索パラメータにアクセスできます。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const filters = (await searchParams).filters
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page({ searchParams }) {
+  const filters = (await searchParams).filters
+}
+```
+
+`searchParams` を使用すると、検索パラメータを読み取るために受信リクエストが必要になるため、ページは [**動的レンダリング**](/docs/app/guides/caching#dynamic-rendering) の対象となります。
+
+クライアントコンポーネントは [`useSearchParams`](/docs/app/api-reference/functions/use-search-params) フックを使って検索パラメータを読み取ることができます。
+
+`useSearchParams` については、[静的にレンダリングされた](/docs/app/api-reference/functions/use-search-params#static-rendering) ルートおよび [動的にレンダリングされた](/docs/app/api-reference/functions/use-search-params#dynamic-rendering) ルートに関するドキュメントを参照してください。
+
+### どのようなときに何を使うか
+
+- ページの**データを読み込むために**検索パラメータが必要な場合は、`searchParams` プロップを使用します（例: ページネーション、データベースからのフィルタリング）。
+- 検索パラメータが**クライアント側のみで**使われる場合は、`useSearchParams` を使用します（例: props 経由ですでに読み込まれているリストのフィルタリング）。
+- ちょっとした最適化として、再レンダーを引き起こさずに検索パラメータを読み取るために、**コールバックやイベントハンドラー内**で `new URLSearchParams(window.location.search)` を使用できます。
+
+## ページ間のリンク
+
+ルート間を遷移するには、[`<Link>` コンポーネント](/docs/app/api-reference/components/link) を使用できます。`<Link>` は Next.js に組み込まれているコンポーネントで、HTML の `<a>` タグを拡張し、[プリフェッチ](/docs/app/getting-started/linking-and-navigating#prefetching) や [クライアントサイドでのナビゲーション](/docs/app/getting-started/linking-and-navigating#client-side-transitions) を提供します。
+
+たとえばブログ投稿の一覧を生成するには、`next/link` から `<Link>` をインポートし、コンポーネントに `href` プロップを渡します。
+
+```tsx filename="app/ui/post.tsx" highlight={1,10} switcher
+import Link from 'next/link'
+
+export default async function Post({ post }) {
+  const posts = await getPosts()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.slug}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```jsx filename="app/ui/post.js" highlight={1,10}  switcher
+import Link from 'next/link'
+
+export default async function Post({ post }) {
+  const posts = await getPosts()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.slug}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> **補足**: Next.js でルート間を移動する基本的な方法は `<Link>` を使うことです。より高度なナビゲーションが必要な場合は、[`useRouter` フック](/docs/app/api-reference/functions/use-router) も利用できます。
+
+## ルート Props ヘルパー
+
+Next.js は、ルート構造から `params` と名前付きスロットを推論するユーティリティ型を提供します：
+
+- [**PageProps**](/docs/app/api-reference/file-conventions/page#page-props-helper)：`params` と `searchParams` を含む `page` コンポーネント用の Props。
+- [**LayoutProps**](/docs/app/api-reference/file-conventions/layout#layout-props-helper)：`children` および任意の名前付きスロット（例：`@analytics` のようなフォルダ）を含む `layout` コンポーネント用の Props。
+
+これらはグローバルに利用可能なヘルパーであり、`next dev`、`next build`、または [`next typegen`](/docs/app/api-reference/cli/next#next-typegen-options) のいずれかを実行したときに自動生成されます。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+export default async function Page(props: PageProps<'/blog/[slug]'>) {
+  const { slug } = await props.params
+  return <h1>Blog post: {slug}</h1>
+}
+```
+
+```tsx filename="app/dashboard/layout.tsx"
+export default function Layout(props: LayoutProps<'/dashboard'>) {
+  return (
+    <section>
+      {props.children}
+      {/* app/dashboard/@analytics がある場合、型付きスロットとして表示されます: */}
+      {/* {props.analytics} */}
+    </section>
+  )
+}
+```
+
+> **補足**
+>
+> - 静的ルートでは `params` は `{}` に解決されます。
+> - `PageProps`、`LayoutProps` はグローバルヘルパーのため、インポートは不要です。
+> - 型は `next dev`、`next build`、`next typegen` の実行時に自動生成されます。

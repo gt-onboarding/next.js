@@ -1,0 +1,85 @@
+---
+title: Next.js アプリケーションに JSON-LD を実装する方法
+nav_title: JSON-LD
+description: JSON-LD を Next.js アプリケーションに追加して、検索エンジンや AI にコンテンツを説明する方法を学びます。
+---
+
+[JSON-LD](https://json-ld.org/) は構造化データのための形式で、検索エンジンや AI が、ページのコンテンツだけでなくその構造も理解できるようにするために利用できます。例えば、人、イベント、組織、映画、本、レシピなど、さまざまな種類のエンティティを記述するために使用できます。
+
+JSON-LD に関する現時点での推奨方法は、構造化データを `layout.js` または `page.js` コンポーネント内の `<script>` タグとしてレンダリングすることです。
+
+次のスニペットでは `JSON.stringify` を使用していますが、これは XSS インジェクションに使われる悪意のある文字列をサニタイズしません。この種の脆弱性を防ぐには、例えば文字 `<` をその Unicode 等価である `\u003c` に置き換えるなどして、`JSON-LD` のペイロードから `HTML` タグを除去することができます。
+
+潜在的に危険な文字列をサニタイズするための、組織内で推奨されているアプローチを確認するか、[serialize-javascript](https://www.npmjs.com/package/serialize-javascript) など、コミュニティによって保守されている `JSON.stringify` の代替手段を使用してください。
+
+```tsx filename="app/products/[id]/page.tsx" switcher
+export default async function Page({ params }) {
+  const { id } = await params
+  const product = await getProduct(id)
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: product.image,
+    description: product.description,
+  }
+
+  return (
+    <section>
+      {/* JSON-LDをページに追加する */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
+      />
+      {/* ... */}
+    </section>
+  )
+}
+```
+
+```jsx filename="app/products/[id]/page.js" switcher
+export default async function Page({ params }) {
+  const { id } = await params
+  const product = await getProduct(id)
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: product.image,
+    description: product.description,
+  }
+
+  return (
+    <section>
+      {/* JSON-LDをページに追加する */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
+      />
+      {/* ... */}
+    </section>
+  )
+}
+```
+
+構造化データは、Google 向けには [Rich Results Test](https://search.google.com/test/rich-results)、汎用的な検証には [Schema Markup Validator](https://validator.schema.org/) を使って検証・テストできます。
+
+コミュニティパッケージの [`schema-dts`](https://www.npmjs.com/package/schema-dts) などを使うと、TypeScript で JSON-LD に型付けできます。
+
+```tsx
+import { Product, WithContext } from 'schema-dts'
+
+const jsonLd: WithContext<Product> = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: 'Next.js Sticker',
+  image: 'https://nextjs.org/imgs/sticker.png',
+  description: 'Dynamic at the speed of static.',
+}
+```

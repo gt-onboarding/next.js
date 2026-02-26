@@ -1,0 +1,66 @@
+---
+title: Next.js で Babel を設定する方法
+nav_title: Babel
+description: Next.js によって追加される Babel プリセットを独自の設定で拡張します。
+---
+
+<details>
+  <summary>例</summary>
+
+- [Babel 設定をカスタマイズする](https://github.com/vercel/next.js/tree/canary/examples/with-custom-babel-config)
+
+</details>
+
+Next.js はアプリに `next/babel` プリセットを追加しており、React アプリケーションとサーバーサイドコードをコンパイルするために必要なものがすべて含まれています。デフォルトの Babel 設定をさらに拡張することも可能です。
+
+## プリセットとプラグインの追加
+
+まずは、プロジェクトのルートディレクトリに `.babelrc` ファイル（または `babel.config.js`）を用意するだけで十分です。このようなファイルが見つかると、そのファイルが設定の*唯一の参照元*とみなされるため、Next.js が必要とする `next/babel` プリセットも必ず含めて定義する必要があります。
+
+`.babelrc` ファイルの例を次に示します。
+
+```json filename=".babelrc"
+{
+  "presets": ["next/babel"],
+  "plugins": []
+}
+```
+
+`next/babel` に含まれているプリセットについて知るには、[このファイルを参照](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/babel/preset.ts)してください。
+
+プリセットやプラグインを**個別に設定せずに追加する**には、次のように記述します。
+
+```json filename=".babelrc"
+{
+  "presets": ["next/babel"],
+  "plugins": ["@babel/plugin-proposal-do-expressions"]
+}
+```
+
+## プリセットとプラグインのカスタマイズ
+
+プリセットやプラグインに**カスタム設定を指定して**追加するには、`next/babel` プリセットに対して次のように記述します:
+
+```json filename=".babelrc"
+{
+  "presets": [
+    [
+      "next/babel",
+      {
+        "preset-env": {},
+        "transform-runtime": {},
+        "styled-jsx": {},
+        "class-properties": {}
+      }
+    ]
+  ],
+  "plugins": []
+}
+```
+
+各設定で利用可能なオプションの詳細については、Babel の[ドキュメント](https://babeljs.io/docs/)を参照してください。
+
+> **補足**:
+>
+> - Next.js ではサーバーサイドでのコンパイルに [**現在の** Node.js バージョン](https://github.com/nodejs/release#release-schedule) を使用します。
+> - `"preset-env"` の `modules` オプションは `false` のままにしておく必要があります。そうしないと webpack のコード分割が無効になります。

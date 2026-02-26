@@ -1,0 +1,71 @@
+---
+title: クライアントサイドレンダリング (CSR)
+description: Pages Router でクライアントサイドレンダリングを実装する方法を学びます。
+related:
+  description: Next.js におけるその他のレンダリング手法について学びます。
+  links:
+    - pages/building-your-application/rendering/server-side-rendering
+    - pages/building-your-application/rendering/static-site-generation
+    - pages/guides/incremental-static-regeneration
+---
+
+React によるクライアントサイドレンダリング (CSR) では、ブラウザは最小限の HTML ページと、そのページに必要な JavaScript をダウンロードします。その後、その JavaScript を使って DOM を更新し、ページをレンダリングします。アプリケーションが最初に読み込まれるとき、ユーザーは完全なページが表示されるまでにわずかな遅延を感じることがあります。これは、すべての JavaScript がダウンロード、パース、実行されるまでページが完全にはレンダリングされないためです。
+
+ページが最初に読み込まれた後は、同じサイト内の別ページへの遷移は通常より高速になります。必要なデータだけをフェッチすればよく、JavaScript がページ全体をリロードせずにページの一部を再レンダリングできるためです。
+
+Next.js では、クライアントサイドレンダリングを実装する方法が 2 つあります:
+
+1. ページ内でサーバーサイドレンダリングのメソッド（[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) や [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)）の代わりに React の `useEffect()` フックを使う。
+2. [SWR](https://swr.vercel.app/) や [TanStack Query](https://tanstack.com/query/latest/) などのデータフェッチ用ライブラリを使用してクライアント側でデータを取得する（推奨）。
+
+以下は、Next.js ページ内で `useEffect()` を使用する例です:
+
+```jsx filename="pages/index.js"
+import React, { useState, useEffect } from 'react'
+
+export function Page() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch('https://api.example.com/data')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const result = await response.json()
+      setData(result)
+    }
+
+    fetchData().catch((e) => {
+      // 必要に応じてエラーを処理する
+      console.error('An error occurred while fetching the data: ', e)
+    })
+  }, [])
+
+  return <p>{data ? `Your data: ${data}` : 'Loading...'}</p>
+}
+```
+
+上の例では、コンポーネントはまず `Loading...` をレンダーします。その後、データが取得されると再レンダーされ、データが表示されます。
+
+`useEffect` の中でデータをフェッチするのは、古い React アプリケーションで見られることがあるパターンですが、パフォーマンスやキャッシュ、楽観的更新などを向上させるために、データ取得用ライブラリの使用を推奨します。ここでは、クライアント側でデータをフェッチするために [SWR](https://swr.vercel.app/) を使った最小限の例を示します。
+
+```jsx filename="pages/index.js"
+import useSWR from 'swr'
+
+export function Page() {
+  const { data, error, isLoading } = useSWR(
+    'https://api.example.com/data',
+    fetcher
+  )
+
+  if (error) return <p>Failed to load.</p>
+  if (isLoading) return <p>Loading...</p>
+
+  return <p>Your Data: {data}</p>
+}
+```
+
+> **補足**:
+>
+> CSR は SEO に影響を与える可能性があることに注意してください。一部の検索エンジンのクローラーは JavaScript を実行しないため、アプリケーションの最初の空の状態やローディング状態しか認識できない場合があります。また、インターネット接続やデバイスが遅いユーザーにとっては、すべての JavaScript が読み込まれて実行されるまで完全なページが表示されないため、パフォーマンスの問題につながることもあります。Next.js はハイブリッドなアプローチを推奨しており、アプリケーション内の **各ページのニーズに応じて**、[サーバーサイドレンダリング](/docs/pages/building-your-application/rendering/server-side-rendering)、[静的サイト生成](/docs/pages/building-your-application/rendering/static-site-generation)、クライアントサイドレンダリングを組み合わせて使用できます。App Router では、ページがレンダリングされている間にローディングインジケーターを表示するために、[Suspense を使った Loading UI](/docs/app/api-reference/file-conventions/loading) も使用できます。

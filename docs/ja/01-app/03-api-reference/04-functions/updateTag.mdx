@@ -1,0 +1,153 @@
+---
+title: updateTag
+description: updateTag 関数の API リファレンス。
+---
+
+`updateTag` を使用すると、[Server Actions](/docs/app/getting-started/updating-data) 内から、特定のキャッシュタグが付与された [cached data](/docs/app/guides/caching) をオンデマンドで更新できます。
+
+この関数は、ユーザーが行った書き込みをすぐに読み返せる **read-your-own-writes** シナリオ向けに設計されています。つまり、ユーザーが（投稿の作成などの）変更を行った際に、古いデータではなく、その変更がすぐに UI に反映されるようにするためのものです。
+
+## 使用方法
+
+`updateTag` は、[Server Actions](/docs/app/getting-started/updating-data) の内部から**のみ**呼び出すことができます。Route Handlers、Client Components、その他のコンテキストでは使用できません。
+
+Route Handlers やその他のコンテキストでキャッシュタグを無効化する必要がある場合は、代わりに [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) を使用してください。
+
+> **補足**: `updateTag` は、指定されたタグに対するキャッシュ済みデータを即座に無効化します。次回のリクエストは、キャッシュから古い内容を返すのではなく、新しいデータの取得が完了するまで待機するため、ユーザーは変更内容をすぐに確認できます。
+
+## 引数
+
+```tsx
+updateTag(tag: string): void;
+```
+
+- `tag`: 更新したいデータに関連付けられたキャッシュタグを表す文字列。256文字以内である必要があります。この値は大文字と小文字を区別します。
+
+タグは、まずキャッシュされたデータに割り当てる必要があります。これには次の 2 つの方法があります。
+
+- 外部 API リクエストをキャッシュするために、`fetch` の [`next.tags`](/docs/app/guides/caching#fetch-optionsnexttags-and-revalidatetag) オプションを使用する：
+
+```tsx
+fetch(url, { next: { tags: ['posts'] } })
+```
+
+- `'use cache'` ディレクティブ付きでキャッシュされた関数やコンポーネント内で [`cacheTag`](/docs/app/api-reference/functions/cacheTag) を使用する場合:
+
+```tsx
+import { cacheTag } from 'next/cache'
+
+async function getData() {
+  'use cache'
+  cacheTag('posts')
+  // ...
+}
+```
+
+## 戻り値
+
+`updateTag` の戻り値はありません。
+
+## revalidateTag との違い
+
+`updateTag` と `revalidateTag` はどちらもキャッシュされたデータを無効化しますが、目的が異なります。
+
+- **`updateTag`**:
+  - Server Actions 内でのみ使用できる
+  - 次のリクエストは新しいデータを待機する（古いコンテンツは返されない）
+  - read-your-own-writes シナリオ向けに設計されている
+
+- **`revalidateTag`**:
+  - Server Actions と Route Handlers の両方で使用できる
+  - `profile="max"`（推奨）の場合: 新しいデータをバックグラウンドでフェッチしながらキャッシュ済みデータを返す（stale-while-revalidate）
+  - カスタム profile の場合: 高度な用途向けに任意のキャッシュ有効期間プロファイルを設定できる
+  - profile なしの場合: `updateTag` と同等のレガシーな挙動
+
+## 使用例
+
+### Read-Your-Own-Writes 対応の Server Action
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データベースに投稿を作成する
+  const post = await db.post.create({
+    data: { title, content },
+  })
+
+  // キャッシュタグを無効化して新しい投稿をすぐに表示できるようにする
+  // 'posts' タグ: 投稿一覧を表示するすべてのページに影響する
+  updateTag('posts')
+  // 'post-{id}' タグ: 個別の投稿詳細ページに影響する
+  updateTag(`post-${post.id}`)
+
+  // 新しい投稿にリダイレクト - キャッシュではなく最新データが表示される
+  redirect(`/posts/${post.id}`)
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // データベースに投稿を作成する
+  const post = await db.post.create({
+    data: { title, content },
+  })
+
+  // キャッシュタグを無効化して新しい投稿をすぐに表示できるようにする
+  // 'posts' タグ: 投稿一覧を表示するすべてのページに影響する
+  updateTag('posts')
+  // 'post-{id}' タグ: 個別の投稿詳細ページに影響する
+  updateTag(`post-${post.id}`)
+
+  // 新しい投稿にリダイレクトする - キャッシュではなく最新データが表示される
+  redirect(`/posts/${post.id}`)
+}
+```
+
+### Server Actions の外で使用した場合のエラー
+
+```ts filename="app/api/posts/route.ts" switcher
+import { updateTag } from 'next/cache'
+
+export async function POST() {
+  // これはエラーをスローします
+  updateTag('posts')
+  // エラー: updateTag はServer Action内からのみ呼び出せます
+
+  // Route Handlers では代わりに revalidateTag を使用してください
+  revalidateTag('posts', 'max')
+}
+```
+
+## updateTag を使用するタイミング
+
+`updateTag` を使用するのは次のような場合です:
+
+- Server Action 内で実行しているとき
+- 自分で行った書き込みをすぐに読み取るために、キャッシュを即時に無効化する必要があるとき
+- 次のリクエストで更新後のデータが必ず参照されるようにしたいとき
+
+代わりに `revalidateTag` を使用するのは次のような場合です:
+
+- Route Handler やその他の非 Action コンテキストで実行しているとき
+- stale-while-revalidate の挙動を利用したいとき
+- キャッシュ無効化用の Webhook や API エンドポイントを構築しているとき
+
+## 関連
+
+- [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) - ルートハンドラー内のタグを無効化するため
+- [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) - 特定のパスを無効化するため

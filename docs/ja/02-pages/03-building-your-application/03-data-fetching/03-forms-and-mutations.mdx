@@ -1,0 +1,107 @@
+---
+title: フォームとミューテーション
+nav_title: フォームとミューテーション
+description: Next.js でフォーム送信とデータミューテーションを扱う方法を学びます。
+---
+
+フォームを使用すると、Web アプリケーションでデータを作成および更新できます。Next.js では、**API Routes** を使用してフォーム送信とデータミューテーションを処理するための強力な方法を提供しています。
+
+> **補足:**
+>
+> - 今後は、App Router を[段階的に採用](/docs/app/guides/migrating/app-router-migration)し、フォーム送信とデータミューテーションの処理には [Server Actions](/docs/app/getting-started/updating-data) を使用することを推奨する予定です。Server Actions を使うと、コンポーネントから直接呼び出せる非同期のサーバー関数を、API Route を手動で作成することなく定義できます。
+> - API Routes は[ CORS ヘッダーを指定しません](https://developer.mozilla.org/docs/Web/HTTP/CORS)。つまり、デフォルトでは同一オリジンからのアクセスのみに制限されます。
+> - API Routes はサーバー上で実行されるため、[Environment Variables](/docs/pages/guides/environment-variables)（API キーなどの機密値）をクライアントに公開せずに利用できます。これはアプリケーションのセキュリティにとって非常に重要です。
+
+## 使用例
+
+### リダイレクト
+
+ミューテーションの後にユーザーを別のルートへリダイレクトしたい場合は、[`redirect`](/docs/pages/building-your-application/routing/api-routes#response-helpers) を使って任意の絶対または相対 URL にリダイレクトできます。
+
+```ts filename="pages/api/submit.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const id = await addPost()
+  res.redirect(307, `/post/${id}`)
+}
+```
+
+```js filename="pages/api/submit.js" switcher
+export default async function handler(req, res) {
+  const id = await addPost()
+  res.redirect(307, `/post/${id}`)
+}
+```
+
+### Cookie の設定
+
+API ルート内では、レスポンスオブジェクトの `setHeader` メソッドを使用して Cookie を設定できます。
+
+```ts filename="pages/api/cookie.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  res.setHeader('Set-Cookie', 'username=lee; Path=/; HttpOnly')
+  res.status(200).send('Cookie has been set.')
+}
+```
+
+```js filename="pages/api/cookie.js" switcher
+export default async function handler(req, res) {
+  res.setHeader('Set-Cookie', 'username=lee; Path=/; HttpOnly')
+  res.status(200).send('Cookie has been set.')
+}
+```
+
+### Cookie の読み取り
+
+[`cookies`](/docs/pages/building-your-application/routing/api-routes#request-helpers) リクエストヘルパーを使用すると、API ルート内で Cookie を読み取ることができます。
+
+```ts filename="pages/api/cookie.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const auth = req.cookies.authorization
+  // ...
+}
+```
+
+```js filename="pages/api/cookie.js" switcher
+export default async function handler(req, res) {
+  const auth = req.cookies.authorization
+  // ...
+}
+```
+
+### Cookie の削除
+
+API ルート内では、レスポンスの `setHeader` メソッドを使用して Cookie を削除できます。
+
+```ts filename="pages/api/cookie.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  res.setHeader('Set-Cookie', 'username=; Path=/; HttpOnly; Max-Age=0')
+  res.status(200).send('Cookie has been deleted.')
+}
+```
+
+```js filename="pages/api/cookie.js" switcher
+export default async function handler(req, res) {
+  res.setHeader('Set-Cookie', 'username=; Path=/; HttpOnly; Max-Age=0')
+  res.status(200).send('Cookie has been deleted.')
+}
+```

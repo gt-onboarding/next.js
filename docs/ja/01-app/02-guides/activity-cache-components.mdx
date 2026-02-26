@@ -1,0 +1,313 @@
+---
+title: Activity と Cache Components
+nav_title: Activity と Cache Components
+description: Cache Components が Activity によってルートをアンマウントせずに保持する場合に、どの UI ステートを保持し、どれをリセットするかを判断する方法を学びます。
+related:
+  title: 関連
+  description: Activity と Cache Components についてさらに学びます。
+  links:
+    - app/getting-started/cache-components
+    - app/guides/activity
+---
+
+[Cache Components](/docs/app/getting-started/cache-components) が有効な場合、他のページへナビゲートしてもルートはアンマウントされません。代わりに、Next.js は React の [`<Activity>`](https://react.dev/reference/react/Activity) コンポーネントを使ってルートを非表示にし、ツリーから削除するのではなく `mode="hidden"` に設定します。
+
+これによりコンポーネントの state と DOM の state が保持され、戻る/進むナビゲーションに有利になります。一方で、アンマウントによって state をクリアすることに依存していたパターンは、自動ではリセットされなくなります。どの state を保持し、どれをリセットするかは、開発者が判断します。
+
+Next.js は **3 エントリ制限** を用いて、最大 3 つのルートを保持します。それを超えてナビゲートすると、最も古いルートの DOM と React state は破棄されます。つまり、ユーザーが多くのページを移動してから戻った場合、ごく古い state は破棄されており、新しい状態から再レンダーされることがあります。
+
+### なぜ Activity には Cache Components が同梱されているのか
+
+Cache Components と Activity は連携して、サーバーレンダリングを維持しつつ SPA ライクなナビゲーション（即時のルート遷移）を実現します:
+
+- **サーバーコンポーネント** は `"use cache"` を使ってライフタイムを延長し、プリフェッチと即時のルート遷移を可能にします
+- **クライアントコンポーネント** は Activity を使って、ナビゲーション間で状態と DOM を保持します。これがない場合、フォーム入力値、スクロール位置、コンポーネントの状態はナビゲーションのたびにリセットされます
+
+この基盤により、ルートの完全なプリフェッチ、即時の戻る/進むナビゲーション、そして今後追加予定の View Transitions や Gesture APIs といった機能が実現されます。
+
+> **補足:** 段階的な移行のためのオプトアウト戦略が検討されています。
+
+Activity の仕組みと、それによって可能になるパターンを理解したい場合は、[Activity ガイド](/docs/app/guides/activity)を参照してください。
+
+## 何を保持するかを選ぶ
+
+Activity はデフォルトですべてのコンポーネントの state を保持します。各 state ごとに、その挙動が UI にとって適切かどうかを判断してください。以下のパターンでは、よくあるシナリオと、それぞれのケースでどのように対処するかを両方の立場から示します。
+
+### 展開可能な UI（ドロップダウン、アコーディオン、パネル）
+
+ユーザーが別のページに遷移して戻ってきた場合、Activity は展開可能な要素の開閉状態を保持します。
+
+**保持すべき場合:** 展開済みセクションを含むサイドバー、FAQ アコーディオン、フィルターパネルなど。ユーザーは意図的にビューを構成しており、それを復元することで同じ作業をやり直さずに済みます。
+
+**リセットすべき場合:** ボタンクリックによって表示されるドロップダウンメニューやポップオーバーなど。これらは永続的なビュー状態ではなく、一時的なインタラクションです。ドロップダウンがすでに開いた状態でページに戻るのはユーザーフレンドリーではありません。
+
+一時的な開閉状態をリセットするには、`useLayoutEffect` のクリーンアップ関数内で閉じてください:
+
+```tsx highlight={8-13}
+'use client'
+
+import { useState, useLayoutEffect } from 'react'
+
+function SettingsDropdown() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  // このコンポーネントが非表示になったときにドロップダウンを閉じる
+  useLayoutEffect(() => {
+    return () => {
+      setIsOpen(false)
+    }
+  }, [])
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen((o) => !o)}>Options</button>
+      {isOpen && (
+        <ul>
+          <li>
+            <button>Edit Profile</button>
+          </li>
+          <li>
+            <button>Change Password</button>
+          </li>
+        </ul>
+      )}
+    </div>
+  )
+}
+```
+
+Activity がこのコンポーネントを非表示にするとき、クリーンアップ関数が実行されて `isOpen` をリセットします。ページが再び表示されたときには、ドロップダウンは閉じた状態のままです。`useLayoutEffect` を使うことで、コンポーネントが非表示になる前にクリーンアップが同期的に実行され、古い state が一瞬表示されてしまうようなチラつきを防ぎます。
+
+ナビゲーションリンクがクリックされたときにドロップダウンを即座に閉じるには、`Link` の [`onNavigate`](/docs/app/api-reference/components/link#onnavigate) コールバックを使うこともできます。
+
+### ダイアログと初期化ロジック
+
+Activity はダイアログの開閉状態を保持します。これは、その状態に基づいて実行される Effect にも影響します。
+
+**維持すべきとき:** ユーザーが作業中だったマルチステップウィザードや設定パネルなど。ステップや入力状態を保持することで、進捗が失われるのを防ぎます。
+
+**リセットすべきとき:** 開くたびに（入力へのフォーカスなどの）初期化ロジックを実行するダイアログ。ユーザーがダイアログを開いたまま別の場所へ遷移した場合、Activity は `isDialogOpen: true` を保持します。ユーザーが再度開こうとしても、すでに `true` であるのに `true` をセットすることになり、状態が変化しないため Effect が再実行されません。
+
+次の例を考えてみましょう:
+
+```tsx
+'use client'
+
+import { useState, useRef, useEffect } from 'react'
+
+function ProductTab() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isDialogOpen) {
+      inputRef.current?.focus()
+    }
+  }, [isDialogOpen])
+
+  // ...
+}
+```
+
+ユーザーがダイアログを開いたまま別のページへ移動した場合、戻ってきて再度ダイアログを開いても、`isDialogOpen` がすでに `true` であるためフォーカス用の Effect はトリガーされません。
+
+これを解決するには、ダイアログの状態を、検索パラメータのような、保存されているコンポーネントの状態の外側にあるものから導出します:
+
+```tsx highlight={3,7-9,20,25}
+'use client'
+
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useRef } from 'react'
+
+function ProductTab() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const isDialogOpen = searchParams.get('edit') === 'true'
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isDialogOpen) {
+      inputRef.current?.focus()
+    }
+  }, [isDialogOpen])
+
+  return (
+    <div>
+      <button onClick={() => router.push('?edit=true')}>Edit Product</button>
+
+      {isDialogOpen && (
+        <dialog open>
+          <input ref={inputRef} placeholder="Product name" />
+          <button onClick={() => router.replace('?', { scroll: false })}>
+            Close
+          </button>
+        </dialog>
+      )}
+    </div>
+  )
+}
+```
+
+このアプローチでは、`isDialogOpen` はコンポーネントの state ではなく URL から導出されます。別のページに遷移して戻ってきたとき、検索パラメーターはクリアされるため（URL が変化するため）、その結果 `isDialogOpen` は `false` になります。ダイアログを開くとパラメーターが設定され、それによって `isDialogOpen` が変化し、Effect フックがトリガーされます。
+
+### フォーム入力値
+
+Activity はフォームの入力値を保持します。フィールドに入力されたテキスト、選択されたオプション、チェックボックスの状態などです。
+
+**保持すべきとき:** フィルター付きの検索ページ、ユーザーが作成途中の下書き、保存されていない変更がある設定フォームなど。入力状態を保持することは Activity による最大の UX 上の利点の 1 つであり、ユーザーが作業内容を失わずに済みます。
+
+**リセットすべきとき:** 戻ってきたときに新しい状態から始めたい「create new item」ページや、送信に成功したあとのお問い合わせフォームなど。
+
+Activity がコンポーネントを非表示にするときにフォームフィールドをリセットするには、コールバック ref を使用します:
+
+```tsx
+<form
+  ref={(form) => {
+    // クリーンアップ関数 - ActivityがこのコンポーネントをHideするときに実行される
+    return () => form?.reset()
+  }}
+>
+  {/* フィールド */}
+</form>
+```
+
+これは、ユーザーが別のページに遷移するたびにフォームをリセットします。その他のパターンについては、Activity ガイドの[状態のリセット](/docs/app/guides/activity#resetting-state)を参照してください。ここでは、React の state に対するキーを使ったリセットなども紹介しています。
+
+### アクションの state（`useActionState`）
+
+Activity は、[`useActionState`](https://react.dev/reference/react/useActionState) の結果――成功メッセージ、エラーメッセージ、アクションから返されるその他の state――を保持します。
+
+**保持したほうがよい場合:** 「チケットが正常に引き換えられました」と表示するチケット引き換えフォームや、「変更を保存しました」と表示する設定フォームなど。ページに戻ってきたときに前回のアクションの結果が見えると、ユーザーは何が起きたのかを確認できるため有用です。
+
+**リセットしたほうがよい場合:** ページを開くたびに常に初期状態から始めるべき「新規トランザクション」フローや、新しいコンテキストで古い成功/エラーメッセージが残っていると混乱を招くようなフォームなど。
+
+`useActionState` は、副作用を許容する `useReducer` と考えることができます。フォーム送信だけを扱う必要はなく、任意のアクションを dispatch できます。`RESET` アクションを追加することで、Activity がコンポーネントを非表示にするときに state をクリアする、わかりやすい方法が得られます（React ドキュメントの [Reset state](https://react.dev/reference/react/useActionState#reset-state) を参照してください）:
+
+```tsx highlight={5-6,9-21,26-35}
+'use client'
+
+import { useActionState, useLayoutEffect, useRef, startTransition } from 'react'
+
+type Action = { type: 'SUBMIT'; data: FormData } | { type: 'RESET' }
+type State = { success: boolean; error: string | null }
+
+function CommentForm() {
+  const [state, dispatch, isPending] = useActionState(
+    async (prev: State, action: Action) => {
+      if (action.type === 'RESET') {
+        return { success: false, error: null }
+      }
+      // フォームの送信を処理する
+      const res = await saveComment(action.data)
+      if (!res.ok) return { success: false, error: res.message }
+      shouldReset.current = true
+      return { success: true, error: null }
+    },
+    { success: false, error: null }
+  )
+
+  const shouldReset = useRef(false)
+
+  // ActivityがこのコンポーネントをhideするときにRESETをdispatchする
+  useLayoutEffect(() => {
+    return () => {
+      if (shouldReset.current) {
+        shouldReset.current = false
+        startTransition(() => {
+          dispatch({ type: 'RESET' })
+        })
+      }
+    }
+  }, [dispatch])
+
+  return (
+    <form action={(formData) => dispatch({ type: 'SUBMIT', data: formData })}>
+      <textarea name="comment" />
+      <button type="submit" disabled={isPending}>
+        {isPending ? '投稿中...' : 'コメントを投稿'}
+      </button>
+      {state.success && <p>コメントを投稿しました！</p>}
+      {state.error && <p>{state.error}</p>}
+    </form>
+  )
+}
+```
+
+ステップごとの流れは次のとおりです。
+
+1. ユーザーがフォームを送信します。reducer は `FormData` を伴う `SUBMIT` アクションを受け取り、`saveComment` を呼び出して `{ success: true }` を返します。同時に、リセットが必要であることを示すために `shouldReset.current = true` をセットします。
+2. ユーザーが別のページに移動します。Activity によってコンポーネントが非表示になり、`useLayoutEffect` のクリーンアップが実行されます。`shouldReset.current` が `true` なので、`RESET` アクションが dispatch されます。
+3. reducer は `RESET` を受け取り、初期状態（`{ success: false, error: null }`）を返します。古い成功メッセージがクリアされます。
+4. ユーザーが元のページに戻ってきた場合、フォームは新しい送信を受け付ける準備ができています。もし一度も送信していなければ（ステップ 1 が起きていなければ）、`shouldReset.current` は依然として `false` のままなので、`RESET` は dispatch されません。フォームの状態はそのままです。
+
+## 状態と認証
+
+ナビゲーションをまたいでもローカルなコンポーネントの state（`useState`、DOM の入力値）は保持され、認証状態が変化しても維持されます。これは標準的な React の挙動です。すなわち、props が変化すると（新しいユーザーを受け取るなどして）再レンダーは発生しますが、既存の state はリセットされません。あるユーザーが作成中の下書きが、別のユーザーから見えてはなりません。
+
+ログアウトフローでは、`router.push` の代わりに `window.location.href` を使用すると、ページ全体のリロードが発生し、クライアントサイドの state がすべてクリアされます。
+
+ログインユーザーが切り替わった際に、ページ全体をリロードせずに特定の state だけをリセットするには、次のようにします。
+
+```tsx
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+
+function UserScopedForm({ userId }: { userId: string | null }) {
+  const [draft, setDraft] = useState('')
+  const lastUserIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (lastUserIdRef.current !== null && lastUserIdRef.current !== userId) {
+      setDraft('') // ユーザー変更時にリセット
+    }
+    lastUserIdRef.current = userId
+  }, [userId])
+
+  return <textarea value={draft} onChange={(e) => setDraft(e.target.value)} />
+}
+```
+
+別の方法として、コンポーネントにユーザー ID を `key` として指定し、リセット処理を React に任せることもできます: `<Form key={userId} />`。他のパターンについては、[状態のリセット](/docs/app/guides/activity#resetting-state) を参照してください。
+
+## グローバルスタイル
+
+ページレベルのスタイル（CSS 変数、z-index、グローバルクラスなど）は、Activity によって元のコンポーネントが非表示になっている場合でも、実際に表示されているページに影響を与える可能性があります。非表示になっている間は、それらを無効化したくなることが多いでしょう。非表示ページのアクセントカラーや z-index の上書きが、表示中のページに影響してしまうべきではありません。
+
+コールバック ref を使って、スタイルシートの `media` 属性を切り替えます:
+
+```tsx
+<style
+  ref={(style) => {
+    if (style) style.media = '' // 表示時に有効化
+    return () => {
+      if (style) style.media = 'not all' // 非表示時に無効化
+    }
+  }}
+>
+  {`:root { --page-accent: blue; }`}
+</style>
+```
+
+または、複数のスタイル要素を扱う場合や、クリーンアップ処理がより複雑になる場合は、`useLayoutEffect` を使用してください：
+
+```tsx
+'use client'
+
+import { useLayoutEffect, useRef } from 'react'
+
+function PageWithStyles() {
+  const styleRef = useRef<HTMLStyleElement>(null)
+
+  useLayoutEffect(() => {
+    if (styleRef.current) styleRef.current.media = ''
+    return () => {
+      if (styleRef.current) styleRef.current.media = 'not all'
+    }
+  }, [])
+
+  return <style ref={styleRef}>{`:root { --page-accent: blue; }`}</style>
+}
+```
+
+Activity がコンポーネントを非表示にすると、クリーンアップ処理で `media="not all"` が設定され、スタイルシートが無効になります。再び表示されると、エフェクトが再実行され、`media` が元に戻されてスタイルシートが再び有効になります。

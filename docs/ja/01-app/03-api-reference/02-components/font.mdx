@@ -1,0 +1,1062 @@
+---
+title: フォントモジュール
+nav_title: フォント
+description: 組み込みの `next/font` ローダーを使用した Web フォント読み込みの最適化。
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共有されています。Pages Router 専用のコンテンツを追加するには `<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されるコンテンツはコンポーネントで囲まないでください。 */}
+
+[`next/font`](/docs/app/api-reference/components/font) はフォント（カスタムフォントを含む）を自動的に最適化し、外部へのネットワークリクエストを不要にしてプライバシーとパフォーマンスを向上させます。
+
+あらゆるフォントファイル向けの **自動ビルトインセルフホスティング** 機能が含まれています。つまり、[layout shift（レイアウトシフト）](https://web.dev/articles/cls) を発生させることなく、Web フォントを最適な形で読み込むことができます。
+
+また、すべての [Google Fonts](https://fonts.google.com/) を手軽に利用できます。CSS とフォントファイルはビルド時にダウンロードされ、他の静的アセットとともにセルフホストされます。**ブラウザから Google へのリクエストは一切送信されません。**
+
+<AppOnly>
+  ```tsx filename="app/layout.tsx" switcher
+  import { Inter } from 'next/font/google'
+
+// 可変フォントを読み込む場合、font-weight を指定する必要はありません
+const inter = Inter({
+subsets: ['latin'],
+display: 'swap',
+})
+
+export default function RootLayout({
+children,
+}: {
+children: React.ReactNode
+}) {
+return (
+<html lang="en" className={inter.className}>
+<body>{children}</body>
+</html>
+)
+}
+
+````
+
+```jsx filename="app/layout.js" switcher
+import { Inter } from 'next/font/google'
+
+// 可変フォントを読み込む場合、font-weight を指定する必要はありません
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+````
+
+</AppOnly>
+
+<PagesOnly>
+  すべてのページでフォントを利用するには、次のように `/pages` 配下の [`_app.js` ファイル](/docs/pages/building-your-application/routing/custom-app) に追加します：
+
+```jsx filename="pages/_app.js"
+import { Inter } from 'next/font/google'
+
+// 可変フォントを読み込む場合、font-weight を指定する必要はありません
+const inter = Inter({ subsets: ['latin'] })
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <main className={inter.className}>
+      <Component {...pageProps} />
+    </main>
+  )
+}
+```
+
+</PagesOnly>
+
+> **🎥 動画で学ぶ:** `next/font` の使い方についてさらに学ぶ → [YouTube（6 分）](https://www.youtube.com/watch?v=L8_98i_bMMA)。
+
+## リファレンス
+
+| Key                                         | `font/google`       | `font/local`        | 型                             | 必須      |
+| ------------------------------------------- | ------------------- | ------------------- | ------------------------------ | --------- |
+| [`src`](#src)                               | <Cross size={18} /> | <Check size={18} /> | 文字列またはオブジェクトの配列 | 必須      |
+| [`weight`](#weight)                         | <Check size={18} /> | <Check size={18} /> | 文字列または配列               | 必須/任意 |
+| [`style`](#style)                           | <Check size={18} /> | <Check size={18} /> | 文字列または配列               | -         |
+| [`subsets`](#subsets)                       | <Check size={18} /> | <Cross size={18} /> | 文字列の配列                   | -         |
+| [`axes`](#axes)                             | <Check size={18} /> | <Cross size={18} /> | 文字列の配列                   | -         |
+| [`display`](#display)                       | <Check size={18} /> | <Check size={18} /> | 文字列                         | -         |
+| [`preload`](#preload)                       | <Check size={18} /> | <Check size={18} /> | ブール値                       | -         |
+| [`fallback`](#fallback)                     | <Check size={18} /> | <Check size={18} /> | 文字列の配列                   | -         |
+| [`adjustFontFallback`](#adjustfontfallback) | <Check size={18} /> | <Check size={18} /> | ブール値または文字列           | -         |
+| [`variable`](#variable)                     | <Check size={18} /> | <Check size={18} /> | 文字列                         | -         |
+| [`declarations`](#declarations)             | <Cross size={18} /> | <Check size={18} /> | オブジェクトの配列             | -         |
+
+### `src`
+
+フォントファイルへのパスを、文字列またはオブジェクトの配列（型は `Array<{path: string, weight?: string, style?: string}>`）として指定します。パスは、フォントローダー関数が呼び出されるディレクトリからの相対パスです。
+
+`next/font/local` で使用されます。
+
+- 必須
+
+例:
+
+- `src:'./fonts/my-font.woff2'` の場合、`my-font.woff2` は `app` ディレクトリ内の `fonts` ディレクトリに配置されます
+- `src:[{path: './inter/Inter-Thin.ttf', weight: '100',},{path: './inter/Inter-Regular.ttf',weight: '400',},{path: './inter/Inter-Bold-Italic.ttf', weight: '700',style: 'italic',},]`
+- フォントローダー関数が `app/page.tsx` 内で `src:'../styles/fonts/my-font.ttf'` を使って呼び出される場合、`my-font.ttf` はプロジェクトルートの `styles/fonts` ディレクトリに配置されます
+
+### `weight`
+
+次のような指定が可能なフォントの[`weight`](https://fonts.google.com/knowledge/glossary/weight):
+
+- 特定フォントで利用可能なウェイト値のいずれか、または[可変](https://fonts.google.com/variablefonts)フォントの場合は値の範囲を表す文字列
+- フォントが[variable google font](https://fonts.google.com/variablefonts)でない場合のウェイト値の配列。`next/font/google` にのみ適用されます。
+
+`next/font/google` と `next/font/local` で使用されます
+
+- 使用するフォントが[可変](https://fonts.google.com/variablefonts)フォント **ではない** 場合は必須
+
+例:
+
+- `weight: '400'`: 単一のウェイト値を表す文字列。フォント[`Inter`](https://fonts.google.com/specimen/Inter?query=inter)の場合、指定可能な値は `'100'`, `'200'`, `'300'`, `'400'`, `'500'`, `'600'`, `'700'`, `'800'`, `'900'`、または `'variable'`（このフォントでのデフォルト値）です
+- `weight: '100 900'`: 可変フォントに対して、`100` から `900` までの範囲を表す文字列
+- `weight: ['100','400','900']`: 非可変フォントに対して、3つの候補値を持つ配列
+
+### `style`
+
+フォントの[`style`](https://developer.mozilla.org/docs/Web/CSS/font-style) プロパティ。指定可能な内容は次のとおりです:
+
+- 文字列の [value](https://developer.mozilla.org/docs/Web/CSS/font-style#values)。デフォルト値は `'normal'`
+- フォントが [variable Google Fonts](https://fonts.google.com/variablefonts) でない場合に指定する、style 値の配列。`next/font/google` でのみ有効です。
+
+`next/font/google` と `next/font/local` で使用されます
+
+- 省略可能
+
+例:
+
+- `style: 'italic'`: 文字列 - `next/font/google` では `normal` または `italic` を指定できます
+- `style: 'oblique'`: 文字列 - `next/font/local` では任意の値を指定できますが、[standard font styles](https://developer.mozilla.org/docs/Web/CSS/font-style) に基づくことが想定されています
+- `style: ['italic','normal']`: `next/font/google` 用の 2 要素の配列 - 値は `normal` と `italic` のいずれかです
+
+### `subsets`
+
+[`subsets`](https://fonts.google.com/knowledge/glossary/subsetting) は、[プリロード](/docs/app/api-reference/components/font#specifying-a-subset)したい各サブセット名を文字列の配列で指定します。`subsets` で指定されたフォントは、[`preload`](#preload) オプションが true（デフォルト）の場合、`head` に link の preload タグが挿入されます。
+
+`next/font/google` で使用されます。
+
+- 省略可
+
+例:
+
+- `subsets: ['latin']`: `latin` サブセットを含む配列
+
+使用可能なすべてのサブセット一覧は、対象フォントの Google Fonts ページで確認できます。
+
+### `axes`
+
+一部のバリアブルフォントには、追加で指定できる `axes` があります。デフォルトでは、ファイルサイズを抑えるためにフォントのウェイトのみが含まれます。指定可能な `axes` の値は、フォントごとに異なります。
+
+`next/font/google` で使用されます
+
+- 省略可能
+
+例:
+
+- `axes: ['slnt']`: `Inter` バリアブルフォントの `slnt` を追加の `axes` として指定した配列です。`Inter` フォントが `slnt` を追加の `axes` として持っていることは[こちら](https://fonts.google.com/variablefonts?vfquery=inter#font-families)で確認できます。使用するフォントで利用可能な `axes` の値は、[Google variable fonts ページ](https://fonts.google.com/variablefonts#font-families)でフィルタを使い、`wght` 以外の axes を確認することで調べられます。
+
+### `display`
+
+フォントの [`display`](https://developer.mozilla.org/docs/Web/CSS/@font-face/font-display) 設定。文字列の[値](https://developer.mozilla.org/docs/Web/CSS/@font-face/font-display#values)として `'auto'`、`'block'`、`'swap'`、`'fallback'`、`'optional'` を指定でき、デフォルト値は `'swap'` です。
+
+`next/font/google` と `next/font/local` で使用されます
+
+- 任意
+
+例:
+
+- `display: 'optional'`: 値として `optional` を指定した文字列
+
+### `preload`
+
+フォントを[事前読み込み](/docs/app/api-reference/components/font#preloading)するかどうかを指定するブール値です。デフォルト値は `true` です。
+
+`next/font/google` と `next/font/local` で使用されます。
+
+- 省略可能
+
+例:
+
+- `preload: false`
+
+### `fallback`
+
+フォントを読み込めなかった場合に使用するフォールバックフォント。デフォルトはなく、フォールバックフォント名の文字列配列で指定します。
+
+- オプション
+
+`next/font/google` と `next/font/local` で使用されます。
+
+例:
+
+- `fallback: ['system-ui', 'arial']`: フォールバックフォントとして `system-ui` または `arial` を指定する配列
+
+### `adjustFontFallback`
+
+- `next/font/google` の場合: 自動フォールバックフォントを使用して [Cumulative Layout Shift](https://web.dev/cls/) を軽減するかどうかを設定するブール値です。デフォルトは `true` です。
+- `next/font/local` の場合: 自動フォールバックフォントを使用して [Cumulative Layout Shift](https://web.dev/cls/) を軽減するかどうかを設定するための、文字列またはブール値 `false` です。指定可能な値は `'Arial'`、`'Times New Roman'`、または `false` です。デフォルトは `'Arial'` です。
+
+`next/font/google` と `next/font/local` で使用されます。
+
+- オプションです。
+
+例:
+
+- `adjustFontFallback: false`: `next/font/google` 用
+- `adjustFontFallback: 'Times New Roman'`: `next/font/local` 用
+
+### `variable`
+
+スタイルが[CSS variable method](#css-variables)で適用される場合に使用される、CSS変数名を指定する文字列。
+
+`next/font/google` と `next/font/local` で使用されます。
+
+- 任意
+
+例:
+
+- `variable: '--my-font'`: CSS変数 `--my-font` が宣言されます
+
+### `declarations`
+
+生成される `@font-face` をさらに定義するための、フォントフェイス[ディスクリプター](https://developer.mozilla.org/docs/Web/CSS/@font-face#descriptors)のキーと値のペアからなる配列。
+
+`next/font/local` で使用されます
+
+- 省略可能
+
+例:
+
+- `declarations: [{ prop: 'ascent-override', value: '90%' }]`
+
+## 例
+
+## Google Fonts
+
+Google Fonts を使用するには、`next/font/google` から関数としてインポートします。パフォーマンスと柔軟性を最大限に高めるため、[variable fonts](https://fonts.google.com/variablefonts)（可変フォント）の使用を推奨します。
+
+<AppOnly>
+  ```tsx filename="app/layout.tsx" switcher
+  import { Inter } from 'next/font/google'
+
+// 可変フォントを読み込む場合、フォントウェイトを指定する必要はありません
+const inter = Inter({
+subsets: ['latin'],
+display: 'swap',
+})
+
+export default function RootLayout({
+children,
+}: {
+children: React.ReactNode
+}) {
+return (
+<html lang="en" className={inter.className}>
+<body>{children}</body>
+</html>
+)
+}
+
+````
+
+```jsx filename="app/layout.js" switcher
+import { Inter } from 'next/font/google'
+
+// 可変フォントを読み込む場合、フォントウェイトを指定する必要はありません
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+````
+
+可変フォントを使用できない場合は、**ウェイトを指定する必要があります**：
+
+```tsx filename="app/layout.tsx" switcher
+import { Roboto } from 'next/font/google'
+
+const roboto = Roboto({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en" className={roboto.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { Roboto } from 'next/font/google'
+
+const roboto = Roboto({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={roboto.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+  すべてのページでフォントを使用するには、次のように `/pages` 配下の [`_app.js` ファイル](/docs/pages/building-your-application/routing/custom-app) に追加します：
+
+```jsx filename="pages/_app.js"
+import { Inter } from 'next/font/google'
+
+// 可変フォントを読み込む場合、フォントウェイトを指定する必要はありません
+const inter = Inter({ subsets: ['latin'] })
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <main className={inter.className}>
+      <Component {...pageProps} />
+    </main>
+  )
+}
+```
+
+可変フォントを使用できない場合は、**ウェイトを指定する必要があります**：
+
+```jsx filename="pages/_app.js"
+import { Roboto } from 'next/font/google'
+
+const roboto = Roboto({
+  weight: '400',
+  subsets: ['latin'],
+})
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <main className={roboto.className}>
+      <Component {...pageProps} />
+    </main>
+  )
+}
+```
+
+</PagesOnly>
+
+複数のウェイトやスタイルを指定したい場合は、配列を使用できます：
+
+```jsx filename="app/layout.js"
+const roboto = Roboto({
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+  display: 'swap',
+})
+```
+
+> **補足**: 複数の単語からなるフォント名にはアンダースコア（\_）を使用してください。例: `Roboto Mono` は `Roboto_Mono` としてインポートする必要があります。
+
+<PagesOnly>
+  ### `<head>` でフォントを適用する
+
+ラッパーや `className` を使わずに、次のように `<head>` 内へ挿入してフォントを使用することもできます:
+
+```jsx filename="pages/_app.js"
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <>
+      <style jsx global>{`
+        html {
+          font-family: ${inter.style.fontFamily};
+        }
+      `}</style>
+      <Component {...pageProps} />
+    </>
+  )
+}
+```
+
+### 単一ページでの使用
+
+フォントを単一のページで使用するには、次のようにそのページに追加します:
+
+```jsx filename="pages/index.js"
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export default function Home() {
+  return (
+    <div className={inter.className}>
+      <p>Hello World</p>
+    </div>
+  )
+}
+```
+
+</PagesOnly>
+
+### サブセットの指定
+
+Google Fonts は自動的に[サブセット化](https://fonts.google.com/knowledge/glossary/subsetting)されます。これによりフォントファイルのサイズが小さくなり、パフォーマンスが向上します。プリロードしたいサブセットを定義する必要があります。[`preload`](/docs/app/api-reference/components/font#preload) が `true` のときに、どのサブセットも指定しないと警告が発生します。
+
+これは関数呼び出しの引数にサブセットを指定することで行えます:
+
+<AppOnly>
+
+```tsx filename="app/layout.tsx" switcher
+const inter = Inter({ subsets: ['latin'] })
+```
+
+```jsx filename="app/layout.js" switcher
+const inter = Inter({ subsets: ['latin'] })
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```jsx filename="pages/_app.js"
+const inter = Inter({ subsets: ['latin'] })
+```
+
+</PagesOnly>
+
+詳しくは [Font API Reference](/docs/app/api-reference/components/font) を参照してください。
+
+## 複数フォントの使用
+
+アプリケーションで複数のフォントをインポートして使用できます。これには 2 つの方法があります。
+
+1 つ目の方法は、フォントをエクスポートするユーティリティ関数を作成し、そのフォントをインポートして、必要な箇所でその `className` を適用するやり方です。これにより、フォントは実際にレンダリングされるときにのみプリロードされることが保証されます。
+
+```ts filename="app/fonts.ts" switcher
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+export const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export const roboto_mono = Roboto_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+})
+```
+
+```js filename="app/fonts.js" switcher
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+export const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export const roboto_mono = Roboto_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+})
+```
+
+<AppOnly>
+  ```tsx filename="app/layout.tsx" switcher
+  import { inter } from './fonts'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+return (
+<html lang="en" className={inter.className}>
+<body>
+<div>{children}</div>
+</body>
+</html>
+)
+}
+
+````
+
+```jsx filename="app/layout.js" switcher
+import { inter } from './fonts'
+
+export default function Layout({ children }) {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>
+        <div>{children}</div>
+      </body>
+    </html>
+  )
+}
+````
+
+```tsx filename="app/page.tsx" switcher
+import { roboto_mono } from './fonts'
+
+export default function Page() {
+  return (
+    <>
+      <h1 className={roboto_mono.className}>My page</h1>
+    </>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { roboto_mono } from './fonts'
+
+export default function Page() {
+  return (
+    <>
+      <h1 className={roboto_mono.className}>My page</h1>
+    </>
+  )
+}
+```
+
+</AppOnly>
+
+上記の例では、`Inter` はグローバルに適用され、`Roboto Mono` は必要に応じてインポートして適用できます。
+
+または、[CSS 変数](/docs/app/api-reference/components/font#variable) を作成し、好みの CSS ソリューションと組み合わせて使用することもできます:
+
+<AppOnly>
+  ```tsx filename="app/layout.tsx" switcher
+  import { Inter, Roboto_Mono } from 'next/font/google'
+  import styles from './global.css'
+
+const inter = Inter({
+subsets: ['latin'],
+variable: '--font-inter',
+display: 'swap',
+})
+
+const roboto_mono = Roboto_Mono({
+subsets: ['latin'],
+variable: '--font-roboto-mono',
+display: 'swap',
+})
+
+export default function RootLayout({
+children,
+}: {
+children: React.ReactNode
+}) {
+return (
+<html lang="en" className={`${inter.variable} ${roboto_mono.variable}`}>
+<body>
+<h1>My App</h1>
+<div>{children}</div>
+</body>
+</html>
+)
+}
+
+````
+
+```jsx filename="app/layout.js" switcher
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
+const roboto_mono = Roboto_Mono({
+  subsets: ['latin'],
+  variable: '--font-roboto-mono',
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={`${inter.variable} ${roboto_mono.variable}`}>
+      <body>
+        <h1>My App</h1>
+        <div>{children}</div>
+      </body>
+    </html>
+  )
+}
+````
+
+</AppOnly>
+
+```css filename="app/global.css"
+html {
+  font-family: var(--font-inter);
+}
+
+h1 {
+  font-family: var(--font-roboto-mono);
+}
+```
+
+上記の例では、`Inter` がグローバルに適用され、すべての `<h1>` タグには `Roboto Mono` がスタイルとして適用されます。
+
+> **推奨**: 新しいフォントはそれぞれクライアントがダウンロードする追加リソースになるため、複数のフォント使用は控えめにしてください。
+
+### ローカルフォント
+
+`next/font/local` をインポートし、ローカルフォントファイルの `src` を指定します。パフォーマンスと柔軟性を最大化するために、[variable fonts](https://fonts.google.com/variablefonts) の使用を推奨します。
+
+<AppOnly>
+  ```tsx filename="app/layout.tsx" switcher
+  import localFont from 'next/font/local'
+
+// フォントファイルは `app` ディレクトリ内に配置できます
+const myFont = localFont({
+src: './my-font.woff2',
+display: 'swap',
+})
+
+export default function RootLayout({
+children,
+}: {
+children: React.ReactNode
+}) {
+return (
+<html lang="en" className={myFont.className}>
+<body>{children}</body>
+</html>
+)
+}
+
+````
+
+```jsx filename="app/layout.js" switcher
+import localFont from 'next/font/local'
+
+// フォントファイルは `app` ディレクトリ内に配置できます
+const myFont = localFont({
+  src: './my-font.woff2',
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={myFont.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+````
+
+</AppOnly>
+
+<PagesOnly>
+  ```jsx filename="pages/_app.js"
+  import localFont from 'next/font/local'
+
+// フォントファイルは `pages` ディレクトリ内に配置できます
+const myFont = localFont({ src: './my-font.woff2' })
+
+export default function MyApp({ Component, pageProps }) {
+return (
+<main className={myFont.className}>
+<Component {...pageProps} />
+</main>
+)
+}
+
+````
+</PagesOnly>
+
+1つのフォントファミリーに複数のファイルを使用したい場合、`src` は配列を指定できます:
+
+```js
+const roboto = localFont({
+src: [
+  {
+    path: './Roboto-Regular.woff2',
+    weight: '400',
+    style: 'normal',
+  },
+  {
+    path: './Roboto-Italic.woff2',
+    weight: '400',
+    style: 'italic',
+  },
+  {
+    path: './Roboto-Bold.woff2',
+    weight: '700',
+    style: 'normal',
+  },
+  {
+    path: './Roboto-BoldItalic.woff2',
+    weight: '700',
+    style: 'italic',
+  },
+],
+})
+````
+
+詳細については [Font API Reference](/docs/app/api-reference/components/font) を参照してください。
+
+### Tailwind CSS を使用する場合
+
+`next/font` は、[CSS variables](/docs/app/api-reference/components/font#css-variables) を用いて [Tailwind CSS](https://tailwindcss.com/) とシームレスに連携します。
+
+次の例では、`next/font/google` から `Inter` と `Roboto_Mono` フォントを使用しています（任意の Google Font や Local Font を使用できます）。`variable` オプションを使って CSS 変数名を定義します。このフォントの場合は、それぞれ `inter` と `roboto_mono` などの名前を指定します。次に、`inter.variable` と `roboto_mono.variable` を適用して、HTML ドキュメントに CSS 変数を含めます。
+
+> **補足**: 好みやスタイリング、プロジェクト要件に応じて、これらの変数を `<html>` もしくは `<body>` タグに追加できます。
+
+<AppOnly>
+  ```tsx filename="app/layout.tsx" switcher
+  import { Inter, Roboto_Mono } from 'next/font/google'
+
+const inter = Inter({
+subsets: ['latin'],
+display: 'swap',
+variable: '--font-inter',
+})
+
+const roboto_mono = Roboto_Mono({
+subsets: ['latin'],
+display: 'swap',
+variable: '--font-roboto-mono',
+})
+
+export default function RootLayout({
+children,
+}: {
+children: React.ReactNode
+}) {
+return (
+<html
+lang="en"
+className={`${inter.variable} ${roboto_mono.variable} antialiased`} >
+<body>{children}</body>
+</html>
+)
+}
+
+````
+
+```jsx filename="app/layout.js" switcher
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
+const roboto_mono = Roboto_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-roboto-mono',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html
+      lang="en"
+      className={`${inter.variable} ${roboto_mono.variable} antialiased`}
+    >
+      <body>{children}</body>
+    </html>
+  )
+}
+````
+
+</AppOnly>
+
+<PagesOnly>
+  ```jsx filename="pages/_app.js"
+  import { Inter } from 'next/font/google'
+
+const inter = Inter({
+subsets: ['latin'],
+variable: '--font-inter',
+})
+
+const roboto_mono = Roboto_Mono({
+subsets: ['latin'],
+display: 'swap',
+variable: '--font-roboto-mono',
+})
+
+export default function MyApp({ Component, pageProps }) {
+return (
+<main className={`${inter.variable} ${roboto_mono.variable} font-sans`}>
+<Component {...pageProps} />
+</main>
+)
+}
+
+````
+</PagesOnly>
+
+最後に、CSS 変数を [Tailwind CSS config](/docs/app/getting-started/css#tailwind-css) に追加します。
+
+```css filename="global.css"
+@import 'tailwindcss';
+
+@theme inline {
+--font-sans: var(--font-inter);
+--font-mono: var(--font-roboto-mono);
+}
+````
+
+### Tailwind CSS v3
+
+```js filename="tailwind.config.js"
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
+    './app/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        mono: ['var(--font-roboto-mono)'],
+      },
+    },
+  },
+  plugins: [],
+}
+```
+
+これで、`font-sans` および `font-mono` のユーティリティクラスを使用して、要素にフォントを適用できるようになります。
+
+```html
+<p class="font-sans ...">The quick brown fox ...</p>
+<p class="font-mono ...">The quick brown fox ...</p>
+```
+
+### スタイルの適用
+
+フォントスタイルは次の 3 つの方法で適用できます：
+
+- [`className`](#classname)
+- [`style`](#style-1)
+- [CSS Variables](#css-variables)
+
+#### `className`
+
+読み込まれたフォント用に、HTML 要素に指定できる読み取り専用の CSS の `className` を返します。
+
+```tsx
+<p className={inter.className}>Hello, Next.js!</p>
+```
+
+#### `style`
+
+読み込まれたフォント用の、読み取り専用の CSS `style` オブジェクトを返します。これは HTML 要素に渡すためのもので、フォントファミリー名やフォールバックフォントにアクセスするための `style.fontFamily` などを含みます。
+
+```tsx
+<p style={inter.style}>Hello World</p>
+```
+
+#### CSS Variables
+
+スタイルを外部スタイルシートで設定し、そこで追加オプションも指定したい場合は、CSS 変数を使う方法を使用します。
+
+フォントをインポートするだけでなく、CSS 変数が定義されている CSS ファイルもインポートし、次のようにフォントローダーオブジェクトの `variable` オプションを設定します。
+
+```tsx filename="app/page.tsx" switcher
+import { Inter } from 'next/font/google'
+import styles from '../styles/component.module.css'
+
+const inter = Inter({
+  variable: '--font-inter',
+})
+```
+
+```jsx filename="app/page.js" switcher
+import { Inter } from 'next/font/google'
+import styles from '../styles/component.module.css'
+
+const inter = Inter({
+  variable: '--font-inter',
+})
+```
+
+フォントを使用するには、スタイルを適用したいテキストを囲む親コンテナの `className` をフォントローダーの `variable` の値に設定し、そのテキストの `className` を外部 CSS ファイルの `styles` プロパティの値に設定します。
+
+```tsx filename="app/page.tsx" switcher
+<main className={inter.variable}>
+  <p className={styles.text}>Hello World</p>
+</main>
+```
+
+```jsx filename="app/page.js" switcher
+<main className={inter.variable}>
+  <p className={styles.text}>Hello World</p>
+</main>
+```
+
+`component.module.css` ファイルで `text` クラスセレクターを次のように定義します：
+
+```css filename="styles/component.module.css"
+.text {
+  font-family: var(--font-inter);
+  font-weight: 200;
+  font-style: italic;
+}
+```
+
+上記の例では、`Hello World` というテキストは、`Inter` フォントと生成されたフォールバックフォントを使用し、`font-weight: 200` と `font-style: italic` を指定してスタイリングされています。
+
+### フォント定義ファイルを使用する
+
+`localFont` や Google フォントの関数を呼び出すたびに、そのフォントはアプリケーション内で 1 つのインスタンスとしてホストされます。したがって、同じフォントを複数の場所で使用する必要がある場合は、1 か所で読み込み、必要な場所でそのフォントオブジェクトをインポートするようにします。これはフォント定義ファイルを使用して行います。
+
+たとえば、アプリディレクトリのルートにある `styles` フォルダ内に `fonts.ts` ファイルを作成します。
+
+次に、次のようにフォント定義を指定します。
+
+```ts filename="styles/fonts.ts" switcher
+import { Inter, Lora, Source_Sans_3 } from 'next/font/google'
+import localFont from 'next/font/local'
+
+// 可変フォントを定義する
+const inter = Inter()
+const lora = Lora()
+// 非可変フォントの2つのウェイトを定義する
+const sourceCodePro400 = Source_Sans_3({ weight: '400' })
+const sourceCodePro700 = Source_Sans_3({ weight: '700' })
+// GreatVibes-Regular.ttf が styles フォルダに保存されているカスタムローカルフォントを定義する
+const greatVibes = localFont({ src: './GreatVibes-Regular.ttf' })
+
+export { inter, lora, sourceCodePro400, sourceCodePro700, greatVibes }
+```
+
+```js filename="styles/fonts.js" switcher
+import { Inter, Lora, Source_Sans_3 } from 'next/font/google'
+import localFont from 'next/font/local'
+
+// 可変フォントを定義する
+const inter = Inter()
+const lora = Lora()
+// 非可変フォントの2つのウェイトを定義する
+const sourceCodePro400 = Source_Sans_3({ weight: '400' })
+const sourceCodePro700 = Source_Sans_3({ weight: '700' })
+// GreatVibes-Regular.ttf が styles フォルダに保存されているカスタムローカルフォントを定義する
+const greatVibes = localFont({ src: './GreatVibes-Regular.ttf' })
+
+export { inter, lora, sourceCodePro400, sourceCodePro700, greatVibes }
+```
+
+これらの定義は、コード内で次のように使用できます。
+
+```tsx filename="app/page.tsx" switcher
+import { inter, lora, sourceCodePro700, greatVibes } from '../styles/fonts'
+
+export default function Page() {
+  return (
+    <div>
+      <p className={inter.className}>Hello world using Inter font</p>
+      <p style={lora.style}>Hello world using Lora font</p>
+      <p className={sourceCodePro700.className}>
+        Hello world using Source_Sans_3 font with weight 700
+      </p>
+      <p className={greatVibes.className}>My title in Great Vibes font</p>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { inter, lora, sourceCodePro700, greatVibes } from '../styles/fonts'
+
+export default function Page() {
+  return (
+    <div>
+      <p className={inter.className}>Hello world using Inter font</p>
+      <p style={lora.style}>Hello world using Lora font</p>
+      <p className={sourceCodePro700.className}>
+        Hello world using Source_Sans_3 font with weight 700
+      </p>
+      <p className={greatVibes.className}>My title in Great Vibes font</p>
+    </div>
+  )
+}
+```
+
+コード内でフォント定義にアクセスしやすくするために、`tsconfig.json` または `jsconfig.json` ファイルで、次のようにパスエイリアスを定義できます。
+
+```json filename="tsconfig.json"
+{
+  "compilerOptions": {
+    "paths": {
+      "@/fonts": ["./styles/fonts"]
+    }
+  }
+}
+```
+
+次のように任意のフォント定義をインポートできます。
+
+```tsx filename="app/about/page.tsx" switcher
+import { greatVibes, sourceCodePro400 } from '@/fonts'
+```
+
+```jsx filename="app/about/page.js" switcher
+import { greatVibes, sourceCodePro400 } from '@/fonts'
+```
+
+### プリロード
+
+<AppOnly>
+
+サイトのページでフォント関数を呼び出しても、サイト全体で自動的に利用可能になり、すべてのルートでプリロードされるわけではありません。代わりに、そのフォントが使用されているファイルの種類に基づいて、関連するルートでのみプリロードされます。
+
+- [単一のページ](/docs/app/api-reference/file-conventions/page) の場合、そのページに対応する単一のルートでプリロードされます。
+- [layout](/docs/app/api-reference/file-conventions/layout) の場合、その layout でラップされているすべてのルートでプリロードされます。
+- [root layout](/docs/app/api-reference/file-conventions/layout#root-layout) の場合、すべてのルートでプリロードされます。
+
+</AppOnly>
+
+<PagesOnly>
+
+サイトのページでフォント関数を呼び出しても、サイト全体で自動的に利用可能になり、すべてのルートでプリロードされるわけではありません。代わりに、そのフォントが使用されているファイルの種類に基づいて、関連するルートでのみプリロードされます。
+
+- [単一のページ](/docs/pages/building-your-application/routing/pages-and-layouts) の場合、そのページに対応する単一のルートでプリロードされます。
+- [カスタム App](/docs/pages/building-your-application/routing/custom-app) 内にある場合、`/pages` 配下のサイト内すべてのルートでプリロードされます。
+
+</PagesOnly>
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                                               |
+| ---------- | -------------------------------------------------------------------------------------- |
+| `v13.2.0`  | `@next/font` が `next/font` に名称変更されました。インストール手順は不要になりました。 |
+| `v13.0.0`  | `@next/font` が追加されました。                                                        |

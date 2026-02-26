@@ -1,0 +1,226 @@
+---
+title: revalidatePath
+description: revalidatePath 関数の API リファレンス。
+---
+
+`revalidatePath` を使用すると、特定のパスに対して[キャッシュされたデータ](/docs/app/guides/caching)をオンデマンドで無効化できます。
+
+## 使用方法
+
+`revalidatePath` はサーバー関数および Route Handlers から呼び出すことができます。
+
+`revalidatePath` はクライアントコンポーネントや Proxy からは呼び出せません。サーバー環境でのみ動作するためです。
+
+> **補足**:
+>
+> - **サーバー関数**: （影響を受けるパスを閲覧している場合）UI を即座に更新します。現在は、以前に表示したすべてのページについても、再度遷移した際にリフレッシュされます。この挙動は一時的なものであり、将来的には特定のパスにのみ適用されるように更新される予定です。
+> - **Route Handlers**: パスに再検証のマークを付けます。再検証は、指定されたパスが次に訪問されたときに行われます。これは、動的ルートセグメントで `revalidatePath` を呼び出しても、多数の再検証が一度に即座にトリガーされることはないことを意味します。無効化が行われるのは、そのパスが次に訪問されたときだけです。
+
+## パラメータ
+
+```tsx
+revalidatePath(path: string, type?: 'page' | 'layout'): void;
+```
+
+- `path`: ルートのファイル構造を表す文字列です。`/product/123` のようなリテラルパス、または `/product/[slug]` のような動的セグメントを含むルートパターンを指定できます。`/page` や `/layout` を末尾に付けず、代わりに `type` パラメータを使用してください。1024 文字を超えてはいけません。この値は大文字・小文字を区別します。[`trailingSlash`](/docs/app/api-reference/config/next-config-js/trailingSlash) の設定に関わらず、末尾のスラッシュを付ける必要はありません。
+- `type`: （省略可）再検証するパスの種類を指定するための `'page'` または `'layout'` 文字列です。`path` が `/product/[slug]` のように動的セグメントを含む場合、このパラメータは必須です。`/product/1` のようなリテラルパスを `path` に指定する場合は、`type` を省略してください。
+
+[単一のページ](#revalidating-a-specific-path)を再検証したい場合は、リテラルパスを使用してください。[すべての一致するページ](#revalidating-a-page-path)を再検証したい場合は、ルートパターンと `type` を組み合わせて使用してください。
+
+## 戻り値
+
+`revalidatePath` は値を返しません。
+
+## 何を無効化できるか
+
+path パラメータは、ページ、レイアウト、またはルートハンドラーを指すことができます：
+
+- **Pages**: 特定のページを無効化します
+- **Layouts**: レイアウト（そのセグメントの `layout.tsx`）、それにネストされたすべてのレイアウト、およびそれらの下にあるすべてのページを無効化します
+- **Route Handlers**: ルートハンドラー内でアクセスされたデータキャッシュのエントリを無効化します。たとえば `revalidatePath("/api/data")` は、この GET ハンドラーを無効化します：
+
+```ts filename="app/api/data/route.ts"
+export async function GET() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    cache: 'force-cache',
+  })
+
+  return Response.json(await data.json())
+}
+```
+
+## `revalidatePath` と rewrites の併用
+
+[rewrites](/docs/app/api-reference/config/next-config-js/rewrites) を使用する場合、ブラウザーのアドレスバーに表示されるソースパスではなく、**destination** パス（実際のルートファイルが存在する場所）を渡す必要があります。
+
+たとえば、`/blog` から `/news` への rewrite がある場合:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/blog',
+        destination: '/news',
+      },
+    ]
+  },
+}
+```
+
+このページを再検証するには、`destination` のパスを使用します。
+
+```ts
+// 正しい: destination パスを使用する
+revalidatePath('/news')
+
+// 誤り: source パスはキャッシュエントリと一致しない
+revalidatePath('/blog')
+```
+
+これは、`revalidatePath` がユーザーに表示される URL ではなく、ルートのファイル構造を基準に動作するためです。キャッシュエントリは、どのルートファイルによってレンダーされるかに基づいてタグ付けされます。
+
+## `revalidateTag` および `updateTag` との関係
+
+`revalidatePath`、[`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)、[`updateTag`](/docs/app/api-reference/functions/updateTag) はそれぞれ異なる目的を持ちます:
+
+- **`revalidatePath`**: 特定のページまたはレイアウトのパスに対するキャッシュを無効化する
+- **`revalidateTag`**: 特定のタグが付与されたデータを **stale（古い状態）** としてマークする。これらのタグを使用するすべてのページに適用される
+- **`updateTag`**: 特定のタグが付与されたデータを期限切れとして扱う。これらのタグを使用するすべてのページに適用される
+
+`revalidatePath` を呼び出すと、次回のアクセス時には指定したパスだけが最新のデータを取得します。同じデータタグを使用している他のページは、それらのタグが再検証されるまで、キャッシュされたデータを返し続けます:
+
+```tsx
+// ページ A: /blog
+const posts = await fetch('https://api.vercel.app/blog', {
+  next: { tags: ['posts'] },
+})
+
+// ページ B: /dashboard
+const recentPosts = await fetch('https://api.vercel.app/blog?limit=5', {
+  next: { tags: ['posts'] },
+})
+```
+
+`revalidatePath('/blog')` を呼び出した後:
+
+- **Page A (/blog)**: 新しいデータを表示（ページが再レンダーされる）
+- **Page B (/dashboard)**: 引き続き古いデータを表示（キャッシュタグ &#39;posts&#39; は無効化されていない）
+
+[`revalidateTag` と `updateTag`](/docs/app/api-reference/functions/updateTag#differences-from-revalidatetag) の違いについては、こちらを参照してください。
+
+### 再検証ユーティリティの構築
+
+`revalidatePath` と `updateTag` は互いを補完し合うプリミティブで、アプリケーション全体のデータ整合性を包括的に確保するために、ユーティリティ関数内で併用されることがよくあります。
+
+```ts
+'use server'
+
+import { revalidatePath, updateTag } from 'next/cache'
+
+export async function updatePost() {
+  await updatePostInDatabase()
+
+  revalidatePath('/blog') // ブログページを更新する
+  updateTag('posts') // 'posts'タグを使用するすべてのページを更新する
+}
+```
+
+このパターンを使用すると、特定のページと同じデータを利用する他のページの両方で、一貫性を保つことができます。
+
+## 使用例
+
+### 特定のパスを再検証する
+
+```ts
+import { revalidatePath } from 'next/cache'
+revalidatePath('/blog/post-1')
+```
+
+これにより、次回のページアクセス時に再検証されるよう、特定の 1 つのパスを無効化します。
+
+### ページパスの再検証
+
+```ts
+import { revalidatePath } from 'next/cache'
+revalidatePath('/blog/[slug]', 'page')
+// またはルートグループを使用する場合
+revalidatePath('/(main)/blog/[slug]', 'page')
+```
+
+これは、次回のページアクセス時の再検証に向けて、指定された `page` ファイルにマッチするすべてのパスを無効化します。ただし、その特定のページ配下のページは無効化されません。たとえば、`/blog/[slug]` は `/blog/[slug]/[author]` を無効化しません。
+
+### レイアウトパスを再検証する
+
+```ts
+import { revalidatePath } from 'next/cache'
+revalidatePath('/blog/[slug]', 'layout')
+// またはルートグループを使用する場合
+revalidatePath('/(main)/post/[slug]', 'layout')
+```
+
+これは、指定された `layout` ファイルにマッチするあらゆるパスを、次回のページアクセス時に再検証されるよう無効化します。これにより、同じレイアウトを持つ配下のページも無効化され、次回のアクセス時に再検証されます。たとえば、上記のケースでは、`/blog/[slug]/[another]` も次回のアクセス時に無効化および再検証されます。
+
+### すべてのデータを再検証する
+
+```ts
+import { revalidatePath } from 'next/cache'
+
+revalidatePath('/', 'layout')
+```
+
+これはクライアントサイドのルーターキャッシュをクリアし、次回のページアクセス時に再検証が行われるようにデータキャッシュを無効化します。
+
+### サーバー関数
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export default async function submit() {
+  await submitForm()
+  revalidatePath('/')
+}
+```
+
+### ルートハンドラー
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { revalidatePath } from 'next/cache'
+import type { NextRequest } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (path) {
+    revalidatePath(path)
+    return Response.json({ revalidated: true, now: Date.now() })
+  }
+
+  return Response.json({
+    revalidated: false,
+    now: Date.now(),
+    message: 'Missing path to revalidate',
+  })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function GET(request) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (path) {
+    revalidatePath(path)
+    return Response.json({ revalidated: true, now: Date.now() })
+  }
+
+  return Response.json({
+    revalidated: false,
+    now: Date.now(),
+    message: 'Missing path to revalidate',
+  })
+}
+```

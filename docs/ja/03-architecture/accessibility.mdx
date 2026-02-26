@@ -1,0 +1,34 @@
+---
+title: アクセシビリティ
+description: Next.js に組み込まれているアクセシビリティ機能。
+---
+
+Next.js チームは、すべての開発者（とそのエンドユーザー）にとって Next.js を利用しやすいものにすることに尽力しています。アクセシビリティ機能を Next.js に標準で備えることで、私たちは Web をすべての人にとってより誰もが利用しやすいものにすることを目指しています。
+
+## ルートアナウンス
+
+サーバーでレンダリングされるページ間を遷移する場合（例: `<a href>` タグを使用する場合）、スクリーンリーダーなどの支援技術は、ユーザーがページが切り替わったことを理解できるよう、ページ読み込み時にページタイトルを読み上げます。
+
+従来のページナビゲーションに加えて、Next.js はパフォーマンス向上のためのクライアントサイド遷移（`next/link` を使用）もサポートしています。クライアントサイド遷移も支援技術に確実にアナウンスされるようにするため、Next.js にはデフォルトでルートアナウンサーが含まれています。
+
+Next.js のルートアナウンサーは、まず `document.title`、次に `<h1>` 要素、最後に URL のパス名を順に確認して、読み上げるページ名を決定します。もっともアクセシブルなユーザー体験を提供するために、アプリケーション内の各ページに一意でわかりやすいタイトルが付いていることを確認してください。
+
+## リンティング
+
+Next.js は、Next.js 向けのカスタムルールを含む [ESLint の統合サポート](/docs/pages/api-reference/config/eslint) を標準で提供します。デフォルトで Next.js には `eslint-plugin-jsx-a11y` が含まれており、次のようなアクセシビリティの問題を早期に検出するのに役立ちます (警告対象の例):
+
+- [aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-props.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+- [aria-proptypes](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-proptypes.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+- [aria-unsupported-elements](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-unsupported-elements.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+- [role-has-required-aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/role-has-required-aria-props.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+- [role-supports-aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/role-supports-aria-props.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+
+たとえば、このプラグインは、`img` タグに代替テキストを追加しているか、正しい `aria-*` 属性や正しい `role` 属性を使用しているかなどを検証するのに役立ちます。
+
+## アクセシビリティ関連リソース
+
+- [WebAIM WCAG チェックリスト](https://webaim.org/standards/wcag/checklist)
+- [WCAG 2.2 ガイドライン](https://www.w3.org/TR/WCAG22/)
+- [The A11y Project](https://www.a11yproject.com/)
+- 前景と背景の[色のコントラスト比](https://developer.mozilla.org/docs/Web/Accessibility/Understanding_WCAG/Perceivable/Color_contrast)を確認する
+- アニメーションを使用する際は [`prefers-reduced-motion`](https://web.dev/prefers-reduced-motion/) を使用する

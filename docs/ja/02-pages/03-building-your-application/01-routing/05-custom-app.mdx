@@ -1,0 +1,89 @@
+---
+title: カスタム App
+description: Next.js が使用するデフォルトの App コンポーネントをオーバーライドして、ページの初期化を制御し、すべてのページで共有されるレイアウトを追加します。
+---
+
+Next.js はページを初期化するために `App` コンポーネントを使用します。これをオーバーライドしてページの初期化を制御し、次のことができます。
+
+- ページ遷移間で共有されるレイアウトを作成する
+- ページに追加のデータを渡す
+- [グローバル CSS を追加する](/docs/app/getting-started/css)
+
+## 使用方法
+
+デフォルトの `App` を上書きするには、以下のように `pages/_app` ファイルを作成します。
+
+```tsx filename="pages/_app.tsx" switcher
+import type { AppProps } from 'next/app'
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />
+}
+```
+
+```jsx filename="pages/_app.jsx" switcher
+export default function MyApp({ Component, pageProps }) {
+  return <Component {...pageProps} />
+}
+```
+
+`Component` プロップは現在アクティブな `page` を指します。そのため、ルート間を移動するたびに `Component` は新しい `page` に変わります。したがって、`Component` に渡した任意の props は、その `page` で受け取られます。
+
+`pageProps` は、[データ取得メソッド](/docs/pages/building-your-application/data-fetching) のいずれかによってページのために事前に読み込まれた初期 props を持つオブジェクトであり、そうでない場合は空のオブジェクトです。
+
+> **補足**:
+>
+> - アプリが実行中の状態でカスタムの `App` を追加した場合、開発サーバーを再起動する必要があります。これは、以前に `pages/_app.js` が存在していなかった場合にのみ必要です。
+> - `App` は、[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) や [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) のような Next.js の[データ取得メソッド](/docs/pages/building-your-application/data-fetching)をサポートしません。
+
+## `getInitialProps` with `App`
+
+`App` で [`getInitialProps`](/docs/pages/api-reference/functions/get-initial-props) を使用すると、[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) を持たないページでは[自動静的最適化](/docs/pages/building-your-application/rendering/automatic-static-optimization)が無効になります。
+
+**このパターンは推奨しません。** 代わりに、ページやレイアウトのデータをより簡単に取得できるようにする App Router の[段階的な採用](/docs/app/guides/migrating/app-router-migration)を検討してください。
+
+```tsx filename="pages/_app.tsx" switcher
+import App, { AppContext, AppInitialProps, AppProps } from 'next/app'
+
+type AppOwnProps = { example: string }
+
+export default function MyApp({
+  Component,
+  pageProps,
+  example,
+}: AppProps & AppOwnProps) {
+  return (
+    <>
+      <p>Data: {example}</p>
+      <Component {...pageProps} />
+    </>
+  )
+}
+
+MyApp.getInitialProps = async (
+  context: AppContext
+): Promise<AppOwnProps & AppInitialProps> => {
+  const ctx = await App.getInitialProps(context)
+
+  return { ...ctx, example: 'data' }
+}
+```
+
+```jsx filename="pages/_app.jsx" switcher
+import App from 'next/app'
+
+export default function MyApp({ Component, pageProps, example }) {
+  return (
+    <>
+      <p>Data: {example}</p>
+      <Component {...pageProps} />
+    </>
+  )
+}
+
+MyApp.getInitialProps = async (context) => {
+  const ctx = await App.getInitialProps(context)
+
+  return { ...ctx, example: 'data' }
+}
+```

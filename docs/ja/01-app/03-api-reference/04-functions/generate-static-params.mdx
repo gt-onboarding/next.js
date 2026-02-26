@@ -1,0 +1,539 @@
+---
+title: generateStaticParams
+description: generateStaticParams 関数の API リファレンス。
+---
+
+`generateStaticParams` 関数は、[動的ルートセグメント](/docs/app/api-reference/file-conventions/dynamic-routes)と組み合わせて使用することで、リクエストごとのオンデマンド生成ではなく、ビルド時にルートを[**静的生成**](/docs/app/guides/caching#static-rendering)できます。
+
+`generateStaticParams` は次のファイルで使用できます:
+
+- [Pages](/docs/app/api-reference/file-conventions/page) (`page.tsx`/`page.js`)
+- [Layouts](/docs/app/api-reference/file-conventions/layout) (`layout.tsx`/`layout.js`)
+- [Route Handlers](/docs/app/api-reference/file-conventions/route) (`route.ts`/`route.js`)
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+// [slug] 動的セグメントに渡す `params` のリストを返す
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+// `generateStaticParams` が返す `params` を使用して、
+// このページの複数バージョンが静的に生成される
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+// [slug] 動的セグメントに渡す `params` のリストを返す
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+// `generateStaticParams` が返す `params` を使用して、
+// このページの複数バージョンが静的に生成される
+export default async function Page({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+> **補足**:
+>
+> - `generateStaticParams` で生成されていない動的セグメントにアクセスされたときの挙動を制御するには、[`dynamicParams`](/docs/app/api-reference/file-conventions/route-segment-config#dynamicparams) セグメント設定オプションを使用できます。
+> - 実行時に[パスを再検証 (ISR)](#all-paths-at-runtime) するには、[`generateStaticParams` から空配列を返す](#all-paths-at-build-time)か、[`export const dynamic = 'force-static'`](/docs/app/api-reference/file-conventions/route-segment-config#dynamic) を利用する必要があります。
+> - `next dev` 実行中は、ルートへナビゲートしたときに `generateStaticParams` が呼び出されます。
+> - `next build` 実行中は、対応する Layout または Page が生成される前に `generateStaticParams` が実行されます。
+> - 再検証 (ISR) 時には、`generateStaticParams` は再度呼び出されません。
+> - `generateStaticParams` は、Pages Router における [`getStaticPaths`](/docs/pages/api-reference/functions/get-static-paths) 関数の代替となります。
+
+## パラメーター
+
+`options.params`（省略可能）
+
+1 つのルート内で複数の動的セグメントが `generateStaticParams` を使用している場合、子の `generateStaticParams` 関数は、親が生成する各 `params` セットごとに 1 回ずつ実行されます。
+
+`params` オブジェクトには、親の `generateStaticParams` によって設定された `params` が含まれており、これを使用して[子セグメントの `params` を生成](#multiple-dynamic-segments-in-a-route)できます。
+
+## 戻り値
+
+`generateStaticParams` は、各オブジェクトが 1 つのルートの動的セグメントに対応する値を表すオブジェクトの配列を返す必要があります。
+
+- オブジェクト内の各プロパティは、そのルートで指定する動的セグメントです。
+- プロパティ名がセグメント名であり、プロパティ値がそのセグメントに実際に設定される値です。
+
+| ルートの例                       | `generateStaticParams` の戻り値の型       |
+| -------------------------------- | ----------------------------------------- |
+| `/product/[id]`                  | `{ id: string }[]`                        |
+| `/products/[category]/[product]` | `{ category: string, product: string }[]` |
+| `/products/[...slug]`            | `{ slug: string[] }[]`                    |
+
+## 単一の動的セグメント
+
+```tsx filename="app/product/[id]/page.tsx" switcher
+export function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+// `generateStaticParams` が返す `params` を使用して
+// このページの3つのバージョンが静的に生成されます
+// - /product/1
+// - /product/2
+// - /product/3
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  // ...
+}
+```
+
+```jsx filename="app/product/[id]/page.js" switcher
+export function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+// `generateStaticParams` が返す `params` を使用して
+// このページの3つのバージョンが静的に生成されます
+// - /product/1
+// - /product/2
+// - /product/3
+export default async function Page({ params }) {
+  const { id } = await params
+  // ...
+}
+```
+
+## 複数の動的セグメント
+
+```tsx filename="app/products/[category]/[product]/page.tsx" switcher
+export function generateStaticParams() {
+  return [
+    { category: 'a', product: '1' },
+    { category: 'b', product: '2' },
+    { category: 'c', product: '3' },
+  ]
+}
+
+// `generateStaticParams` が返す `params` を使用して
+// このページの3つのバージョンが静的に生成されます
+// - /products/a/1
+// - /products/b/2
+// - /products/c/3
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ category: string; product: string }>
+}) {
+  const { category, product } = await params
+  // ...
+}
+```
+
+```jsx filename="app/products/[category]/[product]/page.js" switcher
+export function generateStaticParams() {
+  return [
+    { category: 'a', product: '1' },
+    { category: 'b', product: '2' },
+    { category: 'c', product: '3' },
+  ]
+}
+
+// `generateStaticParams` が返す `params` を使用して
+// このページの3つのバージョンが静的に生成されます
+// - /products/a/1
+// - /products/b/2
+// - /products/c/3
+export default async function Page({ params }) {
+  const { category, product } = await params
+  // ...
+}
+```
+
+## キャッチオール動的セグメント
+
+```tsx filename="app/product/[...slug]/page.tsx" switcher
+export function generateStaticParams() {
+  return [{ slug: ['a', '1'] }, { slug: ['b', '2'] }, { slug: ['c', '3'] }]
+}
+
+// `generateStaticParams`が返す`params`を使用して
+// このページの3つのバージョンが静的に生成されます
+// - /product/a/1
+// - /product/b/2
+// - /product/c/3
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string[] }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/product/[...slug]/page.js" switcher
+export function generateStaticParams() {
+  return [{ slug: ['a', '1'] }, { slug: ['b', '2'] }, { slug: ['c', '3'] }]
+}
+
+// `generateStaticParams` が返す `params` を使用して
+// このページの3つのバージョンが静的に生成されます
+// - /product/a/1
+// - /product/b/2
+// - /product/c/3
+export default async function Page({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+## 使用例
+
+### 静的レンダリング
+
+#### すべてのパスをビルド時に生成する
+
+すべてのパスをビルド時に静的レンダリングするには、`generateStaticParams` にすべてのパスのリストを渡します。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+#### ビルド時にパスの一部のみを静的レンダリングする
+
+ビルド時にパスの一部のみを静的レンダリングし、残りは初回アクセス時にランタイムでレンダリングするには、対象となるパスだけを含む部分的なリストを返します。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  // ビルド時に最初の10件の投稿をレンダリングする
+  return posts.slice(0, 10).map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  // ビルド時に最初の10件の投稿をレンダリングする
+  return posts.slice(0, 10).map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+次に、[`dynamicParams`](/docs/app/api-reference/file-conventions/route-segment-config#dynamicparams) セグメント設定オプションを使用すると、`generateStaticParams` で生成されていない動的セグメントにアクセスされたときの挙動を制御できます。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+// 上位10件以外の投稿は404になります
+export const dynamicParams = false
+
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+  const topPosts = posts.slice(0, 10)
+
+  return topPosts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+// 上位10件以外の投稿は404になります
+export const dynamicParams = false
+
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+  const topPosts = posts.slice(0, 10)
+
+  return topPosts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+#### 実行時の全パス
+
+すべてのパスを初回アクセス時に静的レンダリングするには、空の配列を返します（ビルド時にはどのパスもレンダリングされません）、または [`export const dynamic = 'force-static'`](/docs/app/api-reference/file-conventions/route-segment-config#dynamic) を指定します。
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  return []
+}
+```
+
+> **補足:**
+>
+> - `generateStaticParams` からは、空配列であっても必ず配列を返す必要があります。そうしないと、そのルートは動的レンダリングになります。
+
+```jsx filename="app/changelog/[slug]/page.js"
+export const dynamic = 'force-static'
+```
+
+#### Cache Components を使用する場合
+
+動的ルートで [Cache Components](/docs/app/getting-started/cache-components) を使用する場合、`generateStaticParams` は **少なくとも 1 つのパラメーター** を返す必要があります。空配列を返すと [ビルドエラー](/docs/messages/empty-generate-static-params) になります。これは、Cache Components が、実行時にルートが `cookies()`, `headers()`, `searchParams` に誤ってアクセスしていないか検証できるようにするためです。
+
+> **補足**: ビルド時に実際のパラメーターの値がわからない場合でも、検証用としてプレースホルダーのパラメーター（例: `[{ slug: '__placeholder__' }]`）を返し、ページ側で `notFound()` を使って処理できます。ただし、この方法ではビルド時の検証が十分に機能せず、実行時エラーを引き起こす可能性があります。
+
+詳しい手順については、[dynamic routes のセクション](/docs/app/api-reference/file-conventions/dynamic-routes#with-cache-components)を参照してください。
+
+### Route Handlers を使用する場合
+
+ビルド時に API レスポンスを静的に生成するために、`generateStaticParams` を [Route Handlers](/docs/app/api-reference/file-conventions/route) と組み合わせて使用できます。
+
+```ts filename="app/api/posts/[id]/route.ts" switcher
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+export async function GET(
+  request: Request,
+  { params }: RouteContext<'/api/posts/[id]'>
+) {
+  const { id } = await params
+  // これはID 1、2、3に対して静的に生成されます
+  return Response.json({ id, title: `Post ${id}` })
+}
+```
+
+```js filename="app/api/posts/[id]/route.js" switcher
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+export async function GET(request, { params }) {
+  const { id } = await params
+  // これはID 1、2、3に対して静的に生成されます
+  return Response.json({ id, title: `Post ${id}` })
+}
+```
+
+### Cache Components を使った Route Handlers
+
+[Cache Components](/docs/app/getting-started/cache-components) を使用する場合は、キャッシュを最適化するために `use cache` と組み合わせて使用してください。
+
+```ts filename="app/api/posts/[id]/route.ts"
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+async function getPost(id: Promise<string>) {
+  'use cache'
+  const resolvedId = await id
+  const response = await fetch(`https://api.example.com/posts/${resolvedId}`)
+  return response.json()
+}
+
+export async function GET(
+  request: Request,
+  { params }: RouteContext<'/api/posts/[id]'>
+) {
+  const post = await getPost(params.then((p) => p.id))
+  return Response.json(post)
+}
+```
+
+詳しくは、[Route Handlers のドキュメント](/docs/app/api-reference/file-conventions/route#static-generation-with-generatestaticparams)を参照してください。
+
+### 指定されていないパスのレンダリングを無効化する
+
+指定されていないパスが実行時に静的レンダリングされないようにするには、ルートセグメント内で `export const dynamicParams = false` オプションを指定します。この設定オプションを使用すると、`generateStaticParams` によって提供されたパスのみが配信され、指定されていないルートは 404 になるか（[キャッチオールルート](/docs/app/api-reference/file-conventions/dynamic-routes#catch-all-segments) の場合は）マッチします。
+
+### 1 つのルート内の複数の動的セグメント
+
+現在のレイアウトまたはページ **より上の階層** にある動的セグメントの params は生成できますが、**下の階層** に対しては生成できません。たとえば、`app/products/[category]/[product]` というルートがある場合:
+
+- `app/products/[category]/[product]/page.js` は `[category]` と `[product]` の **両方** の params を生成できます。
+- `app/products/[category]/layout.js` は `[category]` の params **のみ** 生成できます。
+
+複数の動的セグメントを含むルートの params を生成するには、2 つの方法があります:
+
+#### 下位から params を生成する
+
+子ルートセグメントから、複数の動的セグメントの params を生成します。
+
+```tsx filename="app/products/[category]/[product]/page.tsx" switcher
+// [category] と [product] の両方のセグメントを生成する
+export async function generateStaticParams() {
+  const products = await fetch('https://.../products').then((res) => res.json())
+
+  return products.map((product) => ({
+    category: product.category.slug,
+    product: product.id,
+  }))
+}
+
+export default function Page({
+  params,
+}: {
+  params: Promise<{ category: string; product: string }>
+}) {
+  // ...
+}
+```
+
+```jsx filename="app/products/[category]/[product]/page.js" switcher
+// [category] と [product] の両方のセグメントを生成する
+export async function generateStaticParams() {
+  const products = await fetch('https://.../products').then((res) => res.json())
+
+  return products.map((product) => ({
+    category: product.category.slug,
+    product: product.id,
+  }))
+}
+
+export default function Page({ params }) {
+  // ...
+}
+```
+
+#### 上位から順にパラメータを生成する
+
+まず親セグメント用のパラメータを生成し、その結果を使って子セグメント用のパラメータを生成します。
+
+```tsx filename="app/products/[category]/layout.tsx" switcher
+// [category] のセグメントを生成する
+export async function generateStaticParams() {
+  const products = await fetch('https://.../products').then((res) => res.json())
+
+  return products.map((product) => ({
+    category: product.category.slug,
+  }))
+}
+
+export default function Layout({
+  params,
+}: {
+  params: Promise<{ category: string }>
+}) {
+  // ...
+}
+```
+
+```jsx filename="app/products/[category]/layout.js" switcher
+// [category] のセグメントを生成する
+export async function generateStaticParams() {
+  const products = await fetch('https://.../products').then((res) => res.json())
+
+  return products.map((product) => ({
+    category: product.category.slug,
+  }))
+}
+
+export default function Layout({ params }) {
+  // ...
+}
+```
+
+子ルートセグメントの `generateStaticParams` 関数は、親の `generateStaticParams` 関数によって生成された各セグメントごとに一度実行されます。
+
+子の `generateStaticParams` 関数は、親の `generateStaticParams` 関数から返される `params` を利用して、自分のセグメントを動的に生成できます。
+
+```tsx filename="app/products/[category]/[product]/page.tsx" switcher
+// 親セグメントの `generateStaticParams` 関数から渡された `params` を使用して
+// [product] のセグメントを生成する
+export async function generateStaticParams({
+  params: { category },
+}: {
+  params: { category: string }
+}) {
+  const products = await fetch(
+    `https://.../products?category=${category}`
+  ).then((res) => res.json())
+
+  return products.map((product) => ({
+    product: product.id,
+  }))
+}
+
+export default function Page({
+  params,
+}: {
+  params: Promise<{ category: string; product: string }>
+}) {
+  // ...
+}
+```
+
+```jsx filename="app/products/[category]/[product]/page.js" switcher
+// 親セグメントの `generateStaticParams` 関数から渡された `params` を使用して
+// [product] のセグメントを生成する
+export async function generateStaticParams({ params: { category } }) {
+  const products = await fetch(
+    `https://.../products?category=${category}`
+  ).then((res) => res.json())
+
+  return products.map((product) => ({
+    product: product.id,
+  }))
+}
+
+export default function Page({ params }) {
+  // ...
+}
+```
+
+`params` 引数には同期的にアクセスでき、親セグメントに対応する `params` のみが含まれていることに注意してください。
+
+型補完のためには、TypeScript の `Awaited` ヘルパーを [`Page Props helper`](/docs/app/api-reference/file-conventions/page#page-props-helper) または [`Layout Props helper`](/docs/app/api-reference/file-conventions/layout#layout-props-helper) と組み合わせて使用できます。
+
+```ts filename="app/products/[category]/[product]/page.tsx" switcher
+export async function generateStaticParams({
+  params: { category },
+}: {
+  params: Awaited<LayoutProps<'/products/[category]'>['params']>
+}) {
+  const products = await fetch(
+    `https://.../products?category=${category}`
+  ).then((res) => res.json())
+
+  return products.map((product) => ({
+    product: product.id,
+  }))
+}
+```
+
+> **補足**: すべての `generate` で始まる関数、レイアウト、ページ、サーバーコンポーネント間で、同一のデータに対する `fetch` リクエストは自動的に[メモ化](/docs/app/guides/caching#request-memoization)されます。`fetch` が利用できない場合は、React の [`cache` 関数を使用](/docs/app/guides/caching#react-cache-function)できます。
+
+## バージョン履歴
+
+| バージョン | 変更内容                                  |
+| ---------- | ----------------------------------------- |
+| `v13.0.0`  | `generateStaticParams` が追加されました。 |

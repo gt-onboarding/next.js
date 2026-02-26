@@ -1,0 +1,75 @@
+---
+title: htmlLimitedBots
+description: ブロック用メタデータを受信させるユーザーエージェントのリストを指定します。
+---
+
+`htmlLimitedBots` 設定では、[ストリーミングメタデータ](/docs/app/api-reference/functions/generate-metadata#streaming-metadata) の代わりにブロック用メタデータを受信させるユーザーエージェントのリストを指定できます。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  htmlLimitedBots: /MySpecialBot|MyAnotherSpecialBot|SimpleCrawler/,
+}
+
+export default config
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  htmlLimitedBots: /MySpecialBot|MyAnotherSpecialBot|SimpleCrawler/,
+}
+```
+
+## デフォルトリスト
+
+Next.js には、HTML 制限ボットのデフォルトリストが含まれており、次のようなものがあります：
+
+- Google クローラー（例：Mediapartners-Google、AdsBot-Google、Google-PageRenderer）
+- Bingbot
+- Twitterbot
+- Slackbot
+
+完全なリストは[こちら](https://github.com/vercel/next.js/blob/canary/packages/next/src/shared/lib/router/utils/html-bots.ts)を参照してください。
+
+`htmlLimitedBots` 設定を指定すると、Next.js のデフォルトリストが上書きされます。ただし、これは高度な設定であり、ほとんどのケースではデフォルトで十分です。
+
+```ts filename="next.config.ts" switcher
+const config: NextConfig = {
+  htmlLimitedBots: /MySpecialBot|MyAnotherSpecialBot|SimpleCrawler/,
+}
+
+export default config
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  htmlLimitedBots: /MySpecialBot|MyAnotherSpecialBot|SimpleCrawler/,
+}
+```
+
+## 無効化
+
+ストリーミングメタデータを完全に無効化するには、
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  htmlLimitedBots: /.*/,
+}
+
+export default config
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  htmlLimitedBots: /.*/,
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更点                                         |
+| ---------- | ---------------------------------------------- |
+| 15.2.0     | `htmlLimitedBots` オプションが導入されました。 |

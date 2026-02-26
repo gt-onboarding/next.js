@@ -1,0 +1,203 @@
+---
+title: NextResponse
+description: NextResponse の API リファレンス。
+---
+
+{/* このドキュメントの内容は app ルーターと Pages ルーターで共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共通のコンテンツはコンポーネントでラップしないようにしてください。 */}
+
+NextResponse は [Web Response API](https://developer.mozilla.org/docs/Web/API/Response) を拡張し、便利な補助メソッドを追加で提供します。
+
+## `cookies`
+
+レスポンスの [`Set-Cookie`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie) ヘッダーを読み取ったり変更したりできます。
+
+### `set(name, value)`
+
+指定された `name` と `value` を持つクッキーをレスポンスに設定します。
+
+```ts
+// 受信リクエスト /home に対して
+let response = NextResponse.next()
+// バナーを非表示にするクッキーを設定する
+response.cookies.set('show-banner', 'false')
+// レスポンスには `Set-Cookie:show-banner=false;path=/home` ヘッダーが含まれる
+return response
+```
+
+### `get(name)`
+
+指定した Cookie 名に対応する Cookie の値を返します。Cookie が見つからない場合は `undefined` を返します。複数の Cookie が見つかった場合は、最初のものを返します。
+
+```ts
+// 受信リクエスト /home に対して
+let response = NextResponse.next()
+// { name: 'show-banner', value: 'false', Path: '/home' }
+response.cookies.get('show-banner')
+```
+
+### `getAll()`
+
+クッキー名を指定すると、そのクッキーの値を返します。名前を指定しない場合は、レスポンスに含まれるすべてのクッキーを返します。
+
+```ts
+// 受信リクエスト /home に対して
+let response = NextResponse.next()
+// [
+//   { name: 'experiments', value: 'new-pricing-page', Path: '/home' },
+//   { name: 'experiments', value: 'winter-launch', Path: '/home' },
+// ]
+response.cookies.getAll('experiments')
+// または、レスポンスのすべてのCookieを取得する
+response.cookies.getAll()
+```
+
+### `has(name)`
+
+Cookie 名を指定し、指定された Cookie がレスポンスに存在する場合は `true` を返します。
+
+```ts
+// 受信リクエスト /home に対して
+let response = NextResponse.next()
+// クッキーが存在する場合は true、存在しない場合は false を返す
+response.cookies.has('experiments')
+```
+
+### `delete(name)`
+
+指定した Cookie 名の Cookie をレスポンスから削除します。
+
+```ts
+// 受信リクエスト /home に対して
+let response = NextResponse.next()
+// 削除された場合は true、何も削除されなかった場合は false を返す
+response.cookies.delete('experiments')
+```
+
+## `json()`
+
+指定した JSON ボディを持つレスポンスを生成します。
+
+```ts filename="app/api/route.ts" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+## `redirect()`
+
+[URL](https://developer.mozilla.org/docs/Web/API/URL) へのリダイレクトレスポンスを生成します。
+
+```ts
+import { NextResponse } from 'next/server'
+
+return NextResponse.redirect(new URL('/new', request.url))
+```
+
+[`URL`](https://developer.mozilla.org/docs/Web/API/URL) は、`NextResponse.redirect()` メソッドで使用される前に作成したり変更したりできます。たとえば、`request.nextUrl` プロパティを使って現在の URL を取得し、それを変更して別の URL へリダイレクトすることができます。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// 受信したリクエストに対して...
+const loginUrl = new URL('/login', request.url)
+// /login URL に ?from=/incoming-url を追加する
+loginUrl.searchParams.set('from', request.nextUrl.pathname)
+// 新しい URL にリダイレクトする
+return NextResponse.redirect(loginUrl)
+```
+
+## `rewrite()`
+
+指定された[URL](https://developer.mozilla.org/docs/Web/API/URL)へのプロキシとなるようにリライトしつつ、元の URL を保持したレスポンスを生成します。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// 受信リクエスト: /about、ブラウザには /about が表示される
+// 書き換え後のリクエスト: /proxy、ブラウザには /about が表示される
+return NextResponse.rewrite(new URL('/proxy', request.url))
+```
+
+## `next()`
+
+`next()` メソッドは、処理を早い段階でいったん終了してルーティングを続行できるため、Proxy を扱う際に便利です。
+
+```ts
+import { NextResponse } from 'next/server'
+
+return NextResponse.next()
+```
+
+レスポンス生成時に、`NextResponse.next({ request: { headers } })` を使用して `headers` を上流に転送することもできます。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// 受信したリクエストに対して...
+const newHeaders = new Headers(request.headers)
+// 新しいヘッダーを追加する
+newHeaders.set('x-version', '123')
+// 変更したリクエストヘッダーをアップストリームに転送する
+return NextResponse.next({
+  request: {
+    // 新しいリクエストヘッダー
+    headers: newHeaders,
+  },
+})
+```
+
+これは `newHeaders` を上流のターゲットページやルート、または Server Action に転送し、クライアントには公開しません。このパターンはデータを上流に受け渡すのに便利ですが、そのデータを含むヘッダーが外部サービスに転送される可能性があるため、注意して使用する必要があります。
+
+これに対して、`NextResponse.next({ headers })` はプロキシからクライアントへヘッダーを送信するための省略記法です。これは**推奨されるプラクティスではなく**、避けるべきです。理由の一つとして、`Content-Type` のようなレスポンスヘッダーを設定すると、（たとえば Server Actions で使用される `Content-Type` などの）フレームワークの前提を上書きしてしまい、その結果、送信の失敗やストリーミングレスポンスの破損につながる可能性があります。
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+async function proxy(request: NextRequest) {
+  const headers = await injectAuth(request.headers)
+  // このようにヘッダーを転送しないでください
+  return NextResponse.next({ headers })
+}
+```
+
+一般的に、受信したリクエストヘッダーをすべてコピーすることは避けてください。そのようにすると、機密性の高いデータがクライアントや上流サービスに漏洩する可能性があります。
+
+許可リストを使って、受信したリクエストヘッダーから必要なものだけを抜き出したサブセットを作成する、防御的なアプローチを取ることを推奨します。たとえば、カスタムの `x-*` ヘッダーは破棄し、既知で安全なヘッダーだけを転送する、といった方法です。
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+function proxy(request: NextRequest) {
+  const incoming = new Headers(request.headers)
+  const forwarded = new Headers()
+
+  for (const [name, value] of incoming) {
+    const headerName = name.toLowerCase()
+    // 既知の安全なヘッダーのみを保持し、カスタムの x-* やその他の機密性の高いヘッダーは破棄する
+    if (
+      !headerName.startsWith('x-') &&
+      headerName !== 'authorization' &&
+      headerName !== 'cookie'
+    ) {
+      // 元のヘッダー名の大文字・小文字表記を保持する
+      forwarded.set(name, value)
+    }
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: forwarded,
+    },
+  })
+}
+```

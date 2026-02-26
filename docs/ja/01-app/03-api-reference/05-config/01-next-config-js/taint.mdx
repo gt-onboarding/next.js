@@ -1,0 +1,226 @@
+---
+title: taint
+description: オブジェクトおよび値をテイントできるようにします。
+version: experimental
+---
+
+## 使用方法
+
+`taint` オプションは、オブジェクトや値に taint（汚染フラグ）を付与するための、React の実験的 API への対応を有効にします。この機能により、機密データが誤ってクライアント側に渡されることを防ぐのに役立ちます。有効化すると、次のものを使用できます:
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) を使ってオブジェクト参照に taint を付与できます。
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) を使って一意な値に taint を付与できます。
+
+> **補足**: このフラグを有効にすると、`app` ディレクトリに対して React の `experimental` チャンネルも有効になります。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **警告:** 機密データをクライアントに公開しないための唯一の仕組みとして taint API に依存しないでください。詳しくは、[セキュリティに関する推奨事項](/blog/security-nextjs-server-components-actions)を参照してください。
+
+taint API を使うと、防御的にデータを扱えます。サーバーとクライアントの境界を通過させてはいけないデータを、宣言的かつ明示的にマークできます。オブジェクトや値がサーバーとクライアントの境界を通過した場合、React はエラーをスローします。
+
+これは次のようなケースで役立ちます:
+
+- データの読み取りメソッドを自分で制御できない場合
+- 自分で定義していない機密データの構造を扱う必要がある場合
+- サーバーコンポーネントのレンダリング中に機密データへアクセスされる場合
+
+機密データが不要なコンテキストに返されないように、データと API の設計を行うことを推奨します。
+
+## 注意事項
+
+- Tainting はオブジェクトを参照によってのみ追跡できます。オブジェクトをコピーすると、taint されていないバージョンが作成され、API によるすべての保証が失われます。コピーした側を taint する必要があります。
+- Tainting は、tainted な値から導出されたデータを追跡できません。導出された値も taint する必要があります。
+- 値は、そのライフタイム参照がスコープ内にある間は tainted のままです。詳しくは、[`experimental_taintUniqueValue` パラメータリファレンス](https://react.dev/reference/react/experimental_taintUniqueValue#parameters) を参照してください。
+
+## 例
+
+### オブジェクト参照の汚染
+
+この場合、`getUserDetails` 関数は特定のユーザーに関するデータを返します。ユーザーオブジェクトの参照を汚染することで、それがサーバーとクライアントの境界を越えられないようにします。たとえば、`UserCard` がクライアントコンポーネントであると仮定します。
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'Do not use the entire user info object. Instead, select only the fields you need.',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'Do not use the entire user info object. Instead, select only the fields you need.',
+    user
+  )
+
+  return user
+}
+```
+
+汚染された `userDetails` オブジェクトであっても、その各フィールドには引き続きアクセスできます。
+
+```tsx filename="app/contact/page.tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+この状態でオブジェクト全体を Client Component に渡そうとすると、エラーがスローされます。
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // エラーがスローされる
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // エラーがスローされる
+  return <UserCard user={userDetails} />
+}
+```
+
+### 一意な値のテイント
+
+この場合は、`config.getConfigDetails` の呼び出しを `await` することでサーバー設定にアクセスできます。しかし、システム設定にはクライアントには公開したくない `SERVICE_API_KEY` が含まれています。
+
+`config.SERVICE_API_KEY` の値にテイントを適用できます。
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'クライアントに設定トークンを渡さないでください',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'クライアントに設定トークンを渡さないでください',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+`systemConfig` オブジェクトの他のプロパティにも引き続きアクセスできます。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+しかし、`SERVICE_API_KEY` を `ClientDashboard` に渡すとエラーが発生します。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // PRで誰かがミスをした場合
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+`systemConfig.SERVICE_API_KEY` は新しい変数に代入し直していても、Client Component に渡すと依然としてエラーがスローされることに注意してください。
+
+一方で、汚染された一意な値から派生した値は、クライアント側に公開されます。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // PRで誰かがミスをした場合
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+より適切な方法は、`getSystemConfig` が返すデータから `SERVICE_API_KEY` を取り除くことです。

@@ -1,0 +1,811 @@
+---
+title: フロントエンドのためのバックエンドとして Next.js を使う方法
+nav_title: Backend for Frontend
+description: Next.js をバックエンドフレームワークとして利用する方法を解説します
+related:
+  title: API リファレンス
+  description: Route Handlers と Proxy についてさらに学ぶ
+  links:
+    - app/api-reference/file-conventions/route
+    - app/api-reference/file-conventions/proxy
+---
+
+Next.js は「Backend for Frontend」パターンをサポートしています。これにより、HTTP リクエストを処理して任意のコンテンツタイプ（HTML に限らない）を返すパブリックなエンドポイントを作成できます。また、データソースへアクセスしたり、リモートデータの更新などの副作用を伴う処理を実行することもできます。
+
+新しいプロジェクトを作成する場合、`create-next-app` を `--api` フラグ付きで実行すると、新しいプロジェクトの `app/` フォルダにサンプルの `route.ts` が自動的に追加され、API エンドポイントの作成方法が示されます。
+
+```bash package="pnpm"
+pnpm create next-app --api
+```
+
+```bash package="npm"
+npx create-next-app@latest --api
+```
+
+```bash package="yarn"
+yarn create next-app --api
+```
+
+```bash package="bun"
+bun create next-app --api
+```
+
+> **補足**: Next.js のバックエンド機能は、完全なバックエンドの代替にはなりません。API レイヤーとして次のような役割を果たします:
+>
+> - 外部からパブリックに到達可能である
+> - あらゆる HTTP リクエストを処理できる
+> - 任意のコンテンツタイプを返すことができる
+
+このパターンを実装するには、次を使用します:
+
+- [Route Handlers](/docs/app/api-reference/file-conventions/route)
+- [`proxy`](/docs/app/api-reference/file-conventions/proxy)
+- Pages Router では、[API Routes](/docs/pages/building-your-application/routing/api-routes)
+
+## 公開エンドポイント
+
+Route Handler は公開 HTTP エンドポイントです。どのクライアントからでもアクセスできます。
+
+`route.ts` または `route.js` というファイル命名規則を使って Route Handler を作成します。
+
+```ts filename="/app/api/route.ts" switcher
+export function GET(request: Request) {}
+```
+
+```js filename="/app/api/route.js" switcher
+export function GET(request) {}
+```
+
+`/api` に送信された `GET` リクエストを処理します。
+
+例外をスローしうる処理には、`try/catch` ブロックを使用してください：
+
+```ts filename="/app/api/route.ts" switcher
+import { submit } from '@/lib/submit'
+
+export async function POST(request: Request) {
+  try {
+    await submit(request)
+    return new Response(null, { status: 204 })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : '予期しないエラー'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/route.js" switcher
+import { submit } from '@/lib/submit'
+
+export async function POST(request) {
+  try {
+    await submit(request)
+    return new Response(null, { status: 204 })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : '予期しないエラー'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+クライアントに送信するエラーメッセージに機密情報を含めないようにします。
+
+アクセスを制限するには、認証と認可を実装します。詳しくは [Authentication](/docs/app/guides/authentication) を参照してください。
+
+## コンテンツタイプ
+
+Route Handlers を使用すると、JSON、XML、画像、ファイル、プレーンテキストなど、UI 以外のレスポンスを返すことができます。
+
+Next.js は、よく使われるエンドポイントに対してファイル規約を使用します:
+
+- [`sitemap.xml`](/docs/app/api-reference/file-conventions/metadata/sitemap)
+- [`opengraph-image.jpg`, `twitter-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image)
+- [favicon、アプリアイコン、apple-icon](/docs/app/api-reference/file-conventions/metadata/app-icons)
+- [`manifest.json`](/docs/app/api-reference/file-conventions/metadata/manifest)
+- [`robots.txt`](/docs/app/api-reference/file-conventions/metadata/robots)
+
+次のような独自のものを定義することもできます:
+
+- `llms.txt`
+- `rss.xml`
+- `.well-known`
+
+たとえば、`app/rss.xml/route.ts` は `rss.xml` 用の Route Handler を作成します。
+
+```ts filename="/app/rss.xml/route.ts" switcher
+export async function GET(request: Request) {
+  const rssResponse = await fetch(/* rss endpoint */)
+  const rssData = await rssResponse.json()
+
+  const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+ <title>${rssData.title}</title>
+ <description>${rssData.description}</description>
+ <link>${rssData.link}</link>
+ <copyright>${rssData.copyright}</copyright>
+ ${rssData.items.map((item) => {
+   return `<item>
+    <title>${item.title}</title>
+    <description>${item.description}</description>
+    <link>${item.link}</link>
+    <pubDate>${item.publishDate}</pubDate>
+    <guid isPermaLink="false">${item.guid}</guid>
+ </item>`
+ })}
+</channel>
+</rss>`
+
+  const headers = new Headers({ 'content-type': 'application/xml' })
+
+  return new Response(rssFeed, { headers })
+}
+```
+
+```js filename="/app/rss.xml/route.js" switcher
+export async function GET(request) {
+  const rssResponse = await fetch(/* rss endpoint */)
+  const rssData = await rssResponse.json()
+
+  const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+ <title>${rssData.title}</title>
+ <description>${rssData.description}</description>
+ <link>${rssData.link}</link>
+ <copyright>${rssData.copyright}</copyright>
+ ${rssData.items.map((item) => {
+   return `<item>
+    <title>${item.title}</title>
+    <description>${item.description}</description>
+    <link>${item.link}</link>
+    <pubDate>${item.publishDate}</pubDate>
+    <guid isPermaLink="false">${item.guid}</guid>
+ </item>`
+ })}
+</channel>
+</rss>`
+
+  const headers = new Headers({ 'content-type': 'application/xml' })
+
+  return new Response(rssFeed, { headers })
+}
+```
+
+マークアップ生成に使用するすべての入力は必ずサニタイズしてください。
+
+### リクエストペイロードの処理
+
+リクエストボディにアクセスするには、`.json()`、`.formData()`、`.text()` のような Request の[インスタンスメソッド](https://developer.mozilla.org/en-US/docs/Web/API/Request#instance_methods)を使用します。
+
+`GET` と `HEAD` リクエストにはボディは含まれません。
+
+```ts filename="/app/api/echo-body/route.ts" switcher
+export async function POST(request: Request) {
+  const res = await request.json()
+  return Response.json({ res })
+}
+```
+
+```js filename="/app/api/echo-body/route.js" switcher
+export async function POST(request) {
+  const res = await request.json()
+  return Response.json({ res })
+}
+```
+
+> **補足**: データを他のシステムに渡す前に検証する
+
+```ts filename="/app/api/send-email/route.ts" switcher
+import { sendMail, validateInputs } from '@/lib/email-transporter'
+
+export async function POST(request: Request) {
+  const formData = await request.formData()
+  const email = formData.get('email')
+  const contents = formData.get('contents')
+
+  try {
+    await validateInputs({ email, contents })
+    const info = await sendMail({ email, contents })
+
+    return Response.json({ messageId: info.messageId })
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : '予期しない例外'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/send-email/route.js" switcher
+import { sendMail, validateInputs } from '@/lib/email-transporter'
+
+export async function POST(request) {
+  const formData = await request.formData()
+  const email = formData.get('email')
+  const contents = formData.get('contents')
+
+  try {
+    await validateInputs({ email, contents })
+    const info = await sendMail({ email, contents })
+
+    return Response.json({ messageId: info.messageId })
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : '予期しない例外'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+リクエストボディは一度しか読み取れません。もう一度読み取る必要がある場合は、リクエストをクローンしてください。
+
+```ts filename="/app/api/clone/route.ts" switcher
+export async function POST(request: Request) {
+  try {
+    const clonedRequest = request.clone()
+
+    await request.body()
+    await clonedRequest.body()
+    await request.body() // エラーをスロー
+
+    return new Response(null, { status: 204 })
+  } catch {
+    return new Response(null, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/clone/route.js" switcher
+export async function POST(request) {
+  try {
+    const clonedRequest = request.clone()
+
+    await request.body()
+    await clonedRequest.body()
+    await request.body() // エラーがスローされる
+
+    return new Response(null, { status: 204 })
+  } catch {
+    return new Response(null, { status: 500 })
+  }
+}
+```
+
+## データの操作
+
+Route Handlers は、1 つ以上のソースから取得したデータを変換・フィルタリング・集約できます。これによりロジックをフロントエンドから切り離し、内部システムを外部にさらさずに済みます。
+
+また、負荷の高い計算処理をサーバー側にオフロードすることで、クライアント側のバッテリー消費やデータ使用量を削減できます。
+
+```ts file="/app/api/weather/route.ts" switcher
+import { parseWeatherData } from '@/lib/weather'
+
+export async function POST(request: Request) {
+  const body = await request.json()
+  const searchParams = new URLSearchParams({ lat: body.lat, lng: body.lng })
+
+  try {
+    const weatherResponse = await fetch(`${weatherEndpoint}?${searchParams}`)
+
+    if (!weatherResponse.ok) {
+      /* エラー処理 */
+    }
+
+    const weatherData = await weatherResponse.text()
+    const payload = parseWeatherData.asJSON(weatherData)
+
+    return new Response(payload, { status: 200 })
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : '予期しない例外'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js file="/app/api/weather/route.js" switcher
+import { parseWeatherData } from '@/lib/weather'
+
+export async function POST(request) {
+  const body = await request.json()
+  const searchParams = new URLSearchParams({ lat: body.lat, lng: body.lng })
+
+  try {
+    const weatherResponse = await fetch(`${weatherEndpoint}?${searchParams}`)
+
+    if (!weatherResponse.ok) {
+      /* エラー処理 */
+    }
+
+    const weatherData = await weatherResponse.text()
+    const payload = parseWeatherData.asJSON(weatherData)
+
+    return new Response(payload, { status: 200 })
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : '予期しない例外'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+> **補足**: この例では、ジオロケーションデータをURLに含めないようにするために `POST` を使用しています。`GET` リクエストはキャッシュされたりログに記録されたりする可能性があり、機密情報が漏えいするおそれがあります。
+
+## バックエンドへのプロキシ
+
+Route Handler を使用して、別のバックエンドへのプロキシとして利用できます。リクエストを転送する前にバリデーションロジックを追加してください。
+
+```ts filename="/app/api/[...slug]/route.ts" switcher
+import { isValidRequest } from '@/lib/utils'
+
+export async function POST(request: Request, { params }) {
+  const clonedRequest = request.clone()
+  const isValid = await isValidRequest(clonedRequest)
+
+  if (!isValid) {
+    return new Response(null, { status: 400, statusText: 'Bad Request' })
+  }
+
+  const { slug } = await params
+  const pathname = slug.join('/')
+  const proxyURL = new URL(pathname, 'https://nextjs.org')
+  const proxyRequest = new Request(proxyURL, request)
+
+  try {
+    return fetch(proxyRequest)
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/[...slug]/route.js" switcher
+import { isValidRequest } from '@/lib/utils'
+
+export async function POST(request, { params }) {
+  const clonedRequest = request.clone()
+  const isValid = await isValidRequest(clonedRequest)
+
+  if (!isValid) {
+    return new Response(null, { status: 400, statusText: 'Bad Request' })
+  }
+
+  const { slug } = await params
+  const pathname = slug.join('/')
+  const proxyURL = new URL(pathname, 'https://nextjs.org')
+  const proxyRequest = new Request(proxyURL, request)
+
+  try {
+    return fetch(proxyRequest)
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+または、次のいずれかを使用します:
+
+- `proxy` [rewrites](#proxy)
+- `next.config.js` 内の [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites)。
+
+## NextRequest と NextResponse
+
+Next.js は、よくある操作を簡略化するメソッドを追加することで、[`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) と [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response) Web API を拡張します。これらの拡張は、Route Handlers と Proxy の両方で利用できます。
+
+どちらも Cookie の読み取りおよび操作のためのメソッドを提供します。
+
+`NextRequest` には [`nextUrl`](/docs/app/api-reference/functions/next-request#nexturl) プロパティが含まれており、受信したリクエストからパースされた値を提供します。たとえば、リクエストの pathname や search params へ簡単にアクセスできます。
+
+`NextResponse` は、`next()`、`json()`、`redirect()`、`rewrite()` のようなヘルパーを提供します。
+
+`Request` を受け取る関数には、`NextRequest` を渡すことができます。同様に、`Response` が期待される箇所では `NextResponse` を返すことができます。
+
+```ts filename="/app/echo-pathname/route.ts" switcher
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const nextUrl = request.nextUrl
+
+  if (nextUrl.searchParams.get('redirect')) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (nextUrl.searchParams.get('rewrite')) {
+    return NextResponse.rewrite(new URL('/', request.url))
+  }
+
+  return NextResponse.json({ pathname: nextUrl.pathname })
+}
+```
+
+```js filename="/app/echo-pathname/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  const nextUrl = request.nextUrl
+
+  if (nextUrl.searchParams.get('redirect')) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (nextUrl.searchParams.get('rewrite')) {
+    return NextResponse.rewrite(new URL('/', request.url))
+  }
+
+  return NextResponse.json({ pathname: nextUrl.pathname })
+}
+```
+
+[`NextRequest`](/docs/app/api-reference/functions/next-request) と [`NextResponse`](/docs/app/api-reference/functions/next-response) の詳細については、こちらを参照してください。
+
+## Webhook とコールバック URL
+
+Route Handlers を使用して、サードパーティ アプリケーションからのイベント通知を受信します。
+
+たとえば、CMS のコンテンツが変更されたときにルートを再検証するといった使い方ができます。変更時に特定のエンドポイントを呼び出すように CMS を設定します。
+
+```ts filename="/app/webhook/route.ts" switcher
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const token = request.nextUrl.searchParams.get('token')
+
+  if (token !== process.env.REVALIDATE_SECRET_TOKEN) {
+    return NextResponse.json({ success: false }, { status: 401 })
+  }
+
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (!tag) {
+    return NextResponse.json({ success: false }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return NextResponse.json({ success: true })
+}
+```
+
+```js filename="/app/webhook/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  const token = request.nextUrl.searchParams.get('token')
+
+  if (token !== process.env.REVALIDATE_SECRET_TOKEN) {
+    return NextResponse.json({ success: false }, { status: 401 })
+  }
+
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (!tag) {
+    return NextResponse.json({ success: false }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return NextResponse.json({ success: true })
+}
+```
+
+代表的なユースケースのひとつとして、コールバック URL があります。ユーザーがサードパーティのフローを完了すると、サードパーティはユーザーをコールバック URL にリダイレクトします。Route Handler を使用してレスポンスを検証し、その後ユーザーをどこにリダイレクトするかを決定します。
+
+```ts filename="/app/auth/callback/route.ts" switcher
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const token = request.nextUrl.searchParams.get('session_token')
+  const redirectUrl = request.nextUrl.searchParams.get('redirect_url')
+
+  const response = NextResponse.redirect(new URL(redirectUrl, request.url))
+
+  response.cookies.set({
+    value: token,
+    name: '_token',
+    path: '/',
+    secure: true,
+    httpOnly: true,
+    expires: undefined, // セッションクッキー
+  })
+
+  return response
+}
+```
+
+```js filename="/app/auth/callback/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  const token = request.nextUrl.searchParams.get('session_token')
+  const redirectUrl = request.nextUrl.searchParams.get('redirect_url')
+
+  const response = NextResponse.redirect(new URL(redirectUrl, request.url))
+
+  response.cookies.set({
+    value: token,
+    name: '_token',
+    path: '/',
+    secure: true,
+    httpOnly: true,
+    expires: undefined, // セッションクッキー
+  })
+
+  return response
+}
+```
+
+## リダイレクト
+
+```ts filename="app/api/route.ts" switcher
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  redirect('https://nextjs.org/')
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  redirect('https://nextjs.org/')
+}
+```
+
+リダイレクトについて詳しくは、[`redirect`](/docs/app/api-reference/functions/redirect) と [`permanentRedirect`](/docs/app/api-reference/functions/permanentRedirect) を参照してください。
+
+## Proxy
+
+プロジェクト内で使用できる `proxy` ファイルは 1 つだけです。特定のパスを対象にするには `config.matcher` を使用します。詳しくは [`proxy`](/docs/app/api-reference/file-conventions/proxy) を参照してください。
+
+`proxy` を使用すると、ルートパスにリクエストが到達する前にレスポンスを生成できます。
+
+```ts filename="proxy.ts" switcher
+import { isAuthenticated } from '@lib/auth'
+
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request: Request) {
+  if (!isAuthenticated(request)) {
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request) {
+  if (!isAuthenticated(request)) {
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+`proxy` を使用してリクエストを中継することもできます：
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request: Request) {
+  if (request.nextUrl.pathname === '/proxy-this-path') {
+    const rewriteUrl = new URL('https://nextjs.org')
+    return NextResponse.rewrite(rewriteUrl)
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  if (request.nextUrl.pathname === '/proxy-this-path') {
+    const rewriteUrl = new URL('https://nextjs.org')
+    return NextResponse.rewrite(rewriteUrl)
+  }
+}
+```
+
+`proxy` が返せるレスポンスには、リダイレクトもあります:
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request: Request) {
+  if (request.nextUrl.pathname === '/v1/docs') {
+    request.nextUrl.pathname = '/v2/docs'
+    return NextResponse.redirect(request.nextUrl)
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  if (request.nextUrl.pathname === '/v1/docs') {
+    request.nextUrl.pathname = '/v2/docs'
+    return NextResponse.redirect(request.nextUrl)
+  }
+}
+```
+
+## セキュリティ
+
+### ヘッダーの扱い方
+
+ヘッダーをどこで扱うかは慎重に設計し、受信したリクエストヘッダーをそのままレスポンスに渡すことは避けてください。
+
+- **アップストリームリクエストヘッダー**: Proxy 内の `NextResponse.next({ request: { headers } })` は、サーバーが受け取るヘッダーを変更しますが、それらをクライアントに公開することはありません。
+- **レスポンスヘッダー**: `new Response(..., { headers })`、`NextResponse.json(..., { headers })`、`NextResponse.next({ headers })`、または `response.headers.set(...)` は、ヘッダーをクライアントに送り返します。これらのヘッダーに機密な値が追加されている場合、それらはクライアントから参照可能になります。
+
+詳細は [Proxy における NextResponse ヘッダー](/docs/app/api-reference/functions/next-response#next) を参照してください。
+
+### レート制限
+
+Next.js のバックエンドでレート制限を実装できます。コードによるチェックに加えて、ホスティングサービスが提供するレート制限機能があれば有効化してください。
+
+```ts filename="/app/resource/route.ts" switcher
+import { NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
+
+export async function POST(request: Request) {
+  const { rateLimited } = await checkRateLimit(request)
+
+  if (rateLimited) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+
+  return new Response(null, { status: 204 })
+}
+```
+
+```js filename="/app/resource/route.js" switcher
+import { NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
+
+export async function POST(request) {
+  const { rateLimited } = await checkRateLimit(request)
+
+  if (rateLimited) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+
+  return new Response(null, { status: 204 })
+}
+```
+
+### ペイロードの検証
+
+受信するリクエストデータを信用しないでください。使用前に、Content-Type とサイズを検証し、XSS に対するサニタイズを行ってください。
+
+タイムアウトを設定して、不正利用を防ぎ、サーバーリソースを保護してください。
+
+ユーザーが生成した静的アセットは専用のサービスに保存してください。可能な場合は、ブラウザから直接アップロードし、返される URI をデータベースに保存してリクエストサイズを削減します。
+
+### 保護されたリソースへのアクセス
+
+アクセスを許可する前に、必ず認証情報を検証してください。認証および認可にプロキシのみに依存しないでください。
+
+レスポンスやバックエンドのログから、機密データや不要なデータを削除してください。
+
+認証情報や API キーは定期的にローテーションしてください。
+
+## プレフライトリクエスト
+
+プレフライトリクエストでは、`OPTIONS` メソッドを使用して、オリジン、メソッド、ヘッダーに基づいてリクエストを許可してよいかどうかをサーバーに問い合わせます。
+
+`OPTIONS` メソッドが定義されていない場合、Next.js はそれを自動的に追加し、他の定義済みメソッドに基づいて `Allow` ヘッダーを設定します。
+
+- [CORS](/docs/app/api-reference/file-conventions/route#cors)
+
+## ライブラリのパターン
+
+コミュニティ製ライブラリでは、Route Handler の実装にファクトリパターンがよく用いられます。
+
+```ts filename="/app/api/[...path]/route.ts"
+import { createHandler } from 'third-party-library'
+
+const handler = createHandler({
+  /* ライブラリ固有のオプション */
+})
+
+export const GET = handler
+// または
+export { handler as POST }
+```
+
+これは `GET` と `POST` リクエストのための共通ハンドラーを作成します。ライブラリはリクエスト内の `method` と `pathname` に基づいて挙動をカスタマイズします。
+
+ライブラリは `proxy` のファクトリ関数も提供できます。
+
+```ts filename="proxy.ts"
+import { createMiddleware } from 'third-party-library'
+
+export default createMiddleware()
+```
+
+> **補足**: サードパーティ製ライブラリでは、`proxy` を依然として `middleware` と呼んでいる場合があります。
+
+## さらに詳しい例
+
+[Router Handlers](/docs/app/api-reference/file-conventions/route#examples) と [`proxy`](/docs/app/api-reference/file-conventions/proxy#examples) の API リファレンスでは、より多くの使用例を確認できます。
+
+これらの例には、[Cookies](/docs/app/api-reference/file-conventions/route#cookies)、[Headers](/docs/app/api-reference/file-conventions/route#headers)、[Streaming](/docs/app/api-reference/file-conventions/route#streaming)、Proxy における[ネガティブマッチング](/docs/app/api-reference/file-conventions/proxy#negative-matching)、その他の便利なコードスニペットが含まれています。
+
+## 注意事項
+
+### サーバーコンポーネント
+
+データは Route Handlers 経由ではなく、サーバーコンポーネント内でデータ元から直接フェッチしてください。
+
+ビルド時にプリレンダーされるサーバーコンポーネントでは、Route Handlers を使用するとビルドステップが失敗します。これは、ビルド中にはこれらのリクエストを受け付けるサーバーが存在しないためです。
+
+オンデマンドでレンダーされるサーバーコンポーネントでは、Route Handlers からフェッチすると、ハンドラーとレンダープロセス間に追加の HTTP 往復が発生するため、処理が遅くなります。
+
+> サーバー側の `fetch` リクエストは絶対 URL を使用します。これは、外部サーバーへの HTTP 往復が発生することを意味します。開発中は、自分の開発サーバーが外部サーバーとして動作します。ビルド時にはサーバーは存在せず、実行時には、サーバーは公開向けドメインを通じて利用可能になります。
+
+サーバーコンポーネントは、ほとんどのデータ取得ニーズをカバーします。ただし、次のようなケースではクライアントサイドでのデータフェッチが必要になることがあります:
+
+- クライアント専用の Web API に依存するデータ:
+  - ジオロケーション API
+  - Storage API
+  - Audio API
+  - File API
+- 頻繁にポーリングされるデータ
+
+これらの場合は、[`swr`](https://swr.vercel.app/) や [`react-query`](https://tanstack.com/query/latest/docs/framework/react/overview) のようなコミュニティライブラリを使用してください。
+
+### Server Actions
+
+Server Actions を使用すると、クライアントからサーバーサイドのコードを実行できます。主な目的は、フロントエンドクライアントからデータを変更することです。
+
+Server Actions はキューに登録されて順番に処理されます。これをデータフェッチに使用すると、実行が直列的になります。
+
+### `export` モード
+
+`export` モードは、ランタイム サーバーなしで動作する静的サイトを出力します。Next.js ランタイムを必要とする機能は、このモードでは静的サイトを生成し、ランタイム サーバーを伴わないため、[サポートされません](/docs/app/guides/static-exports#unsupported-features)。
+
+`export` モードでは、[`dynamic`](/docs/app/api-reference/file-conventions/route-segment-config#dynamic) ルート セグメント設定を `'force-static'` に指定した場合との組み合わせにおいてのみ、`GET` Route Handler がサポートされます。
+
+これを使用して、静的な HTML、JSON、TXT などのファイルを生成できます。
+
+```js filename="app/hello-world/route.ts"
+export const dynamic = 'force-static'
+
+export function GET() {
+  return new Response('Hello World', { status: 200 })
+}
+```
+
+### デプロイ環境
+
+一部のホスティング環境では、Route Handlers は Lambda 関数としてデプロイされます。これは次のことを意味します:
+
+- Route Handlers はリクエスト間でデータを共有できません。
+- 環境によってはファイルシステムへの書き込みがサポートされない場合があります。
+- 長時間実行されるハンドラーは、タイムアウトにより強制終了される可能性があります。
+- タイムアウト時やレスポンス生成後に接続が閉じられるため、WebSocket は動作しません。

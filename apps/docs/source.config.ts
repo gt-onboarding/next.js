@@ -18,5 +18,9 @@ export const docs = defineDocs({
 })
 
 export default defineConfig({
-  mdxOptions: {},
+  mdxOptions: {
+    remarkImageOptions: {
+      external: false, // don't fetch external URLs for image sizes
+    },
+  },
 })

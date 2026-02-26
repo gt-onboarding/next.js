@@ -1,0 +1,99 @@
+---
+title: serverExternalPackages
+description: '`bundlePagesRouterDependencies` で有効になる依存関係バンドルから、特定の依存関係を除外します。'
+---
+
+[`bundlePagesRouterDependencies`](/docs/pages/api-reference/config/next-config-js/bundlePagesRouterDependencies) オプションによる自動バンドルから、特定の依存関係を除外します。
+
+これらのページでは、その依存関係を解決するために、Node.js 標準の `require` が使用されます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['@acme/ui'],
+}
+
+module.exports = nextConfig
+```
+
+Next.js には、現在互換性対応を進めており、自動的に除外されている [一部の代表的な人気パッケージの短いリスト](https://github.com/vercel/next.js/blob/canary/packages/next/src/lib/server-external-packages.jsonc) が含まれます：
+
+- `@alinea/generated`
+- `@appsignal/nodejs`
+- `@aws-sdk/client-s3`
+- `@aws-sdk/s3-presigned-post`
+- `@blockfrost/blockfrost-js`
+- `@highlight-run/node`
+- `@huggingface/transformers`
+- `@jpg-store/lucid-cardano`
+- `@libsql/client`
+- `@mikro-orm/core`
+- `@mikro-orm/knex`
+- `@node-rs/argon2`
+- `@node-rs/bcrypt`
+- `@prisma/client`
+- `@react-pdf/renderer`
+- `@sentry/profiling-node`
+- `@sparticuz/chromium`
+- `@sparticuz/chromium-min`
+- `@statsig/statsig-node-core`
+- `@swc/core`
+- `@xenova/transformers`
+- `@zenstackhq/runtime`
+- `argon2`
+- `autoprefixer`
+- `aws-crt`
+- `bcrypt`
+- `better-sqlite3`
+- `canvas`
+- `chromadb-default-embed`
+- `config`
+- `cpu-features`
+- `cypress`
+- `dd-trace`
+- `eslint`
+- `express`
+- `firebase-admin`
+- `htmlrewriter`
+- `import-in-the-middle`
+- `isolated-vm`
+- `jest`
+- `jsdom`
+- `keyv`
+- `libsql`
+- `mdx-bundler`
+- `mongodb`
+- `mongoose`
+- `newrelic`
+- `next-mdx-remote`
+- `next-seo`
+- `node-cron`
+- `node-pty`
+- `node-web-audio-api`
+- `onnxruntime-node`
+- `oslo`
+- `pg`
+- `pino`
+- `pino-pretty`
+- `pino-roll`
+- `playwright`
+- `playwright-core`
+- `postcss`
+- `prettier`
+- `prisma`
+- `puppeteer-core`
+- `puppeteer`
+- `ravendb`
+- `require-in-the-middle`
+- `rimraf`
+- `sharp`
+- `shiki`
+- `sqlite3`
+- `thread-stream`
+- `ts-morph`
+- `ts-node`
+- `typescript`
+- `vscode-oniguruma`
+- `webpack`
+- `websocket`
+- `zeromq`

@@ -1,0 +1,37 @@
+---
+title: バージョン14へのアップグレード方法
+nav_title: バージョン14
+description: Next.js アプリケーションをバージョン 13 から 14 にアップグレードします。
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共有されています。Pages Router 専用の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されている内容はコンポーネントでラップしないでください。 */}
+
+## 13 から 14 へのアップグレード
+
+Next.js 14 にアップデートするには、お使いのパッケージマネージャーで次のコマンドを実行してください：
+
+```bash filename="Terminal"
+npm i next@next-14 react@18 react-dom@18 && npm i eslint-config-next@next-14 -D
+```
+
+```bash filename="Terminal"
+yarn add next@next-14 react@18 react-dom@18 && yarn add eslint-config-next@next-14 -D
+```
+
+```bash filename="Terminal"
+pnpm i next@next-14 react@18 react-dom@18 && pnpm i eslint-config-next@next-14 -D
+```
+
+```bash filename="Terminal"
+bun add next@next-14 react@18 react-dom@18 && bun add eslint-config-next@next-14 -D
+```
+
+> **補足:** TypeScript を使用している場合は、`@types/react` と `@types/react-dom` もあわせて最新バージョンに更新していることを確認してください。
+
+### v14 Summary
+
+- 最低対応 Node.js バージョンは 16.14 から 18.17 に引き上げられました。これは、16.x のサポート期間が終了したためです。
+- `next export` コマンドは削除され、代わりに `output: 'export'` 設定に置き換えられました。詳しくは[ドキュメント](https://nextjs.org/docs/app/guides/static-exports)を参照してください。
+- `ImageResponse` 用の `next/server` インポートは `next/og` に名前が変更されました。インポートを安全かつ自動的にリネームするための[コードモッドが提供されています](/docs/app/guides/upgrading/codemods#next-og-import)。
+- `@next/font` パッケージは削除され、組み込みの `next/font` に統一されました。インポートを安全かつ自動的にリネームするための[コードモッドが提供されています](/docs/app/guides/upgrading/codemods#built-in-next-font)。
+- `next-swc` の WASM ターゲットは削除されました。

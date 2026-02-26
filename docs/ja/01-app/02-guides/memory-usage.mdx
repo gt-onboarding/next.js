@@ -1,0 +1,167 @@
+---
+title: メモリ使用量を最適化する方法
+nav_title: メモリ使用量
+description: 開発および本番環境でアプリケーションが使用するメモリを最適化します。
+---
+
+アプリケーションが成長して機能が充実してくると、ローカル開発時や本番ビルドの作成時に、より多くのリソースを必要とするようになります。
+
+ここでは、メモリ使用量を最適化し、Next.js における一般的なメモリ関連の問題に対処するための戦略と手法を見ていきます。
+
+## 依存関係の数を減らす
+
+依存関係が多いアプリケーションほど、より多くのメモリを使用します。
+
+[Bundle Analyzer](/docs/app/guides/package-bundling) を使うと、パフォーマンスとメモリ使用量の改善のために削除を検討できる、サイズの大きな依存関係を特定するのに役立ちます。
+
+## `experimental.webpackMemoryOptimizations` を試す
+
+`v15.0.0` 以降では、`next.config.js` ファイルに `experimental.webpackMemoryOptimizations: true` を追加して、Webpack の動作を変更できます。これにより最大メモリ使用量を抑えられますが、コンパイル時間がわずかに延びる可能性があります。
+
+> **補足**: この機能は現在、より多くのプロジェクトで検証するための実験的機能ですが、リスクは低いと見なされています。
+
+## `--experimental-debug-memory-usage` オプション付きで `next build` を実行する
+
+`14.2.0` 以降では、`next build --experimental-debug-memory-usage` を実行して、ビルドを Next.js がヒープ使用量やガベージコレクション統計などのメモリ使用状況に関する情報をビルド全体を通して継続的に出力するモードで実行できます。メモリ使用量が設定された上限に近づくと、ヒープスナップショットも自動的に取得されます。
+
+> **補足**: この機能は、独自の webpack 設定を行っていない限り自動で有効になる Webpack の build worker オプションとは互換性がありません。
+
+## ヒーププロファイルを記録する
+
+メモリの問題を調査するには、Node.js でヒーププロファイルを記録し、それを Chrome DevTools に読み込んでメモリリークの原因となりうる箇所を特定できます。
+
+ターミナルで、Next.js のビルドを起動するときに `--heap-prof` フラグを Node.js に渡します。
+
+```sh
+node --heap-prof node_modules/next/dist/bin/next build
+```
+
+ビルドの完了時に、Node.js によって `.heapprofile` ファイルが作成されます。
+
+Chrome DevTools で Memory タブを開き、「Load Profile」ボタンをクリックすると、そのファイルを可視化できます。
+
+## ヒープスナップショットを解析する
+
+インスペクター ツールを使用して、アプリケーションのメモリ使用量を解析できます。
+
+`next build` または `next dev` コマンドを実行する際は、コマンドの先頭に `NODE_OPTIONS=--inspect` を追加します。これにより、デフォルトポートでインスペクターエージェントが待ち受けるようになります。
+ユーザーコードが実行される前にブレークしたい場合は、代わりに `--inspect-brk` を指定します。プロセスの実行中は、Chrome DevTools などのツールを使ってデバッグポートに接続し、ヒープスナップショットを記録・解析して、どのデータがメモリに保持されたままになっているかを確認できます。
+
+`14.2.0` 以降では、`next build` を `--experimental-debug-memory-usage` フラグ付きで実行して、ヒープスナップショットの取得を容易にすることもできます。
+
+このモードで実行している間は、任意のタイミングでプロセスに `SIGUSR2` シグナルを送信すると、プロセスがヒープスナップショットを取得します。
+
+ヒープスナップショットは Next.js アプリケーションのプロジェクトルートに保存され、Chrome DevTools などの任意のヒープ解析ツールに読み込んで、どのデータがメモリに保持されているかを確認できます。このモードはまだ Webpack ビルドワーカーとは互換性がありません。
+
+詳細については、[ヒープスナップショットの記録と解析方法](https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots)を参照してください。
+
+## Webpack ビルドワーカー
+
+Webpack ビルドワーカーを使用すると、別の Node.js ワーカー内で Webpack のコンパイルを実行できるため、ビルド中のアプリケーションのメモリ使用量を削減できます。
+
+このオプションは、`v14.1.0` 以降では、アプリケーションにカスタム Webpack 設定がない場合にデフォルトで有効になります。
+
+古いバージョンの Next.js を使用している場合や、カスタム Webpack 設定がある場合は、`next.config.js` 内で `experimental.webpackBuildWorker: true` を設定することで、このオプションを有効にできます。
+
+> **補足**: この機能は、すべてのカスタム Webpack プラグインと互換性があるとは限りません。
+
+## Webpack キャッシュを無効化する
+
+[Webpack cache](https://webpack.js.org/configuration/cache/) は、ビルドの速度を向上させるために、生成された Webpack モジュールをメモリやディスクに保存します。これはパフォーマンス向上に役立ちますが、一方でキャッシュされたデータを保持するためにアプリケーションのメモリ使用量が増加します。
+
+この動作は、アプリケーションに[カスタム Webpack 設定](/docs/app/api-reference/config/next-config-js/webpack)を追加することで無効化できます。
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (
+    config,
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+  ) => {
+    if (config.cache && !dev) {
+      config.cache = Object.freeze({
+        type: 'memory',
+      })
+    }
+    // 重要: 変更した設定を返す
+    return config
+  },
+}
+
+export default nextConfig
+```
+
+## 静的解析を無効にする
+
+特に大規模なプロジェクトでは、型チェックに多くのメモリを消費する場合があります。
+一方で、ほとんどのプロジェクトでは、これらのタスクはすでに専用の CI ランナーによって処理されています。
+ビルド中の「Running TypeScript」ステップでメモリ不足が発生する場合、このステップをビルド時には無効化できます。
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  typescript: {
+    // !! 警告 !!
+    // 型エラーがあってもプロダクションビルドを強制的に成功させます。
+    // !! 警告 !!
+    ignoreBuildErrors: true,
+  },
+}
+
+export default nextConfig
+```
+
+- [TypeScript エラーを無視する](/docs/app/api-reference/config/typescript#disabling-typescript-errors-in-production)
+
+これにより、型エラーが原因で問題のあるデプロイが行われる可能性があることに注意してください。
+静的解析が完了したビルドのみを本番環境に昇格させることを強く推奨します。
+Vercel にデプロイする場合は、カスタムタスクが成功した後にビルドを本番に昇格させる方法については、[ステージングデプロイのガイド](https://vercel.com/docs/deployments/managing-deployments#staging-and-promoting-a-production-deployment)を参照してください。
+
+## ソースマップを無効にする
+
+ソースマップの生成は、ビルド処理中に追加のメモリを消費します。
+
+Next.js の設定に `productionBrowserSourceMaps: false` と `experimental.serverSourceMaps: false` を追加することで、ソースマップの生成を無効にできます。
+
+`cacheComponents` 機能を使用している場合、Next.js は `next build` のプリレンダーフェーズ中に、デフォルトでソースマップを使用します。
+そのフェーズ（"Generating static pages" の後）で繰り返しメモリに関する問題が発生する場合は、
+Next.js の設定に `enablePrerenderSourceMaps: false` を追加して、そのフェーズでのソースマップを無効にしてみてください。
+
+> **補足**: 一部のプラグインはソースマップを有効にする場合があり、無効にするにはカスタム設定が必要になることがあります。
+
+## Edge ランタイムのメモリ問題
+
+Next.js の `v14.1.3` で Edge ランタイム使用時のメモリ問題が修正されています。問題が解消されるか確認するため、このバージョン（またはそれ以降）に更新してください。
+
+## エントリのプリロード
+
+Next.js サーバーが起動すると、リクエスト時ではなく、各ページの JavaScript モジュールをメモリにプリロードします。
+
+この最適化により、初期メモリ使用量が増える代わりに、応答時間を短縮できます。
+
+この最適化を無効にするには、`experimental.preloadEntriesOnStart` フラグを `false` に設定します。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  experimental: {
+    preloadEntriesOnStart: false,
+  },
+}
+
+export default config
+```
+
+```js filename="next.config.mjs" switcher
+/** @type {import('next').NextConfig} */
+const config = {
+  experimental: {
+    preloadEntriesOnStart: false,
+  },
+}
+
+export default config
+```
+
+Next.js はこれらの JavaScript モジュールをアンロードしないため、この最適化を無効にしていても、最終的にすべてのページがリクエストされると、Next.js サーバーのメモリ使用量は同じになります。

@@ -1,0 +1,375 @@
+---
+title: 動的ルートセグメント
+nav_title: 動的セグメント
+description: 動的ルートセグメントを使用すると、動的なデータからルートセグメントをプログラムで生成できます。
+related:
+  title: 次のステップ
+  description: 次に何を行うべきかの詳細については、以下のセクションを参照してください
+  links:
+    - app/api-reference/functions/generate-static-params
+---
+
+事前に正確なルートセグメント名が分からず、動的なデータからルートを作成したい場合には、リクエスト時、またはビルド時のプリレンダリング時に値が埋め込まれる動的セグメントを使用できます。
+
+## 規約
+
+Dynamic Segment は、フォルダ名を角かっこで囲むことで作成できます：`[folderName]`。たとえば、ブログでは `app/blog/[slug]/page.js` のようなルートを含めることができ、この場合 `[slug]` がブログ投稿用の Dynamic Segment になります。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  return <div>My Post: {slug}</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export default async function Page({ params }) {
+  const { slug } = await params
+  return <div>My Post: {slug}</div>
+}
+```
+
+Dynamic Segments は、`params` プロップとして [`layout`](/docs/app/api-reference/file-conventions/layout)、[`page`](/docs/app/api-reference/file-conventions/page)、[`route`](/docs/app/api-reference/file-conventions/route)、および [`generateMetadata`](/docs/app/api-reference/functions/generate-metadata#generatemetadata-function) 関数に渡されます。
+
+| Route                     | Example URL | `params`        |
+| ------------------------- | ----------- | --------------- |
+| `app/blog/[slug]/page.js` | `/blog/a`   | `{ slug: 'a' }` |
+| `app/blog/[slug]/page.js` | `/blog/b`   | `{ slug: 'b' }` |
+| `app/blog/[slug]/page.js` | `/blog/c`   | `{ slug: 'c' }` |
+
+### Client Component 内で
+
+Client Component の **page** では、props から渡される動的セグメントに [`use`](https://react.dev/reference/react/use) API を使用してアクセスできます。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+'use client'
+import { use } from 'react'
+
+export default function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = use(params)
+
+  return (
+    <div>
+      <p>{slug}</p>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+'use client'
+import { use } from 'react'
+
+export default function BlogPostPage({ params }) {
+  const { slug } = use(params)
+
+  return (
+    <div>
+      <p>{slug}</p>
+    </div>
+  )
+}
+```
+
+また、Client Component では [`useParams`](/docs/app/api-reference/functions/use-params) フックを使用して、Client Component ツリー内のどこからでも `params` にアクセスできます。
+
+### キャッチオールセグメント
+
+動的セグメントは、角括弧内に三点リーダー（`[...folderName]`）を追加することで、後続のセグメントをすべて含む**キャッチオール**セグメントに拡張できます。
+
+たとえば、`app/shop/[...slug]/page.js` は `/shop/clothes` にマッチしますが、`/shop/clothes/tops` や `/shop/clothes/tops/t-shirts` などにもマッチします。
+
+| Route                        | Example URL   | `params`                    |
+| ---------------------------- | ------------- | --------------------------- |
+| `app/shop/[...slug]/page.js` | `/shop/a`     | `{ slug: ['a'] }`           |
+| `app/shop/[...slug]/page.js` | `/shop/a/b`   | `{ slug: ['a', 'b'] }`      |
+| `app/shop/[...slug]/page.js` | `/shop/a/b/c` | `{ slug: ['a', 'b', 'c'] }` |
+
+### オプションのキャッチオールセグメント
+
+キャッチオールセグメントは、パラメータを二重の角括弧で囲むことで**オプション**にできます: `[[...folderName]]`。
+
+たとえば、`app/shop/[[...slug]]/page.js` は `/shop/clothes`、`/shop/clothes/tops`、`/shop/clothes/tops/t-shirts` に加えて、**さらに** `/shop` にもマッチします。
+
+**キャッチオール**セグメントと**オプションのキャッチオール**セグメントの違いは、オプションの場合、パラメータなしのルート（上の例では `/shop`）にもマッチする点です。
+
+| Route                          | Example URL   | `params`                    |
+| ------------------------------ | ------------- | --------------------------- |
+| `app/shop/[[...slug]]/page.js` | `/shop`       | `{ slug: undefined }`       |
+| `app/shop/[[...slug]]/page.js` | `/shop/a`     | `{ slug: ['a'] }`           |
+| `app/shop/[[...slug]]/page.js` | `/shop/a/b`   | `{ slug: ['a', 'b'] }`      |
+| `app/shop/[[...slug]]/page.js` | `/shop/a/b/c` | `{ slug: ['a', 'b', 'c'] }` |
+
+### TypeScript
+
+TypeScript を使用する場合、設定したルートセグメントに応じて `params` に型定義を追加できます。`page`、`layout`、`route` それぞれで `params` に型を付けるには、[`PageProps<'/route'>`](/docs/app/api-reference/file-conventions/page#page-props-helper)、[`LayoutProps<'/route'>`](/docs/app/api-reference/file-conventions/layout#layout-props-helper)、または [`RouteContext<'/route'>`](/docs/app/api-reference/file-conventions/route#route-context-helper) を使用します。
+
+ルートの `params` の値は、実行時まで値が分からないため、`string`、`string[]`、または `undefined`（オプショナルな catch-all セグメントの場合）として型付けされます。ユーザーはアドレスバーに任意の URL を入力できるため、これらのより広い型によって、アプリケーションコードがこれらすべての可能なケースを確実に処理できるようになります。
+
+| Route                               | `params` Type Definition                 |
+| ----------------------------------- | ---------------------------------------- |
+| `app/blog/[slug]/page.js`           | `{ slug: string }`                       |
+| `app/shop/[...slug]/page.js`        | `{ slug: string[] }`                     |
+| `app/shop/[[...slug]]/page.js`      | `{ slug?: string[] }`                    |
+| `app/[categoryId]/[itemId]/page.js` | `{ categoryId: string, itemId: string }` |
+
+`[locale]` のように、既知の言語コードの集合を持つ `params` など、取り得る値があらかじめ限られているルートで作業している場合は、実行時バリデーションを使用してユーザーが入力した無効な `params` を処理し、アプリケーションの残りの部分では既知の集合に基づく、より狭い型として扱うことができます。
+
+```tsx filename="/app/[locale]/page.tsx"
+import { notFound } from 'next/navigation'
+import type { Locale } from '@i18n/types'
+import { isValidLocale } from '@i18n/utils'
+
+function assertValidLocale(value: string): asserts value is Locale {
+  if (!isValidLocale(value)) notFound()
+}
+
+export default async function Page(props: PageProps<'/[locale]'>) {
+  const { locale } = await props.params // locale は string 型
+  assertValidLocale(locale)
+  // locale は Locale 型に絞り込まれた
+}
+```
+
+## 動作
+
+- `params` プロップは Promise なので、値にアクセスするには `async`/`await` または React の use 関数を使用する必要があります。
+  - バージョン 14 以前では、`params` は同期的なプロップでした。後方互換性のため、Next.js 15 でも引き続き同期的にアクセスできますが、この挙動は将来的に非推奨となる予定です。
+
+### Cache Components を使用する場合
+
+動的ルートセグメントとともに [Cache Components](/docs/app/getting-started/cache-components) を使用する場合、`params` の扱いは [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) を使用するかどうかによって変わります。
+
+`generateStaticParams` を使用しない場合、プリレンダリング時には `params` の値が不明なため、`params` は実行時データになります。フォールバック UI を提供するために、`params` へのアクセスは `<Suspense>` の境界でラップする必要があります。
+
+`generateStaticParams` を使用する場合、ビルド時に利用できるサンプルの `params` 値を提供します。ビルドプロセスでは、動的コンテンツやその他のランタイム API が正しく扱われているかを検証したうえで、サンプル用の静的 HTML ファイルを生成します。実行時の `params` でレンダリングされたページは、最初のリクエストが正常に完了したあとにディスクへ保存されます。
+
+以下のセクションでは、両方のパターンを示します。
+
+#### `generateStaticParams` なしの場合
+
+すべての params はランタイムデータになります。params へのアクセスは Suspense のフォールバック UI でラップする必要があります。Next.js はビルド時に静的シェルを生成し、コンテンツは各リクエストごとに読み込まれます。
+
+> **補足**: ページレベルのフォールバック UI には、[`loading.tsx`](/docs/app/api-reference/file-conventions/loading) も使用できます。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { Suspense } from 'react'
+
+export default function Page({ params }: PageProps<'/blog/[slug]'>) {
+  return (
+    <div>
+      <h1>Blog Post</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        {params.then(({ slug }) => (
+          <Content slug={slug} />
+        ))}
+      </Suspense>
+    </div>
+  )
+}
+
+async function Content({ slug }: { slug: string }) {
+  const res = await fetch(`https://api.vercel.app/blog/${slug}`)
+  const post = await res.json()
+
+  return (
+    <article>
+      <h2>{post.title}</h2>
+      <p>{post.content}</p>
+    </article>
+  )
+}
+```
+
+#### `generateStaticParams` を使う場合
+
+ビルド時にページを事前レンダーできるよう、事前に params を指定します。ニーズに応じて、すべてのルート、またはその一部のみを事前レンダーできます。
+
+ビルドプロセス中、ルートは各 params の値ごとに実行され、生成された HTML が収集されます。動的コンテンツや実行時データへのアクセス方法に問題がある場合、ビルドは失敗します。
+
+```tsx filename="app/blog/[slug]/page.tsx" highlight={3-5,8,19}
+import { Suspense } from 'react'
+
+export async function generateStaticParams() {
+  return [{ slug: '1' }, { slug: '2' }, { slug: '3' }]
+}
+
+export default async function Page({ params }: PageProps<'/blog/[slug]'>) {
+  const { slug } = await params
+
+  return (
+    <div>
+      <h1>Blog Post</h1>
+      <Content slug={slug} />
+    </div>
+  )
+}
+
+async function Content({ slug }: { slug: string }) {
+  const post = await getPost(slug)
+  return (
+    <article>
+      <h2>{post.title}</h2>
+      <p>{post.content}</p>
+    </article>
+  )
+}
+
+async function getPost(slug: string) {
+  'use cache'
+  const res = await fetch(`https://api.vercel.app/blog/${slug}`)
+  return res.json()
+}
+```
+
+ビルド時の検証は、サンプルのパラメータで実行されるコードパスだけを対象とします。ルート内で、サンプルに含まれていない特定のパラメータ値に対してランタイム API にアクセスする条件分岐ロジックがある場合、それらの分岐はビルド時には検証されません。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { cookies } from 'next/headers'
+
+export async function generateStaticParams() {
+  return [{ slug: 'public-post' }, { slug: 'hello-world' }]
+}
+
+export default async function Page({ params }: PageProps<'/blog/[slug]'>) {
+  const { slug } = await params
+
+  if (slug.startsWith('private-')) {
+    // このブランチはビルド時に実行されない
+    // 'private-*' スラッグへのランタイムリクエストはエラーになる
+    return <PrivatePost slug={slug} />
+  }
+
+  return <PublicPost slug={slug} />
+}
+
+async function PrivatePost({ slug }: { slug: string }) {
+  const token = (await cookies()).get('token')
+  // ... token を使って認証しながらプライベート投稿を取得・レンダリングする
+}
+```
+
+`generateStaticParams` で返されないランタイムパラメータについては、最初のリクエスト時に検証が行われます。上記の例では、`private-` で始まるスラッグへのリクエストは失敗します。これは、`PrivatePost` が Suspense バウンダリなしで `cookies()` にアクセスしているためです。条件分岐に該当しないその他のランタイムパラメータは正常にレンダーされ、その結果がディスクに保存されて以降のリクエストで再利用されます。
+
+これを修正するには、`PrivatePost` を Suspense でラップします:
+
+```tsx filename="app/blog/[slug]/page.tsx" highlight={13-15}
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+
+export async function generateStaticParams() {
+  return [{ slug: 'public-post' }, { slug: 'hello-world' }]
+}
+
+export default async function Page({ params }: PageProps<'/blog/[slug]'>) {
+  const { slug } = await params
+
+  if (slug.startsWith('private-')) {
+    return (
+      <Suspense fallback={<div>Loading...</div>}>
+        <PrivatePost slug={slug} />
+      </Suspense>
+    )
+  }
+
+  return <PublicPost slug={slug} />
+}
+
+async function PrivatePost({ slug }: { slug: string }) {
+  const token = (await cookies()).get('token')
+  // ... tokenを使って認証し、プライベート投稿を取得してレンダリング
+}
+```
+
+## 例
+
+### `generateStaticParams` を使用する
+
+[`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) 関数を使用すると、リクエストごとのオンデマンド処理ではなく、ビルド時にルートを[静的に生成](/docs/app/guides/caching#static-rendering)できます。
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+`generateStaticParams` 関数内で `fetch` を使用する場合、リクエストは[自動的に重複排除](/docs/app/guides/caching#request-memoization)されます。これにより、同じデータに対してレイアウト、ページ、その他の `generateStaticParams` 関数から複数のネットワーク呼び出しが行われるのを防ぎ、ビルド時間を短縮できます。
+
+### `generateStaticParams` を使用した動的な GET Route Handler
+
+`generateStaticParams` は、動的な [Route Handlers](/docs/app/api-reference/file-conventions/route) と組み合わせて、ビルド時に API レスポンスを静的に生成することもできます。
+
+```ts filename="app/api/posts/[id]/route.ts" switcher
+export async function generateStaticParams() {
+  const posts: { id: number }[] = await fetch(
+    'https://api.vercel.app/blog'
+  ).then((res) => res.json())
+
+  return posts.map((post) => ({
+    id: `${post.id}`,
+  }))
+}
+
+export async function GET(
+  request: Request,
+  { params }: RouteContext<'/api/posts/[id]'>
+) {
+  const { id } = await params
+  const res = await fetch(`https://api.vercel.app/blog/${id}`)
+
+  if (!res.ok) {
+    return Response.json({ error: 'Post not found' }, { status: 404 })
+  }
+
+  const post = await res.json()
+  return Response.json(post)
+}
+```
+
+```js filename="app/api/posts/[id]/route.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+
+  return posts.map((post) => ({
+    id: `${post.id}`,
+  }))
+}
+
+export async function GET(request, { params }) {
+  const { id } = await params
+  const res = await fetch(`https://api.vercel.app/blog/${id}`)
+
+  if (!res.ok) {
+    return Response.json({ error: 'Post not found' }, { status: 404 })
+  }
+
+  const post = await res.json()
+  return Response.json(post)
+}
+```
+
+この例では、`generateStaticParams` によって返されるすべてのブログ投稿 ID に対応するルートハンドラーが、ビルド時に静的生成されます。それ以外の ID へのリクエストは、リクエスト時に動的に処理されます。

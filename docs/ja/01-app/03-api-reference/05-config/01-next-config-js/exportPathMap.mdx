@@ -1,0 +1,87 @@
+---
+title: exportPathMap
+description: '`next export` を使用する際に、HTML ファイルとしてエクスポートするページをカスタマイズします。'
+version: legacy
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+> この機能は `next export` 専用であり、現在は `pages` での `getStaticPaths`、または `app` での `generateStaticParams` の利用が推奨されているため**非推奨**です。
+
+`exportPathMap` を使うと、エクスポート時に使用されるリクエストパスからページへのマッピングを指定できます。`exportPathMap` で定義したパスは、[`next dev`](/docs/app/api-reference/cli/next#next-dev-options) を使用するときにも利用可能です。
+
+次のページ構成を持つアプリに対して、カスタムの `exportPathMap` を作成する例から始めましょう:
+
+- `pages/index.js`
+- `pages/about.js`
+- `pages/post.js`
+
+`next.config.js` を開き、次のように `exportPathMap` 設定を追加します:
+
+```js filename="next.config.js"
+module.exports = {
+  exportPathMap: async function (
+    defaultPathMap,
+    { dev, dir, outDir, distDir, buildId }
+  ) {
+    return {
+      '/': { page: '/' },
+      '/about': { page: '/about' },
+      '/p/hello-nextjs': { page: '/post', query: { title: 'hello-nextjs' } },
+      '/p/learn-nextjs': { page: '/post', query: { title: 'learn-nextjs' } },
+      '/p/deploy-nextjs': { page: '/post', query: { title: 'deploy-nextjs' } },
+    }
+  },
+}
+```
+
+> **補足**: `exportPathMap` の `query` フィールドは、[自動静的最適化が適用されたページ](/docs/pages/building-your-application/rendering/automatic-static-optimization) や [`getStaticProps` ページ](/docs/pages/building-your-application/data-fetching/get-static-props) では使用できません。これらはビルド時に HTML ファイルとしてレンダリングされ、`next export` 実行時に追加のクエリ情報を渡すことができないためです。
+
+その後、ページは HTML ファイルとしてエクスポートされます。たとえば、`/about` は `/about.html` になります。
+
+`exportPathMap` は 2 つの引数を受け取る `async` 関数です。1 つ目は `defaultPathMap` で、Next.js が使用するデフォルトのマップです。2 つ目の引数は次のフィールドを持つオブジェクトです:
+
+- `dev` - 開発環境で `exportPathMap` が呼び出されるときは `true`。`next export` 実行時は `false`。開発環境では `exportPathMap` を使ってルートを定義します。
+- `dir` - プロジェクトディレクトリへの絶対パス
+- `outDir` - `out/` ディレクトリへの絶対パス（[`-o`](#customizing-the-output-directory) で設定可能）。`dev` が `true` の場合、`outDir` の値は `null` になります。
+- `distDir` - `.next/` ディレクトリへの絶対パス（[`distDir`](/docs/pages/api-reference/config/next-config-js/distDir) 設定で変更可能）
+- `buildId` - 生成されたビルド ID
+
+返されるオブジェクトはページのマップで、`key` が `pathname`、`value` が次のフィールドを持つオブジェクトです:
+
+- `page`: `String` - レンダリングする `pages` ディレクトリ内のページ
+- `query`: `Object` - プリレンダリング時に `getInitialProps` に渡される `query` オブジェクト。デフォルトは `{}`
+
+> エクスポートされる `pathname` は（`/readme.md` のような）ファイル名にすることもできますが、拡張子が `.html` と異なる場合、そのコンテンツを配信するときに `Content-Type` ヘッダーを `text/html` に設定する必要があります。
+
+## トレーリングスラッシュを追加する
+
+Next.js を設定して、ページを `index.html` ファイルとしてエクスポートし、末尾のスラッシュを必須にすることができます。たとえば `/about` は `/about/index.html` になり、`/about/` でルーティング可能になります。これは Next.js 9 以前のデフォルトの動作でした。
+
+トレーリングスラッシュを再び有効にするには、`next.config.js` を開いて `trailingSlash` 設定を有効にします。
+
+```js filename="next.config.js"
+module.exports = {
+  trailingSlash: true,
+}
+```
+
+## 出力ディレクトリのカスタマイズ
+
+<AppOnly>
+  [`next export`](/docs/app/guides/static-exports)
+  はデフォルトの出力ディレクトリとして `out` を使用しますが、次のように `-o`
+  オプションを使用してカスタマイズできます：
+</AppOnly>
+
+<PagesOnly>
+  [`next export`](/docs/pages/guides/static-exports)
+  はデフォルトの出力ディレクトリとして `out` を使用しますが、次のように `-o`
+  オプションを使用してカスタマイズできます：
+</PagesOnly>
+
+```bash filename="Terminal"
+next export -o outdir
+```
+
+> **警告:** `exportPathMap` の使用は非推奨であり、`pages` 内の `getStaticPaths` によって上書きされます。これらを一緒に使用することは推奨されません。

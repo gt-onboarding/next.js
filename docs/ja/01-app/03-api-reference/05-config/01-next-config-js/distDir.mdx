@@ -1,0 +1,20 @@
+---
+title: distDir
+description: デフォルトの .next ディレクトリの代わりに使用するカスタムのビルドディレクトリを設定する。
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router の両方で共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されるコンテンツはコンポーネントでラップしないでください。 */}
+
+`.next` の代わりに使用するカスタムのビルドディレクトリ名を指定できます。
+
+`next.config.js` を開き、`distDir` 設定を追加します：
+
+```js filename="next.config.js"
+module.exports = {
+  distDir: 'build',
+}
+```
+
+ここで `next build` を実行すると、Next.js はデフォルトの `.next` ディレクトリの代わりに `build` を使用します。
+
+> `distDir` はプロジェクトディレクトリの外に出しては **いけません**。たとえば、`../build` は **無効な** ディレクトリです。

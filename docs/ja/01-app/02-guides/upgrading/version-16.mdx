@@ -1,0 +1,1227 @@
+---
+title: バージョン16へのアップグレード方法
+nav_title: バージョン16
+description: Next.jsアプリケーションをバージョン15から16にアップグレードする方法。
+---
+
+{/* このドキュメントの内容は app ルーターと Pages ルーターで共通です。Pages ルーター専用の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共通の内容はコンポーネントでラップしないでください。 */}
+
+## バージョン 15 から 16 へのアップグレード
+
+### Next.js DevTools MCP と AI エージェントの併用
+
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io) をサポートする AI コーディングアシスタントを使用している場合、**Next.js DevTools MCP** を使ってアップグレードやマイグレーションタスクを自動化できます。
+
+#### セットアップ
+
+MCP クライアントの設定に以下を追加します。各コーディングエージェントごとの設定方法の詳細については、[このセクション](https://github.com/vercel/next-devtools-mcp#mcp-client-configuration)を参照してください。
+
+**例:**
+
+```json filename=".mcp.json"
+{
+  "mcpServers": {
+    "next-devtools": {
+      "command": "npx",
+      "args": ["-y", "next-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+詳しくは、MCP クライアントでの設定方法などについて [`next-devtools-mcp`](https://github.com/vercel/next-devtools-mcp) のドキュメントを参照してください。
+
+> **注:** `next-devtools-mcp@latest` を使用すると、MCP クライアントは常に Next.js DevTools MCP サーバーの最新バージョンを使用するように構成されます。
+
+#### プロンプト例
+
+設定が完了したら、自然言語のプロンプトを使って Next.js アプリをアップグレードできます：
+
+**Next.js 16 にアップグレードする場合：**
+
+コーディングエージェントに接続して、次のように指示します：
+
+```txt
+Next Devtools, help me upgrade my Next.js app to version 16
+```
+
+**（v16 にアップグレードした後）Cache Components に移行するには：**
+
+コードエージェントに接続し、次のプロンプトを送信してください：
+
+```txt
+Next Devtools, migrate my Next.js app to cache components
+```
+
+詳細はドキュメントの[こちら](/docs/app/guides/mcp)をご覧ください。
+
+### Codemod の使用
+
+Next.js バージョン 16 に更新するには、`upgrade` [codemod](/docs/app/guides/upgrading/codemods#160) を使用できます。
+
+```bash package="pnpm"
+pnpm dlx @next/codemod@canary upgrade latest
+```
+
+```bash package="npm"
+npx @next/codemod@canary upgrade latest
+```
+
+```bash package="yarn"
+yarn dlx @next/codemod@canary upgrade latest
+```
+
+```bash package="bun"
+bunx @next/codemod@canary upgrade latest
+```
+
+[codemod](/docs/app/guides/upgrading/codemods#160) は次のことが可能です:
+
+- `next.config.js` を更新して、新しい `turbopack` 設定を使用するようにする
+- `next lint` から ESLint CLI への移行を行う
+- 非推奨となった `middleware` コンベンションから `proxy` への移行を行う
+- 安定版になった API から `unstable_` プレフィックスを削除する
+- ページおよびレイアウトから `experimental_ppr` Route Segment Config を削除する
+
+手動で対応したい場合は、最新版の Next.js と React をインストールしてください:
+
+```bash package="pnpm"
+pnpm add next@latest react@latest react-dom@latest
+```
+
+```bash package="npm"
+npm install next@latest react@latest react-dom@latest
+```
+
+```bash package="yarn"
+yarn add next@latest react@latest react-dom@latest
+```
+
+```bash package="bun"
+bun add next@latest react@latest react-dom@latest
+```
+
+TypeScript を使用している場合は、`@types/react` と `@types/react-dom` も最新バージョンにアップグレードしてください。
+
+## Node.js ランタイムとブラウザサポート
+
+| 要件          | 変更内容 / 詳細                                               |
+| ------------- | ------------------------------------------------------------- |
+| Node.js 20.9+ | 最低バージョンは `20.9.0` (LTS)。Node.js 18 はサポート対象外  |
+| TypeScript 5+ | 最低バージョンは `5.1.0`                                      |
+| ブラウザ      | Chrome 111+、Edge 111+、Firefox 111+、Safari 16.4+ をサポート |
+
+## デフォルトの Turbopack
+
+**Next.js 16** 以降、Turbopack は安定版となり、`next dev` と `next build` で標準的に使用されます。
+
+以前は、`--turbopack` または `--turbo` を使って Turbopack を有効化する必要がありました。
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "next start"
+  }
+}
+```
+
+これはもう不要です。`package.json` の `scripts` を次のように更新できます:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+プロジェクトに[カスタムの `webpack`](/docs/app/api-reference/config/next-config-js/webpack) 設定があり、`next build`（デフォルトで Turbopack を使用）を実行すると、誤った設定による問題を防ぐためにビルドは**失敗**します。
+
+この問題に対処する方法はいくつかあります:
+
+- **とにかく Turbopack を使う:** `next build --turbopack` を実行して、`webpack` の設定を無視し、Turbopack を使ってビルドします。
+- **完全に Turbopack に移行する:** `webpack` の設定内容を、Turbopack と互換性のあるオプションに移行します。
+- **Webpack を使い続ける:** `--webpack` フラグを使って Turbopack を無効化し、Webpack でビルドします。
+
+> **補足**: `webpack` 設定が見つかったことが原因でビルドが失敗しているのに、自分では設定を定義していない場合、プラグインが `webpack` オプションを追加している可能性があります。
+
+### Turbopack を無効化する
+
+Webpack の使用を継続する必要がある場合は、`--webpack` フラグを使ってオプトアウトできます。たとえば、開発環境では Turbopack を使用しつつ、本番用ビルドでは Webpack を使うには次のようにします。
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start"
+  }
+}
+```
+
+開発・本番ともに Turbopack の使用を推奨します。Turbopack に切り替えられない場合は、この[スレッド](https://github.com/vercel/next.js/discussions/77721)にコメントを投稿してください。
+
+### Turbopack の設定場所
+
+`experimental.turbopack` 設定は、もはや実験的機能ではありません。
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+// Next.js 15 - experimental.turbopack
+const nextConfig: NextConfig = {
+  experimental: {
+    turbopack: {
+      // オプション
+    },
+  },
+}
+
+export default nextConfig
+```
+
+これはトップレベルの `turbopack` オプションとして使用できます。
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+// Next.js 16 - nextConfigのトップレベルにturbopackを配置
+const nextConfig: NextConfig = {
+  turbopack: {
+    // オプション
+  },
+}
+
+export default nextConfig
+```
+
+`Turbopack` の[構成オプション](/docs/app/api-reference/config/next-config-js/turbopack)を必ず確認してください。**Next.js 16** では、次のようなさまざまな改善や新しいオプションが追加されています。
+
+- [高度な Webpack ローダー条件](/docs/app/api-reference/config/next-config-js/turbopack#advanced-webpack-loader-conditions)
+- [debugIds](/docs/app/api-reference/config/next-config-js/turbopack#debug-ids)
+
+### resolve エイリアスのフォールバック
+
+一部のプロジェクトでは、クライアントサイドのコードが Node.js のネイティブモジュールを含むファイルを import することがあります。これにより、`Module not found: Can't resolve 'fs'` のようなエラーが発生します。
+
+このような場合は、クライアントサイドのバンドルがこれらの Node.js ネイティブモジュールを参照しないように、コードをリファクタリングするべきです。
+
+しかし、状況によってはそれができないこともあります。Webpack では、このエラーを**抑制**するために通常 `resolve.fallback` オプションが使われていました。Turbopack では、`turbopack.resolveAlias` を使うことで同様のことができます。この場合、ブラウザ向けに `fs` が要求されたときに空のモジュールを読み込むように Turbopack に指示します。
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: {
+      fs: {
+        browser: './empty.ts', // この方法を使用する前に、コードのインポートを修正することをお勧めします
+      },
+    },
+  },
+}
+
+export default nextConfig
+```
+
+クライアント側のコードが Node.js のネイティブモジュールを使用するモジュールを決して import しないように、モジュールをリファクタリングすることが望ましいです。
+
+### Sass node_modules インポート
+
+Turbopack は `node_modules` からの Sass ファイルのインポートを完全にサポートしています。なお、Webpack では従来のチルダ（`~`）プレフィックスが使用できましたが、Turbopack ではこの構文はサポートされていません。
+
+Webpack の場合:
+
+```scss filename="styles/globals.scss"
+@import '~bootstrap/dist/css/bootstrap.min.css';
+```
+
+Turbopack の場合：
+
+```scss filename="styles/globals.scss"
+@import 'bootstrap/dist/css/bootstrap.min.css';
+```
+
+インポートを変更できない場合は、`turbopack.resolveAlias` を使用できます。例えば次のようにします：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: {
+      '~*': '*',
+    },
+  },
+}
+
+export default nextConfig
+```
+
+### Turbopackのファイルシステムキャッシュ（ベータ）
+
+Turbopackは開発環境でファイルシステムキャッシュをサポートするようになり、コンパイラの成果物を実行間でディスクに保存することで、再起動後のコンパイル時間を大幅に短縮できます。
+
+設定でファイルシステムキャッシュを有効にします:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    turbopackFileSystemCacheForDev: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    turbopackFileSystemCacheForDev: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+## 非同期 Request API（破壊的変更）
+
+Version 15 では、**一時的な**同期互換性を伴う互換性のない変更として、[非同期 Request API](https://nextjs.org/docs/app/guides/upgrading/version-15#async-request-apis-breaking-change) が導入されました。
+
+**Next.js 16** 以降では、同期アクセスは完全に削除されます。これらの API は非同期でのみ利用できます。
+
+- [`cookies`](/docs/app/api-reference/functions/cookies)
+- [`headers`](/docs/app/api-reference/functions/headers)
+- [`draftMode`](/docs/app/api-reference/functions/draft-mode)
+- [`layout.js`](/docs/app/api-reference/file-conventions/layout)、[`page.js`](/docs/app/api-reference/file-conventions/page)、[`route.js`](/docs/app/api-reference/file-conventions/route)、[`default.js`](/docs/app/api-reference/file-conventions/default)、[`opengraph-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image#opengraph-image)、[`twitter-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image#twitter-image)、[`icon`](/docs/app/api-reference/file-conventions/metadata/app-icons#icon)、[`apple-icon`](/docs/app/api-reference/file-conventions/metadata/app-icons#apple-icon) 内の `params`
+- [`page.js`](/docs/app/api-reference/file-conventions/page) 内の `searchParams`
+
+[codemod](/docs/app/guides/upgrading/codemods#migrate-to-async-dynamic-apis) を使用して、非同期 Dynamic API へ移行してください。
+
+### 非同期 Dynamic API 用の型の移行
+
+`params` と `searchParams` の非同期版への移行をしやすくするために、[`npx next typegen`](/docs/app/api-reference/cli/next#next-typegen-options) を実行して、グローバルに利用可能な次の型ヘルパーを自動生成できます：
+
+- [`PageProps`](/docs/app/api-reference/file-conventions/page#page-props-helper)
+- [`LayoutProps`](/docs/app/api-reference/file-conventions/layout#layout-props-helper)
+- [`RouteContext`](/docs/app/api-reference/file-conventions/route#route-context-helper)
+
+> **補足**: `typegen` は Next.js 15.5 で導入されました
+
+これにより、新しい非同期 API パターンへの型安全な移行が容易になり、たとえば次のように、コンポーネントを完全な型安全性を保ったまま更新できるようになります。
+
+```tsx filename="/app/blog/[slug]/page.tsx"
+export default async function Page(props: PageProps<'/blog/[slug]'>) {
+  const { slug } = await props.params
+  const query = await props.searchParams
+  return <h1>Blog Post: {slug}</h1>
+}
+```
+
+このアプローチでは、`slug` を含む `props.params` と `searchParams` に、ページ内から直接、完全に型安全な形でアクセスできます。
+
+## icon と open-graph 画像の非同期パラメータ（破壊的変更）
+
+> `opengraph-image`、`twitter-image`、`icon`、`apple-icon` の画像生成用関数に渡される props は、Promise として渡されるようになりました。
+
+以前のバージョンでは、`Image`（画像生成用関数）と `generateImageMetadata` の両方が `params` オブジェクトを受け取っていました。`generateImageMetadata` によって返された `id` は、文字列として画像生成用関数に渡されていました。
+
+```js filename="app/shop/[slug]/opengraph-image.js"
+// Next.js 15 - 同期的な params アクセス
+export function generateImageMetadata({ params }) {
+  const { slug } = params
+  return [{ id: '1' }, { id: '2' }]
+}
+
+// Next.js 15 - 同期的な params と id アクセス
+export default function Image({ params, id }) {
+  const slug = params.slug
+  const imageId = id // 文字列
+  // ...
+}
+```
+
+**Next.js 16** から、[Async Request APIs](#async-request-apis-breaking-change) の変更に合わせて、画像生成関数は `params` と `id` を Promise として受け取るようになりました。`generateImageMetadata` 関数は引き続き同期的な `params` を受け取ります。
+
+```js filename="app/shop/[slug]/opengraph-image.js"
+export async function generateImageMetadata({ params }) {
+  const { slug } = params
+  return [{ id: '1' }, { id: '2' }]
+}
+
+// Next.js 16 - 非同期の params と id へのアクセス
+export default async function Image({ params, id }) {
+  const { slug } = await params // params が非同期になった
+  const imageId = await id // generateImageMetadata 使用時、id は Promise<string> になった
+  // ...
+}
+```
+
+## `sitemap` の非同期 `id` パラメーター（互換性のない変更）
+
+以前は、[`generateSitemaps`](/docs/app/api-reference/functions/generate-sitemaps) から返される `id` の値は、`sitemap` 生成関数にそのまま渡されていました。
+
+```js filename="app/product/sitemap.js"
+export async function generateSitemaps() {
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }]
+}
+
+// Next.js 15 - 同期的なidアクセス
+export default async function sitemap({ id }) {
+  const start = id * 50000 // idは数値
+  // ...
+}
+```
+
+**Next.js 16** から、`sitemap` 生成関数は `id` を Promise として受け取るようになりました。
+
+```js filename="app/product/sitemap.js"
+export async function generateSitemaps() {
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }]
+}
+
+// Next.js 16 - 非同期 id アクセス
+export default async function sitemap({ id }) {
+  const resolvedId = await id // id は Promise<string> になった
+  const start = Number(resolvedId) * 50000
+  // ...
+}
+```
+
+## React 19.2
+
+**Next.js 16** の App Router は最新の React の [Canary リリース](https://react.dev/blog/2023/05/03/react-canaries)を使用しており、新たにリリースされた React 19.2 の機能や、段階的に安定化が進められているその他の機能が含まれています。主な内容は次のとおりです:
+
+- **[View Transitions](https://react.dev/reference/react/ViewTransition)**: Transition やナビゲーション中に更新される要素をアニメーションさせる
+- **[`useEffectEvent`](https://react.dev/reference/react/useEffectEvent)**: Effect から非リアクティブなロジックを抽出し、再利用可能な Effect Event 関数に切り出す
+- **[Activity](https://react.dev/reference/react/Activity)**: `display: none` で UI を非表示にしつつ state を維持し、Effect のクリーンアップも行うことで「バックグラウンドアクティビティ」をレンダリングする
+
+詳しくは [React 19.2 の発表記事](https://react.dev/blog/2025/10/01/react-19-2)を参照してください。
+
+## React Compiler のサポート
+
+React Compiler の 1.0 リリースを受けて、**Next.js 16** では React Compiler の組み込みサポートが安定版になりました。React Compiler はコンポーネントを自動的にメモ化し、コードを手動で変更することなく不要な再レンダーを削減します。
+
+`reactCompiler` 設定オプションは、`experimental` から安定版に格上げされました。さまざまな種類のアプリケーションにおけるビルドパフォーマンスのデータ収集を継続しているため、デフォルトでは有効になっていません。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactCompiler: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactCompiler: true,
+}
+
+module.exports = nextConfig
+```
+
+React Compiler プラグインの最新バージョンをインストールします:
+
+```bash package="pnpm"
+pnpm add -D babel-plugin-react-compiler
+```
+
+```bash package="npm"
+npm install -D babel-plugin-react-compiler
+```
+
+```bash package="yarn"
+yarn add -D babel-plugin-react-compiler
+```
+
+```bash package="bun"
+bun add -D babel-plugin-react-compiler
+```
+
+> **補足:** React Compiler は Babel に依存しているため、このオプションを有効にすると、開発時やビルド時のコンパイル時間が長くなる傾向があります。
+
+## キャッシュ API
+
+### revalidateTag
+
+[`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) の関数シグネチャが新しくなりました。第 2 引数として [`cacheLife`](/docs/app/api-reference/functions/cacheLife#reference) プロファイルを渡すことができます。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function updateArticle(articleId: string) {
+  // 記事データを古いものとしてマーク - 再検証中は記事の閲覧者に古いデータが表示される
+  revalidateTag(`article-${articleId}`, 'max')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function updateArticle(articleId) {
+  // 記事データを古いものとしてマーク - 再検証中は記事の閲覧者に古いデータが表示される
+  revalidateTag(`article-${articleId}`, 'max')
+}
+```
+
+ブログ記事、商品カタログ、ドキュメントなど、更新にわずかな遅延が許容されるコンテンツには、`revalidateTag` を使用してください。バックグラウンドで最新データが読み込まれている間、ユーザーにはキャッシュされた古いコンテンツが表示されます。
+
+### updateTag
+
+[`updateTag`](/docs/app/api-reference/functions/updateTag) は、[Server Actions](/docs/app/getting-started/updating-data#what-are-server-functions) 専用の新しい API であり、ユーザーが変更を行ったときに、古いデータではなく、その変更が即座に UI に反映される **read-your-writes** セマンティクスを提供します。
+
+これは、同じリクエスト内でデータを失効させて、直ちに再取得することによって実現されます。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { updateTag } from 'next/cache'
+
+export async function updateUserProfile(userId: string, profile: Profile) {
+  await db.users.update(userId, profile)
+
+  // キャッシュを無効化して即座に更新 - ユーザーは変更をすぐに確認できる
+  updateTag(`user-${userId}`)
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { updateTag } from 'next/cache'
+
+export async function updateUserProfile(userId, profile) {
+  await db.users.update(userId, profile)
+
+  // キャッシュを無効化して即座に更新 - ユーザーは変更をすぐに確認できる
+  updateTag(`user-${userId}`)
+}
+```
+
+これにより、インタラクティブな機能が変更を即座に反映するようになります。フォームやユーザー設定、そしてユーザーが自分の変更結果をすぐに確認したいあらゆるワークフローに最適です。
+
+`updateTag` と `revalidateTag` の使い分けについての詳細は[こちら](/docs/app/api-reference/functions/updateTag#when-to-use-updatetag)を参照してください。
+
+### refresh
+
+[`refresh`](/docs/app/api-reference/functions/refresh) を使用すると、サーバーアクション内からクライアントルーターをリフレッシュできます。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function markNotificationAsRead(notificationId: string) {
+  // データベース内の通知を更新する
+  await db.notifications.markAsRead(notificationId)
+
+  // ヘッダーに表示されている通知数を更新する
+  refresh()
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function markNotificationAsRead(notificationId) {
+  // データベース内の通知を更新する
+  await db.notifications.markAsRead(notificationId)
+
+  // ヘッダーに表示されている通知数を更新する
+  refresh()
+}
+```
+
+アクション実行後にクライアントサイドルーターをリフレッシュする必要があるときに使用します。
+
+### cacheLife と cacheTag
+
+[`cacheLife`](/docs/app/api-reference/functions/cacheLife) と [`cacheTag`](/docs/app/api-reference/functions/cacheTag) は安定版になりました。`unstable_` プレフィックスは不要です。
+
+次のように import をエイリアスしていた箇所では:
+
+```ts
+import {
+  unstable_cacheLife as cacheLife,
+  unstable_cacheTag as cacheTag,
+} from 'next/cache'
+```
+
+インポート文を次のように更新できます:
+
+```ts
+import { cacheLife, cacheTag } from 'next/cache'
+```
+
+## ルーティングとナビゲーションの強化
+
+**Next.js 16** では、ルーティングとナビゲーションシステムが全面的に見直され、ページ遷移がより軽量かつ高速になりました。これにより、Next.js によるナビゲーションデータのプリフェッチおよびキャッシュの方法が最適化されています:
+
+- **レイアウトの重複排除**: 共通レイアウトを持つ複数の URL をプリフェッチする場合、そのレイアウトは 1 回だけダウンロードされます。
+- **インクリメンタルプリフェッチ**: ページ全体ではなく、キャッシュに存在しない部分のみを Next.js がプリフェッチします。
+
+これらの変更は **コードの修正を一切必要とせず**、すべてのアプリでパフォーマンスを向上させることを目的としています。
+
+その結果、個々のプリフェッチリクエストの数は増える一方で、合計転送サイズは大幅に小さくなる場合があります。これは、ほぼすべてのアプリケーションにとって適切なトレードオフだと考えています。
+
+もしリクエスト数の増加によって問題が発生する場合は、[issue](https://github.com/vercel/next.js/issues) または [discussion](https://github.com/vercel/next.js/discussions) を作成してお知らせください。
+
+## Partial Pre-Rendering (PPR)
+
+**Next.js 16** では、実験的機能であった **Partial Pre-Rendering (PPR)** のフラグや、ルートレベルのセグメント `experimental_ppr` を含む設定オプションが削除されました。
+
+**Next.js 16** 以降では、[`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) 設定を使用して PPR を有効化できます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  cacheComponents: true,
+}
+
+module.exports = nextConfig
+```
+
+**Next.js 16** における PPR は、**Next.js 15** のカナリア版とは動作が異なります。現在 PPR を使用している場合は、今お使いの Next.js 15 のカナリア版をそのまま利用し続けてください。Cache Components への移行方法については、後日ガイドを提供します。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // 現在PPRを使用している場合は
+  // 現在使用しているNext.js 15 canaryのままにしてください
+  experimental: {
+    ppr: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+## `middleware` から `proxy` へ
+
+`middleware` というファイル名は非推奨となり、ネットワーク境界とルーティングへのフォーカスを明確にするために `proxy` へと名称が変更されました。
+
+`edge` ランタイムは `proxy` では **サポートされていません**。`proxy` のランタイムは `nodejs` 固定であり、変更することはできません。引き続き `edge` ランタイムを使用したい場合は、`middleware` を使い続けてください。今後のマイナーリリースで、`edge` ランタイムに関するさらなる手順を案内します。
+
+```bash filename="Terminal"
+# middlewareファイルの名前を変更する
+mv middleware.ts proxy.ts
+# または
+mv middleware.js proxy.js
+```
+
+名前付きエクスポート `middleware` も非推奨となりました。関数の名前を `proxy` に変更してください。
+
+```ts filename="proxy.ts" switcher
+export function proxy(request: Request) {}
+```
+
+```js filename="proxy.js" switcher
+export function proxy(request) {}
+```
+
+デフォルトエクスポートを使用している場合でも、関数名を `proxy` に変更することを推奨します。
+
+`middleware` という名前を含んでいた設定フラグも名称変更されています。たとえば、`skipMiddlewareUrlNormalize` は現在 `skipProxyUrlNormalize` に変更されています。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  skipProxyUrlNormalize: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  skipProxyUrlNormalize: true,
+}
+
+module.exports = nextConfig
+```
+
+バージョン16の[codemod](/docs/app/guides/upgrading/codemods#160)は、これらのフラグも更新できます。
+
+## `next/image` に関する変更
+
+### クエリ文字列付きローカル画像（破壊的変更）
+
+列挙攻撃を防ぐため、クエリ文字列を含むローカル画像ソースには `images.localPatterns.search` の設定が必要になります。
+
+```tsx filename="app/page.tsx"
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image src="/assets/photo?v=1" alt="Photo" width="100" height="100" />
+}
+```
+
+クエリ文字列を付けたローカル画像を使用する必要がある場合は、そのパターンを設定に追加してください:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  images: {
+    localPatterns: [
+      {
+        pathname: '/assets/**',
+        search: '?v=1',
+      },
+    ],
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    localPatterns: [
+      {
+        pathname: '/assets/**',
+        search: '?v=1',
+      },
+    ],
+  },
+}
+
+module.exports = nextConfig
+```
+
+### `minimumCacheTTL` のデフォルト値（互換性のない変更）
+
+`images.minimumCacheTTL` のデフォルト値は `60 seconds` から `4 hours`（14400 秒）に変更されました。これにより、`cache-control` ヘッダーが設定されていない画像の再検証コストが削減されます。
+
+一部の Next.js ユーザーの環境では、アップストリームの画像ソースに `cache-control` ヘッダーが設定されていなかったため、画像の再検証が頻繁に発生していました。その結果、`60` 秒ごとに再検証が行われ、CPU 使用率とコストが増加していました。
+
+しかし、多くの画像はそれほど頻繁には更新されないため、このような短い間隔は理想的ではありません。デフォルトを 4 時間に設定することで、より長期間有効なキャッシュをデフォルトで提供しつつ、必要に応じて 1 日に数回の更新も可能な状態を維持できます。
+
+以前の挙動が必要な場合は、`minimumCacheTTL` をより小さい値に変更してください。例えば、`60` 秒に戻すことができます。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  images: {
+    minimumCacheTTL: 60,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    minimumCacheTTL: 60,
+  },
+}
+
+module.exports = nextConfig
+```
+
+### `imageSizes` のデフォルト値（互換性のない変更）
+
+デフォルトの `images.imageSizes` 配列から、値 `16` が削除されました。
+
+リクエストの分析から、幅 16 ピクセルの画像を配信しているプロジェクトはごくわずかであることが分かりました。この設定を削除することで、`next/image` がブラウザに送信する `srcset` 属性のサイズを削減できます。
+
+幅 16px の画像をサポートする必要がある場合は、次のようにしてください：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  images: {
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+}
+
+module.exports = nextConfig
+```
+
+開発者の利用が減ったからではなく、実際には `devicePixelRatio: 2` によって 32px の画像がフェッチされ、Retina ディスプレイでのぼやけを防いでいるため、幅 16 ピクセルの画像自体があまり使われなくなったと考えています。
+
+### `qualities` のデフォルト値（互換性のない変更）
+
+`images.qualities` のデフォルト値は、すべての画質レベルを指定可能だった状態から、`[75]` のみを許可するように変更されました。
+
+複数の画質レベルをサポートする必要がある場合は、次のようにします:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  images: {
+    qualities: [50, 75, 100],
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    qualities: [50, 75, 100],
+  },
+}
+
+module.exports = nextConfig
+```
+
+`image.qualities` 配列に含まれていない `quality` プロパティを指定した場合、その値は `images.qualities` 内の最も近い値に丸められます。たとえば、上記の設定では、`quality` プロパティに 80 を指定すると、75 に丸められます。
+
+### ローカル IP 制限（破壊的な変更）
+
+新しいセキュリティ制限により、デフォルトでローカル IP アドレスに対する最適化がブロックされます。`images.dangerouslyAllowLocalIP` を `true` に設定するのは、プライベートネットワークに対してのみ行ってください。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  images: {
+    dangerouslyAllowLocalIP: true, // プライベートネットワークのみ
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    dangerouslyAllowLocalIP: true, // プライベートネットワークのみ
+  },
+}
+
+module.exports = nextConfig
+```
+
+### 最大リダイレクト数（破壊的変更）
+
+`images.maximumRedirects` のデフォルト値は、無制限から最大 3 回のリダイレクトに変更されました。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  images: {
+    maximumRedirects: 0, // リダイレクトを無効化
+    // または
+    maximumRedirects: 5, // エッジケースに対応するため増加
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    maximumRedirects: 0, // リダイレクトを無効化
+    // または
+    maximumRedirects: 5, // エッジケースに対応するため増加
+  },
+}
+
+module.exports = nextConfig
+```
+
+### `next/legacy/image` コンポーネント (非推奨)
+
+`next/legacy/image` コンポーネントは非推奨です。代わりに `next/image` を使用してください。
+
+```tsx
+// 変更前
+import Image from 'next/legacy/image'
+
+// 変更後
+import Image from 'next/image'
+```
+
+### `images.domains` 設定（非推奨）
+
+`images.domains` の設定は非推奨になりました。
+
+```js filename="next.config.js"
+// image.domains は非推奨です
+module.exports = {
+  images: {
+    domains: ['example.com'],
+  },
+}
+```
+
+セキュリティを強化するには、代わりに `images.remotePatterns` を使用してください。
+
+```js filename="next.config.js"
+// 代わりに image.remotePatterns を使用してください
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'example.com',
+      },
+    ],
+  },
+}
+```
+
+## `dev` と `build` の同時実行
+
+`next dev` と `next build` は、同時に実行できるよう、別々の出力ディレクトリを使用するようになりました。`next dev` コマンドは `.next/dev` に出力します。
+
+さらに、同一プロジェクトで複数の `next dev` または `next build` インスタンスが起動されるのを防ぐロックファイル機構が追加されています。
+
+開発サーバーが `.next/dev` に出力するため、[Turbopack のトレース用コマンド](/docs/app/guides/local-development#turbopack-tracing) は次のようになります。
+
+```bash package="pnpm"
+pnpm next internal trace .next/dev/trace-turbopack
+```
+
+```bash package="npm"
+npx next internal trace .next/dev/trace-turbopack
+```
+
+```bash package="yarn"
+yarn next internal trace .next/dev/trace-turbopack
+```
+
+```bash package="bun"
+bunx next internal trace .next/dev/trace-turbopack
+```
+
+## Parallel Routes における `default.js` の要件
+
+すべての [parallel route](/docs/app/api-reference/file-conventions/parallel-routes) のスロットで、明示的な `default.js` ファイルが必須になりました。これがない場合、ビルドは失敗します。
+
+以前と同じ挙動を維持するには、[`default.js`](/docs/app/api-reference/file-conventions/default) ファイルを作成し、その中で `notFound()` を呼び出すか、`null` を返してください。
+
+```tsx filename="app/@modal/default.tsx"
+import { notFound } from 'next/navigation'
+
+export default function Default() {
+  notFound()
+}
+```
+
+または `null` を返します：
+
+```tsx filename="app/@modal/default.tsx"
+export default function Default() {
+  return null
+}
+```
+
+## ESLint フラットコンフィグ
+
+`@next/eslint-plugin-next` はデフォルトで ESLint フラットコンフィグ形式を採用しており、レガシー設定のサポートを終了する予定の ESLint v10 に合わせたものです。
+
+[`@next/eslint-plugin-next`](/docs/app/api-reference/config/eslint#setup-eslint) プラグインの API リファレンスを必ず確認してください。
+
+レガシーな `.eslintrc` 形式を使用している場合は、フラットコンフィグ形式への移行を検討してください。詳細は [ESLint migration guide](https://eslint.org/docs/latest/use/configure/migration-guide) を参照してください。
+
+## スクロール動作のオーバーライド
+
+**以前のバージョンの Next.js** では、CSS を使って `<html>` 要素に `scroll-behavior: smooth` をグローバルに設定していた場合、Next.js は SPA ルート遷移中に次のようにこの設定をオーバーライドしていました：
+
+1. 一時的に `scroll-behavior` を `auto` に設定する
+2. ナビゲーションを実行する（即座にページ先頭までスクロールされる）
+3. 元の `scroll-behavior` の値を復元する
+
+これにより、ページ間のナビゲーションは、ページ内ナビゲーション向けにスムーズスクロールを有効にしている場合でも、常に軽快で即時に感じられるようになっていました。しかし、この操作は特に各ナビゲーションの開始時にコストが高くなる可能性がありました。
+
+**Next.js 16** では、この挙動が変更されています。デフォルトでは、ナビゲーション中に Next.js は `scroll-behavior` 設定を **もはやオーバーライドしません**。
+
+**Next.js にこのオーバーライドを行わせたい場合**（以前のデフォルト動作）、`<html>` 要素に `data-scroll-behavior="smooth"` 属性を追加してください：
+
+```tsx filename="app/layout.tsx"
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" data-scroll-behavior="smooth">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## パフォーマンスの改善
+
+`next dev` と `next start` コマンドに対して大幅なパフォーマンス最適化が行われました。また、ターミナル出力も、フォーマットの明確化、エラーメッセージの改善、パフォーマンスメトリクスの改善によって向上しています。
+
+**Next.js 16** では、`next build` の出力から `size` と `First Load JS` のメトリクスが削除されました。これらは React サーバーコンポーネントを用いたサーバー駆動型アーキテクチャにおいて正確ではないことが分かりました。Turbopack と Webpack の両方の実装に問題があり、クライアントコンポーネントのペイロードをどのように計上するかについても一致していませんでした。
+
+実際のルートのパフォーマンスを測定する最も効果的な方法は、[Chrome Lighthouse](https://developer.chrome.com/docs/lighthouse/overview) や Vercel Analytics といったツールを使用することです。これらは Core Web Vitals やダウンロードされるリソースのサイズにフォーカスしています。
+
+### `next dev` の設定ファイル読み込み
+
+以前のバージョンでは、開発時に Next の設定ファイルが 2 回読み込まれていました:
+
+- `next dev` コマンドを実行したとき
+- `next dev` コマンドが Next.js サーバーを起動したとき
+
+これは、Next.js サーバーを起動するために `next dev` コマンド自体は設定ファイルを必要としないため、非効率的でした。
+
+この変更により、`next dev` 実行時に Next.js の設定ファイル内で `process.argv` に `'dev'` が含まれているかを確認しても、`false` が返されるようになりました。
+
+> **補足**: `typegen` と `build` コマンドは、引き続き `process.argv` に含まれます。
+
+これは、`next dev` で副作用を伴う処理を実行するプラグインにとって特に重要です。そのような場合は、`NODE_ENV` が `development` に設定されているかどうかを確認するだけで十分なことがあります。
+
+```js filename="next.config.js"
+import { startServer } from 'docs-lib/dev-server'
+
+const isDev = process.env.NODE_ENV === 'development'
+
+if (isDev) {
+  startServer()
+}
+
+const nextConfig = {
+  /* 設定オプションをここに記述 */
+}
+
+module.exports = nextConfig
+```
+
+または、コンフィグが読み込まれるフェーズを表す [`phase`](/docs/app/api-reference/config/next-config-js#phase) を使用します。
+
+## Build Adapters API（アルファ）
+
+[Build Adapters RFC](https://github.com/vercel/next.js/discussions/77740) に基づき、Build Adapters API の最初のアルファ版が利用可能になりました。
+
+Build Adapters を使用すると、ビルドプロセスにフックするカスタムアダプターを作成でき、デプロイプラットフォームやカスタムビルド統合から Next.js の設定を変更したり、ビルド出力を処理したりできるようになります。
+
+```js filename="next.config.js"
+const nextConfig = {
+  experimental: {
+    adapterPath: require.resolve('./my-adapter.js'),
+  },
+}
+
+module.exports = nextConfig
+```
+
+[RFC ディスカッション](https://github.com/vercel/next.js/discussions/77740)にフィードバックをお寄せください。
+
+## モダン Sass API
+
+`sass-loader` は v16 に更新され、[モダンな Sass 構文](https://sass-lang.com/documentation/js-api/#md:usage) と新機能をサポートしています。
+
+## 削除された機能
+
+これらの機能は以前に非推奨となっており、現在は削除されています。
+
+### AMP サポート
+
+AMP の利用は大きく減少しており、この機能を維持することはフレームワークを複雑にします。すべての AMP API と設定は削除されました:
+
+- Next の設定ファイルにおける `amp` 設定
+- `next/amp` フックの import および使用 (`useAmp`)
+
+```tsx
+// 削除済み
+import { useAmp } from 'next/amp'
+
+// 削除済み
+export const config = { amp: true }
+```
+
+- `pages` での `export const config = { amp: true }`
+
+```js filename="next.config.js"
+const nextConfig = {
+  // 削除済み
+  amp: {
+    canonicalBase: 'https://example.com',
+  },
+}
+
+export default nextConfig
+```
+
+AMP が引き続きあなたのユースケースに必要かどうかを検討してください。現在では、ほとんどのパフォーマンス上のメリットは、Next.js の組み込み最適化機能と最新の Web 標準によって実現できます。
+
+### `next lint` コマンド
+
+`next lint` コマンドは廃止されました。Biome または ESLint を直接使用してください。`next build` はリント処理を実行しなくなりました。
+
+移行を自動化するための codemod が利用可能です：
+
+```bash package="pnpm"
+pnpm dlx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+```bash package="npm"
+npx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+```bash package="yarn"
+yarn dlx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+```bash package="bun"
+bunx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+Next.js の設定ファイルからも `eslint` オプションが削除されました。
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // サポート終了
+  // eslint: {},
+}
+
+export default nextConfig
+```
+
+### ランタイム設定
+
+`serverRuntimeConfig` と `publicRuntimeConfig` は削除されました。代わりに環境変数を使用してください。
+
+**以前 (Next.js 15 より前):**
+
+```js filename="next.config.js"
+module.exports = {
+  serverRuntimeConfig: {
+    dbUrl: process.env.DATABASE_URL,
+  },
+  publicRuntimeConfig: {
+    apiUrl: '/api',
+  },
+}
+```
+
+```tsx filename="pages/index.tsx"
+import getConfig from 'next/config'
+
+export default function Page() {
+  const { publicRuntimeConfig } = getConfig()
+  return <p>API URL: {publicRuntimeConfig.apiUrl}</p>
+}
+```
+
+**After (Next.js 16):**
+
+サーバー専用の値には、サーバーコンポーネント内から環境変数に直接アクセスします：
+
+```tsx filename="app/page.tsx"
+async function fetchData() {
+  const dbUrl = process.env.DATABASE_URL
+  // サーバーサイドの操作にのみ使用
+  return await db.query(dbUrl, 'SELECT * FROM users')
+}
+
+export default async function Page() {
+  const data = await fetchData()
+  return <div>{/* データをレンダリング */}</div>
+}
+```
+
+> **補足**: サーバー側の機密値が誤ってクライアントコンポーネントに渡されるのを防ぐには、[taint API](/docs/app/api-reference/config/next-config-js/taint) を使用してください。
+
+クライアントからアクセス可能な値には、`NEXT_PUBLIC_` プレフィックスを付けてください。
+
+```bash filename=".env.local"
+NEXT_PUBLIC_API_URL="/api"
+```
+
+```tsx filename="app/components/client-component.tsx"
+'use client'
+
+export default function ClientComponent() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL
+  return <p>API URL: {apiUrl}</p>
+}
+```
+
+環境変数をビルド時ではなく実行時に読み取るためには、`process.env` から読み取る前に [`connection()`](/docs/app/api-reference/functions/connection) 関数を使用してください。
+
+```tsx filename="app/page.tsx"
+import { connection } from 'next/server'
+
+export default async function Page() {
+  await connection()
+  const config = process.env.RUNTIME_CONFIG
+  return <p>{config}</p>
+}
+```
+
+[環境変数](/docs/app/guides/environment-variables)の詳細については、こちらを参照してください。
+
+### `devIndicators` オプション
+
+次のオプションは [`devIndicators`](/docs/app/api-reference/config/next-config-js/devIndicators) から削除されました。
+
+- `appIsrStatus`
+- `buildActivity`
+- `buildActivityPosition`
+
+インジケーター自体は引き続き利用可能です。
+
+### `experimental.dynamicIO`
+
+`experimental.dynamicIO` フラグは `cacheComponents` に名称変更されました。
+
+`dynamicIO` フラグを削除して、Next.js の設定ファイルを更新してください。
+
+```js filename="next.config.js"
+// Next.js 15 - experimental.dynamicIO は廃止されました
+module.exports = {
+  experimental: {
+    dynamicIO: true,
+  },
+}
+```
+
+[`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) フラグを `true` に設定します。
+
+```js filename="next.config.js"
+// Next.js 16 - 代わりに cacheComponents を使用してください
+module.exports = {
+  cacheComponents: true,
+}
+```
+
+### `unstable_rootParams`
+
+`unstable_rootParams` 関数は削除されました。現在、代替となる API を開発しており、今後のマイナーリリースで提供予定です。

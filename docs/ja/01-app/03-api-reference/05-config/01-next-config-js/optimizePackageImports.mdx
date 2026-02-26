@@ -1,0 +1,49 @@
+---
+title: optimizePackageImports
+description: optimizePackageImports Next.js 設定オプションのAPIリファレンス
+version: experimental
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router の間で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+一部のパッケージは何百、何千ものモジュールをエクスポートする場合があり、これが開発時と本番環境の両方でパフォーマンス上の問題の原因になることがあります。
+
+パッケージを `experimental.optimizePackageImports` に追加すると、実際に使用しているモジュールだけが読み込まれるようになり、多数の名前付きエクスポートを含む import 文を記述できるという利便性はそのまま保てます。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    optimizePackageImports: ['package-name'],
+  },
+}
+```
+
+次のライブラリは標準で最適化されています。
+
+- `lucide-react`
+- `date-fns`
+- `lodash-es`
+- `ramda`
+- `antd`
+- `react-bootstrap`
+- `ahooks`
+- `@ant-design/icons`
+- `@headlessui/react`
+- `@headlessui-float/react`
+- `@heroicons/react/20/solid`
+- `@heroicons/react/24/solid`
+- `@heroicons/react/24/outline`
+- `@visx/visx`
+- `@tremor/react`
+- `rxjs`
+- `@mui/material`
+- `@mui/icons-material`
+- `recharts`
+- `react-use`
+- `@material-ui/core`
+- `@material-ui/icons`
+- `@tabler/icons-react`
+- `mui-core`
+- `react-icons/*`
+- `effect`
+- `@effect/*`

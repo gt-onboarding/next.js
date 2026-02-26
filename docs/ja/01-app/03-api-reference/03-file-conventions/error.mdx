@@ -1,0 +1,324 @@
+---
+title: error.js
+description: error.js の特殊ファイルに関する API リファレンス。
+related:
+  title: エラー処理についてさらに学ぶ
+  links:
+    - app/getting-started/error-handling
+---
+
+**error** ファイルを使うと、予期しない実行時エラーを処理し、フォールバック UI を表示できます。
+
+<Image
+  alt="error.js の特殊ファイル"
+  srcLight="/docs/light/error-special-file.png"
+  srcDark="/docs/dark/error-special-file.png"
+  width="1600"
+  height="606"
+/>
+
+```tsx filename="app/dashboard/error.tsx" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+import { useEffect } from 'react'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // エラーをエラーレポートサービスに記録する
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // セグメントを再レンダリングして回復を試みる
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/dashboard/error.js" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+import { useEffect } from 'react'
+
+export default function Error({ error, reset }) {
+  useEffect(() => {
+    // エラーをエラー報告サービスに記録する
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // セグメントを再レンダリングして回復を試みる
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+`error.js` はルートセグメントとその配下の子を [React Error Boundary](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary) でラップします。Error Boundary 内でエラーがスローされると、フォールバック UI として `error` コンポーネントが表示されます。
+
+<Image
+  alt="error.js の仕組み"
+  srcLight="/docs/light/error-overview.png"
+  srcDark="/docs/dark/error-overview.png"
+  width="1600"
+  height="903"
+/>
+
+> **補足**:
+>
+> - [React DevTools](https://react.dev/learn/react-developer-tools) を使うと、エラーバウンダリを切り替えてエラー状態をテストできます。
+> - エラーを親のエラーバウンダリまでバブルアップさせたい場合は、`error` コンポーネントをレンダーするときに `throw` することができます。
+
+## リファレンス
+
+### Props
+
+#### `error`
+
+`error.js` Client Component に渡される [`Error`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Error) オブジェクトのインスタンス。
+
+> **補足:** 開発中は、クライアントに渡される `Error` オブジェクトはシリアライズされ、デバッグしやすいように元のエラーの `message` が含まれます。ただし、エラーに含まれる機密情報がクライアントに漏れるのを防ぐため、**本番環境ではこの挙動は異なります**。
+
+#### `error.message`
+
+- クライアントコンポーネントから転送されたエラーは、元の `Error` メッセージを表示します。
+- サーバーコンポーネントから転送されたエラーは、識別子付きの一般的なメッセージを表示します。これは機密情報が漏えいするのを防ぐためです。`errors.digest` に含まれる識別子を使用して、対応するサーバー側のログを特定できます。
+
+#### `error.digest`
+
+スローされたエラーに対して自動生成されるハッシュ値です。サーバーサイドのログ内で対応するエラーを照合するために使用できます。
+
+#### `reset`
+
+エラーの原因が一時的なものであることがあります。このような場合、再試行することで問題が解決する可能性があります。
+
+error コンポーネントでは、`reset()` 関数を使用して、ユーザーにエラーからの復旧を試みるよう促すことができます。実行されると、この関数は error boundary の内容を再レンダーしようとします。再レンダーが成功すると、フォールバック用の error コンポーネントは、その再レンダー結果に置き換えられます。
+
+```tsx filename="app/dashboard/error.tsx" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button onClick={() => reset()}>Try again</button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/dashboard/error.js" switcher
+'use client' // エラーバウンダリはクライアントコンポーネントである必要があります
+
+export default function Error({ error, reset }) {
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button onClick={() => reset()}>Try again</button>
+    </div>
+  )
+}
+```
+
+## 例
+
+### グローバルエラー
+
+あまり一般的ではありませんが、ルートのレイアウトまたはテンプレートで発生するエラーは、ルートの `app` ディレクトリに配置された `global-error.jsx` を使って処理できます。これは、[internationalization](/docs/app/guides/internationalization) を利用している場合でも同様です。グローバルエラー用の UI では、エラーページに必要な独自の `<html>` と `<body>` タグ、グローバルスタイル、フォント、その他の依存関係を定義する必要があります。このファイルは有効な間、ルートレイアウトまたはテンプレートを置き換えます。
+
+> **補足**: エラーバウンダリは [Client Components](/docs/app/getting-started/server-and-client-components#using-client-components) である必要があり、そのため `global-error.jsx` では [`metadata` と `generateMetadata`](/docs/app/getting-started/metadata-and-og-images) の export はサポートされません。代わりに、React の [`<title>`](https://react.dev/reference/react-dom/components/title) コンポーネントを使用できます。
+
+```tsx filename="app/global-error.tsx" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    // global-errorはhtmlタグとbodyタグを含める必要があります
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/global-error.js" switcher
+'use client' // エラーバウンダリはClient Componentである必要があります
+
+export default function GlobalError({ error, reset }) {
+  return (
+    // global-errorはhtmlタグとbodyタグを含める必要があります
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```
+
+### カスタムエラーバウンダリによるグレースフルなエラー復旧
+
+クライアント側のレンダリングに失敗した場合、ユーザー体験を向上させるために、最後にサーバーでレンダリングされた UI を表示し続けると便利です。
+
+`GracefullyDegradingErrorBoundary` は、エラーが発生する前の現在の HTML をキャプチャして保持しておくカスタムエラーバウンダリの一例です。レンダリングエラーが発生すると、キャプチャした HTML を再レンダリングし、ユーザーに知らせるための常に表示される通知バーを表示します。
+
+```tsx filename="app/dashboard/error.tsx" switcher
+'use client'
+
+import React, { Component, ErrorInfo, ReactNode } from 'react'
+
+interface ErrorBoundaryProps {
+  children: ReactNode
+  onError?: (error: Error, errorInfo: ErrorInfo) => void
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+}
+
+export class GracefullyDegradingErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  private contentRef: React.RefObject<HTMLDivElement | null>
+
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false }
+    this.contentRef = React.createRef()
+  }
+
+  static getDerivedStateFromError(_: Error): ErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo)
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // ハイドレーションなしで現在のHTMLコンテンツをレンダリング
+      return (
+        <>
+          <div
+            ref={this.contentRef}
+            suppressHydrationWarning
+            dangerouslySetInnerHTML={{
+              __html: this.contentRef.current?.innerHTML || '',
+            }}
+          />
+          <div className="fixed bottom-0 left-0 right-0 bg-red-600 text-white py-4 px-6 text-center">
+            <p className="font-semibold">
+              ページのレンダリング中にエラーが発生しました
+            </p>
+          </div>
+        </>
+      )
+    }
+
+    return <div ref={this.contentRef}>{this.props.children}</div>
+  }
+}
+
+export default GracefullyDegradingErrorBoundary
+```
+
+```jsx filename="app/dashboard/error.js" switcher
+'use client'
+
+import React, { Component, createRef } from 'react'
+
+class GracefullyDegradingErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+    this.contentRef = createRef()
+  }
+
+  static getDerivedStateFromError(_) {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo)
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // ハイドレーションなしで現在のHTMLコンテンツをレンダリング
+      return (
+        <>
+          <div
+            ref={this.contentRef}
+            suppressHydrationWarning
+            dangerouslySetInnerHTML={{
+              __html: this.contentRef.current?.innerHTML || '',
+            }}
+          />
+          <div className="fixed bottom-0 left-0 right-0 bg-red-600 text-white py-4 px-6 text-center">
+            <p className="font-semibold">
+              ページのレンダリング中にエラーが発生しました
+            </p>
+          </div>
+        </>
+      )
+    }
+
+    return <div ref={this.contentRef}>{this.props.children}</div>
+  }
+}
+
+export default GracefullyDegradingErrorBoundary
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                               |
+| ---------- | ------------------------------------------------------ |
+| `v15.2.0`  | 開発環境でも `global-error` を表示するようにしました。 |
+| `v13.1.0`  | `global-error` を導入しました。                        |
+| `v13.0.0`  | `error` を導入しました。                               |

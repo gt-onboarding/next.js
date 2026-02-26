@@ -1,0 +1,123 @@
+---
+title: use client
+description: use client ディレクティブを使ってコンポーネントをクライアント側でレンダーする方法を学びます。
+---
+
+`'use client'` ディレクティブは、コンポーネントを**クライアント側**でレンダーするためのエントリーポイントを宣言するもので、状態管理、イベントハンドリング、ブラウザ API へのアクセスなど、クライアント側の JavaScript 機能を必要とするインタラクティブなユーザーインターフェイス (UI) を作成する際に使用します。これは React の機能です。
+
+> **補足**
+>
+> Client Components を含むすべてのファイルに `'use client'` ディレクティブを追加する必要はありません。Server Components 内から直接レンダーしたいコンポーネントを含むファイルにだけ追加すれば十分です。`'use client'` ディレクティブはクライアントとサーバーの[境界](https://nextjs.org/docs/app/building-your-application/rendering#network-boundary)を定義し、そのようなファイルからエクスポートされるコンポーネントはクライアント側へのエントリーポイントとして機能します。
+
+## 使用方法
+
+Client Components のエントリーポイントを宣言するには、**ファイルの先頭**で、すべての import より前に `'use client'` ディレクティブを追加します。
+
+```tsx filename="app/components/counter.tsx" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/components/counter.js" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+    </div>
+  )
+}
+```
+
+`'use client'` ディレクティブを使用する場合、Client Components の props は[シリアライズ可能](https://react.dev/reference/rsc/use-client#serializable-types)である必要があります。つまり、サーバーからクライアントへデータを送信する際に、React がシリアライズできる形式で props を扱えるようにしておく必要があります。
+
+```tsx filename="app/components/counter.tsx" highlight={4} switcher
+'use client'
+
+export default function Counter({
+  onClick /* ❌ 関数はシリアライズできません */,
+}) {
+  return (
+    <div>
+      <button onClick={onClick}>Increment</button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/components/counter.js" highlight={4} switcher
+'use client'
+
+export default function Counter({
+  onClick /* ❌ 関数はシリアライズできません */,
+}) {
+  return (
+    <div>
+      <button onClick={onClick}>Increment</button>
+    </div>
+  )
+}
+```
+
+## サーバーコンポーネント内にクライアントコンポーネントをネストする
+
+サーバーコンポーネントとクライアントコンポーネントを組み合わせることで、高いパフォーマンスとインタラクティブ性を両立したアプリケーションを構築できます。
+
+1. **サーバーコンポーネント**: 静的コンテンツ、データの取得、SEO に適した要素に使用します。
+2. **クライアントコンポーネント**: 状態、エフェクト、ブラウザー API を必要とするインタラクティブな要素に使用します。
+3. **コンポーネント構成**: サーバー側とクライアント側のロジックを明確に分離するために、必要に応じてサーバーコンポーネント内にクライアントコンポーネントをネストします。
+
+次の例では:
+
+- `Header` は静的コンテンツを扱うサーバーコンポーネントです。
+- `Counter` はページ内でのインタラクションを可能にするクライアントコンポーネントです。
+
+```tsx filename="app/page.tsx" highlight={2,8} switcher
+import Header from './header'
+import Counter from './counter' // これはClient Componentです
+
+export default function Page() {
+  return (
+    <div>
+      <Header />
+      <Counter />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={2,8} switcher
+import Header from './header'
+import Counter from './counter' // これはClient Componentです
+
+export default function Page() {
+  return (
+    <div>
+      <Header />
+      <Counter />
+    </div>
+  )
+}
+```
+
+## リファレンス
+
+`'use client'` の詳細については、[React ドキュメント](https://react.dev/reference/rsc/use-client)を参照してください。

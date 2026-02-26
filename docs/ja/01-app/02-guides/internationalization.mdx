@@ -1,0 +1,226 @@
+---
+title: 多言語対応
+description: 国際化ルーティングとローカライズされたコンテンツで複数言語をサポートします。
+---
+
+Next.js では、複数の言語をサポートできるように、コンテンツのルーティングとレンダリングを設定できます。サイトを異なるロケールに対応させるには、翻訳されたコンテンツ（ローカリゼーション）と国際化ルーティングが含まれます。
+
+## 用語
+
+- **Locale:** 言語や書式設定の好みのセットを表す識別子。通常、ユーザーの優先言語と、場合によってはその地理的な地域を含みます。
+  - `en-US`: アメリカ合衆国で話される英語
+  - `nl-NL`: オランダで話されるオランダ語
+  - `nl`: 特定の地域を指定しないオランダ語
+
+## ルーティングの概要
+
+どのロケールを使用するかを選択する際には、ブラウザのユーザー言語設定を利用することを推奨します。優先する言語を変更すると、アプリケーションに送信されるリクエストの `Accept-Language` ヘッダーが変更されます。
+
+たとえば、次のようなライブラリを使用すると、受信した `Request` を参照し、`Headers`、対応予定のロケール、およびデフォルトロケールに基づいて、どのロケールを選択するかを判定できます。
+
+```js filename="proxy.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+ルーティングは、サブパス（`/fr/products`）またはドメイン（`my-site.fr/products`）を使用して国際化できます。この情報を使えば、[Proxy](/docs/app/api-reference/file-conventions/proxy) 内でロケールに応じてユーザーをリダイレクトできます。
+
+```js filename="proxy.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// 優先ロケールを取得する。上記と同様の方法またはライブラリを使用
+function getLocale(request) { ... }
+
+export function proxy(request) {
+  // パス名にサポートされているロケールが含まれているか確認
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // ロケールがない場合はリダイレクト
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // 例: 受信リクエストが /products の場合
+  // 新しい URL は /en-US/products になる
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // 内部パス (_next) をすべてスキップ
+    '/((?!_next).*)',
+    // オプション: ルート (/) URL のみで実行
+    // '/'
+  ],
+}
+```
+
+最後に、`app/` 内のすべての特殊ファイルが `app/[lang]` 配下にネストされていることを確認してください。これにより、Next.js のルーターがルート内の異なるロケールを動的に処理し、すべてのレイアウトやページに `lang` パラメータを渡せるようになります。たとえば次のとおりです。
+
+```tsx filename="app/[lang]/page.tsx" switcher
+// 現在のロケールにアクセスできます
+// 例: /en-US/products -> `lang` は "en-US"
+export default async function Page({ params }: PageProps<'/[lang]'>) {
+  const { lang } = await params
+  return ...
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+// 現在のロケールにアクセスできます
+// 例: /en-US/products -> `lang` は "en-US"
+export default async function Page({ params }) {
+  const { lang } = await params
+  return ...
+}
+```
+
+> **補足:** `PageProps` と `LayoutProps` は、ルートパラメータに対して強い型付けを提供する、グローバルに利用可能な TypeScript ヘルパーです。詳細は [PageProps](/docs/app/api-reference/file-conventions/page#page-props-helper) と [LayoutProps](/docs/app/api-reference/file-conventions/layout#layout-props-helper) を参照してください。
+
+ルートレイアウトは、新しいフォルダ内にネストすることもできます（例: `app/[lang]/layout.js`）。
+
+## ローカリゼーション
+
+ユーザーの希望するロケールに応じて表示されるコンテンツを変更する「ローカリゼーション」は、Next.js 固有の機能ではありません。ここで説明するパターンは、どのような Web アプリケーションでも同じように利用できます。
+
+アプリケーション内で英語とオランダ語の両方のコンテンツをサポートしたいとします。その場合、2 つの異なる「辞書」を用意するかもしれません。これは、あるキーからローカライズされた文字列への対応関係を持つオブジェクトです。例えば、次のようになります。
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+次に、リクエストされたロケール向けの翻訳を読み込むための `getDictionary` 関数を作成します：
+
+```ts filename="app/[lang]/dictionaries.ts" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export type Locale = keyof typeof dictionaries
+
+export const hasLocale = (locale: string): locale is Locale =>
+  locale in dictionaries
+
+export const getDictionary = async (locale: Locale) => dictionaries[locale]()
+```
+
+```js filename="app/[lang]/dictionaries.js" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const hasLocale = (locale) => locale in dictionaries
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+現在選択されている言語に基づいて、レイアウトやページ内で辞書を取得できます。
+
+`lang` は `string` 型として定義されているため、`hasLocale` を使用すると、型がサポート対象のロケールに絞り込まれます。これにより、翻訳が存在しない場合にはランタイムエラーではなく 404 が返されることが保証されます。
+
+```tsx filename="app/[lang]/page.tsx" switcher
+import { notFound } from 'next/navigation'
+import { getDictionary, hasLocale } from './dictionaries'
+
+export default async function Page({ params }: PageProps<'/[lang]'>) {
+  const { lang } = await params
+
+  if (!hasLocale(lang)) notFound()
+
+  const dict = await getDictionary(lang)
+  return <button>{dict.products.cart}</button> // カートに追加
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+import { notFound } from 'next/navigation'
+import { getDictionary, hasLocale } from './dictionaries'
+
+export default async function Page({ params }) {
+  const { lang } = await params
+
+  if (!hasLocale(lang)) notFound()
+
+  const dict = await getDictionary(lang)
+  return <button>{dict.products.cart}</button> // カートに追加
+}
+```
+
+`app/` ディレクトリ内のすべてのレイアウトとページはデフォルトで [サーバーコンポーネント](/docs/app/getting-started/server-and-client-components) として扱われるため、翻訳ファイルのサイズがクライアント側の JavaScript バンドルサイズに影響することを気にする必要はありません。このコードは **サーバー上でのみ実行され**、ブラウザにはその結果として生成された HTML だけが送信されます。
+
+## 静的レンダリング
+
+特定のロケールのセットに対して静的ルートを生成するには、任意の page や layout で `generateStaticParams` を使用できます。これは、たとえばルート layout でグローバルに定義することもできます。
+
+```tsx filename="app/[lang]/layout.tsx" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({
+  children,
+  params,
+}: LayoutProps<'/[lang]'>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/[lang]/layout.js" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({ children, params }) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## リソース
+
+- [ミニマルな i18n ルーティングと翻訳](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing)
+- [`next-intl`](https://next-intl.dev)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
+- [`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n)
+- [`lingui`](https://lingui.dev)
+- [`tolgee`](https://tolgee.io/apps-integrations/next)
+- [`next-intlayer`](https://intlayer.org/doc/environment/nextjs)
+- [`gt-next`](https://generaltranslation.com/en/docs/next)

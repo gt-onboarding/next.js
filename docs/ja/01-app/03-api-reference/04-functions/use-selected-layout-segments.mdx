@@ -1,0 +1,85 @@
+---
+title: useSelectedLayoutSegments
+description: useSelectedLayoutSegments フックの API リファレンス。
+---
+
+`useSelectedLayoutSegments` は **Client Component** 用のフックで、呼び出された Layout の **下位** にあるアクティブなルートセグメントを読み取ることができます。
+
+これは、パンくずリストのように、アクティブな子セグメントに関する情報を必要とする親 Layout 内の UI を作成する際に役立ちます。
+
+```tsx filename="app/example-client-component.tsx" switcher
+'use client'
+
+import { useSelectedLayoutSegments } from 'next/navigation'
+
+export default function ExampleClientComponent() {
+  const segments = useSelectedLayoutSegments()
+
+  return (
+    <ul>
+      {segments.map((segment, index) => (
+        <li key={index}>{segment}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```jsx filename="app/example-client-component.js" switcher
+'use client'
+
+import { useSelectedLayoutSegments } from 'next/navigation'
+
+export default function ExampleClientComponent() {
+  const segments = useSelectedLayoutSegments()
+
+  return (
+    <ul>
+      {segments.map((segment, index) => (
+        <li key={index}>{segment}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> **補足**:
+>
+> - `useSelectedLayoutSegments` は [Client Component](/docs/app/getting-started/server-and-client-components) のフックであり、一方 Layout はデフォルトで [サーバーコンポーネント](/docs/app/getting-started/server-and-client-components) なので、`useSelectedLayoutSegments` は通常、Layout にインポートされた Client Component から呼び出されます。
+> - 返されるセグメントには [Route Groups](/docs/app/api-reference/file-conventions/route-groups) も含まれますが、これらを UI に含めたくない場合があります。角かっこで始まる項目を削除するには、[`filter`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter) 配列メソッドを使用できます。
+> - [catch-all](/docs/app/api-reference/file-conventions/dynamic-routes#catch-all-segments) ルートの場合、一致したセグメントは配列内で結合された 1 つの文字列として返されます。たとえば、`app/blog/[...slug]/page.js` があり、`/blog/a/b/c` にアクセスしたときに `app/layout.js` でこのフックを呼び出すと、`['blog', 'a', 'b', 'c']` ではなく `['blog', 'a/b/c']` が返されます。
+
+## 引数
+
+```tsx
+const segments = useSelectedLayoutSegments(parallelRoutesKey?: string)
+```
+
+`useSelectedLayoutSegments` は、必要に応じて [`parallelRoutesKey`](/docs/app/api-reference/file-conventions/parallel-routes#with-useselectedlayoutsegments) を受け取り、そのスロット内でアクティブなルートセグメントを読み取ることができます。
+
+## 戻り値
+
+`useSelectedLayoutSegments` は、フックが呼び出されたレイアウトから 1 階層下にあるアクティブなセグメントを含む文字列の配列を返します。存在しない場合は空配列を返します。
+
+たとえば、以下のレイアウトと URL の場合、返されるセグメントは次のようになります:
+
+| Layout                    | Visited URL           | Returned Segments           |
+| ------------------------- | --------------------- | --------------------------- |
+| `app/layout.js`           | `/`                   | `[]`                        |
+| `app/layout.js`           | `/dashboard`          | `['dashboard']`             |
+| `app/layout.js`           | `/dashboard/settings` | `['dashboard', 'settings']` |
+| `app/dashboard/layout.js` | `/dashboard`          | `[]`                        |
+| `app/dashboard/layout.js` | `/dashboard/settings` | `['settings']`              |
+
+キャッチオールルート (`[...slug]`) の場合、すべての一致したパスセグメントが結合され、配列内の 1 つの文字列として返されます:
+
+| Layout               | Visited URL   | Returned Segments   |
+| -------------------- | ------------- | ------------------- |
+| `app/layout.js`      | `/blog/a/b/c` | `['blog', 'a/b/c']` |
+| `app/blog/layout.js` | `/blog/a/b/c` | `['a/b/c']`         |
+
+## バージョン履歴
+
+| バージョン | 変更内容                                       |
+| ---------- | ---------------------------------------------- |
+| `v13.0.0`  | `useSelectedLayoutSegments` が導入されました。 |

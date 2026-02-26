@@ -1,0 +1,285 @@
+---
+title: generateViewport
+description: generateViewport 関数の API リファレンス。
+related:
+  title: 次のステップ
+  description: すべての Metadata API オプションを確認できます。
+  links:
+    - app/api-reference/file-conventions/metadata
+    - app/getting-started/cache-components
+    - app/api-reference/config/next-config-js/cacheComponents
+---
+
+ページの初期ビューポートは、静的な `viewport` オブジェクトまたは動的な `generateViewport` 関数でカスタマイズできます。
+
+> **補足**:
+>
+> - `viewport` オブジェクトと `generateViewport` 関数のエクスポートは、**サーバーコンポーネントでのみサポートされています**。
+> - 同じルートセグメントから `viewport` オブジェクトと `generateViewport` 関数を両方エクスポートすることはできません。
+> - `metadata` エクスポートから移行している場合は、[metadata-to-viewport-export codemod](/docs/app/guides/upgrading/codemods#metadata-to-viewport-export) を使ってコードを更新できます。
+
+## `viewport` オブジェクト
+
+ビューポートのオプションを定義するには、`layout.jsx` または `page.jsx` ファイルから `viewport` オブジェクトをエクスポートします。
+
+```tsx filename="layout.tsx | page.tsx" switcher
+import type { Viewport } from 'next'
+
+export const viewport: Viewport = {
+  themeColor: 'black',
+}
+
+export default function Page() {}
+```
+
+```jsx filename="layout.jsx | page.jsx" switcher
+export const viewport = {
+  themeColor: 'black',
+}
+
+export default function Page() {}
+```
+
+## `generateViewport` 関数
+
+`generateViewport` は、1つ以上のビューポートフィールドを含む [`Viewport` オブジェクト](#viewport-fields) を返す必要があります。
+
+```tsx filename="layout.tsx | page.tsx" switcher
+export function generateViewport({ params }) {
+  return {
+    themeColor: '...',
+  }
+}
+```
+
+TypeScript では、`params` 引数は、`generateViewport` が定義されている場所に応じて、[`PageProps<'/route'>`](/docs/app/api-reference/file-conventions/page#page-props-helper) または [`LayoutProps<'/route'>`](/docs/app/api-reference/file-conventions/layout#layout-props-helper) を使って型を指定できます。
+
+```jsx filename="layout.js | page.js" switcher
+export function generateViewport({ params }) {
+  return {
+    themeColor: '...',
+  }
+}
+```
+
+> **補足**:
+>
+> - ビューポートが実行時の情報に依存しない場合は、`generateViewport` ではなく、静的な [`viewport` オブジェクト](#the-viewport-object) を使って定義してください。
+
+## ビューポートのフィールド
+
+### `themeColor`
+
+[`theme-color`](https://developer.mozilla.org/docs/Web/HTML/Element/meta/name/theme-color) についての詳細は、MDN を参照してください。
+
+**シンプルなテーマカラー**
+
+```tsx filename="layout.tsx | page.tsx" switcher
+import type { Viewport } from 'next'
+
+export const viewport: Viewport = {
+  themeColor: 'black',
+}
+```
+
+```jsx filename="layout.jsx | page.jsx" switcher
+export const viewport = {
+  themeColor: 'black',
+}
+```
+
+```html filename="<head> output" hideLineNumbers
+<meta name="theme-color" content="black" />
+```
+
+**media 属性あり**
+
+```tsx filename="layout.tsx | page.tsx" switcher
+import type { Viewport } from 'next'
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: 'cyan' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
+  ],
+}
+```
+
+```jsx filename="layout.jsx | page.jsx" switcher
+export const viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: 'cyan' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
+  ],
+}
+```
+
+```html filename="<head> output" hideLineNumbers
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="cyan" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="black" />
+```
+
+### `width`, `initialScale`, `maximumScale` and `userScalable`
+
+> **補足**: `viewport` メタタグは自動的に設定されるため、通常は手動で設定する必要はありません。デフォルト設定で十分なことがほとんどですが、網羅性のためにここで情報を示しています。
+
+```tsx filename="layout.tsx | page.tsx" switcher
+import type { Viewport } from 'next'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  // サポートされているが、使用頻度は低い
+  // interactiveWidget: 'resizes-visual',
+}
+```
+
+```jsx filename="layout.jsx | page.jsx" switcher
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  // サポートされているが、使用頻度は低い
+  // interactiveWidget: 'resizes-visual',
+}
+```
+
+```html filename="<head> output" hideLineNumbers
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+/>
+```
+
+### `colorScheme`
+
+[`color-scheme`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta/name#:~:text=color%2Dscheme%3A%20specifies,of%20the%20following%3A) の詳細については、こちらを参照してください。
+
+```tsx filename="layout.tsx | page.tsx" switcher
+import type { Viewport } from 'next'
+
+export const viewport: Viewport = {
+  colorScheme: 'dark',
+}
+```
+
+```jsx filename="layout.jsx | page.jsx" switcher
+export const viewport = {
+  colorScheme: 'dark',
+}
+```
+
+```html filename="<head> output" hideLineNumbers
+<meta name="color-scheme" content="dark" />
+```
+
+## Cache Components ありの場合
+
+[Cache Components](/docs/app/getting-started/cache-components) が有効な場合、`generateViewport` は他のコンポーネントと同じルールに従います。viewport がランタイムデータ（`cookies()`, `headers()`, `params`, `searchParams`）にアクセスしたり、キャッシュされていないデータフェッチを行う場合は、リクエスト時の実行にフォールバックします。
+
+metadata と異なり、viewport は初期ページロード時の UI に影響するため、ストリーミングすることはできません。`generateViewport` がリクエスト時の実行にフォールバックする場合、ページは処理が完了するまでブロックされる必要があります。
+
+viewport が外部データには依存するがランタイムデータには依存しない場合は、`use cache` を使用してください：
+
+```tsx filename="app/layout.tsx" highlight={2}
+export async function generateViewport() {
+  'use cache'
+  const { width, initialScale } = await db.query('viewport-size')
+  return { width, initialScale }
+}
+```
+
+`viewport` に実際にランタイムデータが必要な場合は、ルート全体を動的にする必要があることを示すために、ドキュメントの `<body>` を Suspense の境界でラップします。
+
+```tsx filename="app/layout.tsx" highlight={1,11-15}
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+
+export async function generateViewport() {
+  const cookieJar = await cookies()
+  return {
+    themeColor: cookieJar.get('theme-color')?.value,
+  }
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <Suspense>
+      <html>
+        <body>{children}</body>
+      </html>
+    </Suspense>
+  )
+}
+```
+
+キャッシュの利用が推奨されるのは、静的シェルを生成できるためです。ドキュメントの `body` を Suspense でラップすると、リクエスト到着時に即座に送信できる静的シェルやコンテンツが存在しなくなり、リクエストのたびにそのルート全体が準備完了までブロックされてしまいます。
+
+> **補足**: アプリケーション内の他のルートでは静的シェルを生成しつつ、特定のルートだけを完全に動的なビューポートとして分離したい場合は、[複数の root layout](/docs/app/api-reference/file-conventions/layout#root-layout) を使用してください。
+
+## 型
+
+`Viewport` 型を使用することで、`viewport` オブジェクトに型安全を持たせることができます。IDE で [組み込みの TypeScript プラグイン](/docs/app/api-reference/config/typescript) を使用している場合、型注釈を手動で追加する必要はありませんが、必要であれば明示的に追加することもできます。
+
+### `viewport` オブジェクト
+
+```tsx
+import type { Viewport } from 'next'
+
+export const viewport: Viewport = {
+  themeColor: 'black',
+}
+```
+
+### `generateViewport` 関数
+
+#### 通常の関数
+
+```tsx
+import type { Viewport } from 'next'
+
+export function generateViewport(): Viewport {
+  return {
+    themeColor: 'black',
+  }
+}
+```
+
+#### セグメントの props を使う場合
+
+```tsx
+import type { Viewport } from 'next'
+
+type Props = {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export function generateViewport({ params, searchParams }: Props): Viewport {
+  return {
+    themeColor: 'black',
+  }
+}
+
+export default function Page({ params, searchParams }: Props) {}
+```
+
+#### JavaScript プロジェクト
+
+JavaScript プロジェクトでは、型安全性を高めるために JSDoc を使用できます。
+
+```js
+/** @type {import("next").Viewport} */
+export const viewport = {
+  themeColor: 'black',
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                            |
+| ---------- | --------------------------------------------------- |
+| `v14.0.0`  | `viewport` と `generateViewport` が導入されました。 |

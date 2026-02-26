@@ -1,0 +1,173 @@
+---
+title: turbopack.ignoreIssue
+description: 特定の Turbopack のエラーや警告を CLI 出力とエラーオーバーレイから非表示にします。
+related:
+  title: 次のステップ
+  description: Turbopack の設定についてさらに学びましょう。
+  links:
+    - app/api-reference/config/next-config-js/turbopack
+    - app/api-reference/turbopack
+---
+
+`turbopack.ignoreIssue` オプションを使用すると、特定の [Turbopack](/docs/app/api-reference/turbopack) のエラーや警告を除外し、CLI 出力やエラーオーバーレイに表示されないようにできます。これは、意図的に未解決のオプションの依存関係など、アプリケーションに影響しない既知の警告を抑制したい場合に便利です。
+
+このオプションは、Turbopack（`next dev --turbopack`）を使用している場合にのみ使用できます。
+
+## 使用方法
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  turbopack: {
+    ignoreIssue: [
+      {
+        path: '**/vendor/**',
+      },
+    ],
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  turbopack: {
+    ignoreIssue: [
+      {
+        path: '**/vendor/**',
+      },
+    ],
+  },
+}
+
+module.exports = nextConfig
+```
+
+## オプション
+
+`ignoreIssue` 配列内の各ルールは、次のフィールドを持つオブジェクトです:
+
+| フィールド                    | 型                 | 必須 | 説明                                     |
+| ----------------------------- | ------------------ | ---- | ---------------------------------------- |
+| [`path`](#path)               | `string \| RegExp` | Yes  | Issue のファイルパスに対してマッチします |
+| [`title`](#title)             | `string \| RegExp` | No   | Issue のタイトルに対してマッチします     |
+| [`description`](#description) | `string \| RegExp` | No   | Issue の説明に対してマッチします         |
+
+ある Issue が `path` と、そのルールで指定されている他のすべてのフィールドにマッチした場合、その Issue は抑制されます。`path` のみが指定されている場合は、一致するファイルに対するすべての Issue が抑制されます。
+
+> **補足:** Issue のタイトルや説明は、Turbopack のバージョン間で変更される可能性があります。`path` フィールドは一般的には安定していますが、すべての種類の Issue で一貫性が保たれることは保証されていません。可能であれば、`title` や `description` によるマッチングよりも、より具体的な `path` のパターンを使用することを推奨します。
+
+### `path`
+
+問題が発生したファイルパスにマッチする、**グロブパターン**（文字列の場合）または**正規表現**。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    ignoreIssue: [
+      // Globパターン: vendor/ 配下のすべてのファイルの問題を抑制する
+      { path: '**/vendor/**' },
+      // 正規表現: パターンに一致するファイルの問題を抑制する
+      { path: /node_modules\/legacy-lib/ },
+    ],
+  },
+}
+```
+
+### `title`
+
+Issue タイトルに対して照合される、**完全一致の文字列**（文字列の場合）または**正規表現**。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    ignoreIssue: [
+      {
+        path: '**/src/**',
+        title: 'Module not found',
+      },
+    ],
+  },
+}
+```
+
+### `description`
+
+文字列の場合は **完全一致する文字列**、もしくは issue の description にマッチする **正規表現** です。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    ignoreIssue: [
+      {
+        path: '**/src/**',
+        description: /Cannot find module 'optional-dep'/,
+      },
+    ],
+  },
+}
+```
+
+## 使用例
+
+### オプションの依存関係に対する警告を抑制する
+
+コードでオプションの `require()` 呼び出しを `try/catch` で囲んでいる場合、Turbopack によって「Module not found」という警告が出力されることがあります。次のように抑制できます。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  turbopack: {
+    ignoreIssue: [
+      {
+        path: '**/lib/optional-feature/**',
+        title: 'Module not found',
+      },
+    ],
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  turbopack: {
+    ignoreIssue: [
+      {
+        path: '**/lib/optional-feature/**',
+        title: 'Module not found',
+      },
+    ],
+  },
+}
+
+module.exports = nextConfig
+```
+
+### 複数のルールを組み合わせる
+
+複数のルールを指定して、さまざまな問題を抑制できます。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    ignoreIssue: [
+      { path: '**/vendor/**' },
+      { path: '**/legacy/**', title: 'Module not found' },
+      { path: /generated\//, description: /expected identifier/ },
+    ],
+  },
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                   |
+| ---------- | ------------------------------------------ |
+| `v16.2.0`  | `turbopack.ignoreIssue` が導入されました。 |

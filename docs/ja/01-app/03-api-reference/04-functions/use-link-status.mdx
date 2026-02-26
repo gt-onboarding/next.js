@@ -1,0 +1,242 @@
+---
+title: useLinkStatus
+description: useLinkStatus フックの API リファレンス。
+related:
+  title: 次のステップ
+  description: API リファレンスを読むことで、このページで言及されている機能についてさらに学びましょう。
+  links:
+    - app/api-reference/components/link
+    - app/api-reference/file-conventions/loading
+---
+
+`useLinkStatus` フックを使用すると、`<Link>` の **pending** 状態を追跡できます。たとえば、ナビゲーションが完了するまでクリックされたリンクにシマー効果を表示するといった、さりげないインラインのフィードバックに使用します。ルートレベルのフォールバックには `loading.js` を、即時遷移にはプリフェッチを優先してください。
+
+`useLinkStatus` は次のような場合に役立ちます:
+
+- [プリフェッチ](/docs/app/getting-started/linking-and-navigating#prefetching) が無効になっている、または進行中であり、そのためナビゲーションがブロックされている場合。
+- 遷移先ルートが動的であり、かつ即時のナビゲーションを可能にする [`loading.js`](/docs/app/api-reference/file-conventions/loading) ファイルを含んでいない場合。
+
+```tsx filename="app/hint.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useLinkStatus } from 'next/link'
+
+function Hint() {
+  const { pending } = useLinkStatus()
+  return (
+    <span aria-hidden className={`link-hint ${pending ? 'is-pending' : ''}`} />
+  )
+}
+
+export default function Header() {
+  return (
+    <header>
+      <Link href="/dashboard" prefetch={false}>
+        <span className="label">Dashboard</span> <Hint />
+      </Link>
+    </header>
+  )
+}
+```
+
+```jsx filename="app/hint.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useLinkStatus } from 'next/link'
+
+function Hint() {
+  const { pending } = useLinkStatus()
+  return (
+    <span aria-hidden className={`link-hint ${pending ? 'is-pending' : ''}`} />
+  )
+}
+
+export default function Header() {
+  return (
+    <header>
+      <Link href="/dashboard" prefetch={false}>
+        <span className="label">Dashboard</span> <Hint />
+      </Link>
+    </header>
+  )
+}
+```
+
+> **補足**:
+>
+> - `useLinkStatus` は `Link` コンポーネントの子孫コンポーネント内でのみ使用する必要があります
+> - このフックは、`Link` コンポーネントで `prefetch={false}` が指定されている場合に最も有用です
+> - リンク先のルートが事前取得されている場合、pending 状態はスキップされます
+> - 短時間に複数のリンクを続けてクリックした場合、最後にクリックしたリンクの pending 状態のみが表示されます
+> - このフックは Pages Router ではサポートされておらず、常に `{ pending: false }` を返します
+> - インラインのインジケータはレイアウトシフトを招きやすいです。固定サイズで常にレンダーされるヒント用の要素を用意して不透明度を切り替えるか、あるいはアニメーションを使用することを推奨します。
+
+## `useLinkStatus` が不要な場合もある
+
+インラインフィードバックを追加する前に、次の点を検討してください。
+
+- 遷移先が静的であり、本番環境ではプリフェッチされているため、pending フェーズ自体が発生しない可能性がある。
+- ルートに `loading.js` ファイルがあり、ルートレベルのフォールバックによる即時トランジションが有効になっている。
+
+ナビゲーションは通常高速です。`useLinkStatus` は、遷移が遅いことを確認した場合の一時的なパッチとして使い、その後はプリフェッチや `loading.js` フォールバックによって根本原因を解消する方向で改善してください。
+
+## パラメータ
+
+```tsx
+const { pending } = useLinkStatus()
+```
+
+`useLinkStatus` は引数を受け取りません。
+
+## 戻り値
+
+`useLinkStatus` は、単一のプロパティを持つオブジェクトを返します。
+
+| プロパティ | 型      | 説明                                                      |
+| ---------- | ------- | --------------------------------------------------------- |
+| pending    | boolean | ブラウザーの履歴が更新される前は `true`、更新後は `false` |
+
+## 例
+
+### インラインリンクヒント
+
+プリフェッチが完了していない場合でも、レイアウトに影響を与えない控えめな固定サイズのヒントを表示して、クリックが行われたことを確認できるようにします。
+
+```tsx filename="app/components/loading-indicator.tsx" switcher
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return (
+    <span aria-hidden className={`link-hint ${pending ? 'is-pending' : ''}`} />
+  )
+}
+```
+
+```jsx filename="app/components/loading-indicator.js" switcher
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return (
+    <span aria-hidden className={`link-hint ${pending ? 'is-pending' : ''}`} />
+  )
+}
+```
+
+```tsx filename="app/shop/layout.tsx" switcher
+import Link from 'next/link'
+import LoadingIndicator from './components/loading-indicator'
+
+const links = [
+  { href: '/shop/electronics', label: 'Electronics' },
+  { href: '/shop/clothing', label: 'Clothing' },
+  { href: '/shop/books', label: 'Books' },
+]
+
+function Menubar() {
+  return (
+    <div>
+      {links.map((link) => (
+        <Link key={link.label} href={link.href}>
+          <span className="label">{link.label}</span> <LoadingIndicator />
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div>
+      <Menubar />
+      {children}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/shop/layout.js" switcher
+import Link from 'next/link'
+import LoadingIndicator from './components/loading-indicator'
+
+const links = [
+  { href: '/shop/electronics', label: 'Electronics' },
+  { href: '/shop/clothing', label: 'Clothing' },
+  { href: '/shop/books', label: 'Books' },
+]
+
+function Menubar() {
+  return (
+    <div>
+      {links.map((link) => (
+        <Link key={link.label} href={link.href}>
+          <span className="label">{link.label}</span> <LoadingIndicator />
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+export default function Layout({ children }) {
+  return (
+    <div>
+      <Menubar />
+      {children}
+    </div>
+  )
+}
+```
+
+## 高速なナビゲーションを適切に扱う
+
+新しいルートへのナビゲーションが高速な場合、ユーザーに不要なヒントの一瞬の表示が発生することがあります。ユーザー体験を向上させ、ナビゲーションの完了に時間がかかる場合にのみヒントを表示する一つの方法としては、初期アニメーションにディレイ（例: 100ms）を追加し、アニメーションを開始する時点では非表示（例: `opacity: 0`）にしておくことです。
+
+```css filename="app/styles/global.css"
+.link-hint {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-left: 0.25rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0;
+  visibility: hidden; /* reserve space without showing the hint */
+}
+
+.link-hint.is-pending {
+  /* アニメーション1: 100ms後にフェードインし、最終的な不透明度を維持する */
+  /* アニメーション2: 保留中にさりげなくパルスする */
+  visibility: visible;
+  animation-name: fadeIn, pulse;
+  animation-duration: 200ms, 1s;
+  /* Appear only if navigation actually takes time */
+  animation-delay: 100ms, 100ms;
+  animation-timing-function: ease, ease-in-out;
+  animation-iteration-count: 1, infinite;
+  animation-fill-mode: forwards, none;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 0.35;
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.15;
+  }
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                           |
+| ---------- | ---------------------------------- |
+| `v15.3.0`  | `useLinkStatus` が導入されました。 |

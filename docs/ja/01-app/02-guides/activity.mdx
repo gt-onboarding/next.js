@@ -1,0 +1,604 @@
+---
+title: Next.js で Activity コンポーネントを使う方法
+nav_title: Activity
+description: Next.js で Activity を使って、表示の切り替えサイクル間で React と DOM の状態を保持し、タブや折りたたみパネル、プリレンダリングといったパターンを実現する方法を学びます。
+related:
+  title: 関連
+  description: Activity は Cache Components と連携して、状態を保持したままの即時ナビゲーションを実現します。
+  links:
+    - app/getting-started/cache-components
+    - app/api-reference/config/next-config-js/cacheComponents
+---
+
+このガイドで使用しているリソースは以下から参照できます。
+
+- [デモ](https://react-activity-patterns.vercel.app/)
+- [コード](https://github.com/vercel-labs/react-activity-patterns)
+
+## 背景
+
+React 19.2 では、[`Activity`](https://react.dev/reference/react/Activity) コンポーネントが導入されました。これは、UI の一部を視覚的に非表示にしながら、DOM 要素と React の state を維持できる強力なプリミティブです。
+
+> **補足:** App Router における Activity は **Next.js 16** 以降で利用可能で、これには React 19.2 が含まれます。Next.js が React のバージョンをどのように管理しているかの詳細は、[インストール](/docs/app/getting-started/installation)を参照してください。
+
+## Activity の動作
+
+Activity は境界として機能し、`hidden` または `visible`（デフォルト）の 2 つのモードを持ちます。`mode="hidden"` に設定すると、次のことを行います:
+
+- すべての子要素に `display: none` を適用する（DOM から削除されず、ドキュメント内に残る）
+- **Effect をクリーンアップする**（クリーンアップ関数を実行する）
+- **ref のクリーンアップ関数を実行する**（クリーンアップ関数を返すコールバック ref）
+- React の state とメモ化された値を保持する
+- 新しい props や context の変化に対して **より低い優先度で** 再レンダーする
+- **SSR 中にスキップされる** - hidden なコンテンツは初期 HTML ペイロードには含まれないが、React がクライアント側でレンダーし、DOM に追加する
+
+境界が再び `mode="visible"` になると、React は子要素を、以前の state を復元した状態で表示し、Effect を再作成します。
+
+```tsx
+'use client'
+
+import { Activity, useState } from 'react'
+
+function Dashboard() {
+  const [isVisible, setIsVisible] = useState(true)
+  const toggleSidebar = () => setIsVisible((state) => !state)
+
+  return (
+    <>
+      <Activity mode={isVisible ? 'visible' : 'hidden'}>
+        <Sidebar />
+      </Activity>
+      <Charts toggleSidebar={toggleSidebar} />
+    </>
+  )
+}
+```
+
+`isVisible` が `false` の場合、`Sidebar` は非表示になりますが、その DOM と React の状態は保持されたままです。新しい props やコンテキストの変更には引き続き反応して再レンダーされますが、表示されているコンテンツよりも優先度は低くなります。`true` にトグルし直すと、サイドバーは以前の状態のまま即座に再表示されます。スクロール位置、展開されているセクション、その他の内部状態はすべて保持されます。
+
+### なぜカスタムラッパーではなく Activity を使うのか
+
+`<div style={{ display: 'none' }}>` でコンテンツをラップするだけでは、なぜ不十分なのか疑問に思うかもしれません。Activity には次のような利点があります:
+
+- **余分な DOM 要素が不要**: ラッパー div は有効な HTML（例: `<ul>` の内側）、CSS レイアウト、アクセシビリティツールを壊す可能性があります
+- **Effect のライフサイクル管理**: React 側で Effect を適切にクリーンアップおよび復元できるように管理されます
+- **Portal も非表示になる**: Portal（モーダル、ツールチップ）経由でレンダーされたコンテンツも Activity と一緒に正しく非表示になります
+- **Selective Hydration**: Activity の境界は React のハイドレーション最適化に参加します
+- **将来のモード**: この API は visible/hidden を超えた追加モードをサポートできるように設計されています
+
+## 状態の保持
+
+### DOM によって管理される state
+
+多くの HTML 要素は、それぞれ自分自身の内部 state を管理します。たとえば `<input>` や `<textarea>` の値、`<details>` の開閉状態、スクロール位置、動画の再生タイムコードなどがあります。
+
+展開可能なセクションを持つフィルターパネルを考えてみましょう。
+
+```tsx
+'use client'
+
+function FiltersPanel() {
+  return (
+    <aside>
+      <details>
+        <summary>Price Range</summary>
+        <input type="range" min="0" max="1000" />
+      </details>
+
+      <details open>
+        <summary>Categories</summary>
+        <input type="text" placeholder="Search categories..." />
+        {/* ... チェックボックスリスト */}
+      </details>
+    </aside>
+  )
+}
+```
+
+`<details>` 要素は開閉状態を保持し、input 要素はユーザーの入力値を保持します。ここで、パネルの表示・非表示を切り替える親コンポーネントを想像してみてください。
+
+```tsx
+'use client'
+
+import { useReducer } from 'react'
+
+function ProductPage() {
+  const [showFilters, toggle] = useReducer((x: boolean) => !x, true)
+
+  return (
+    <>
+      <button onClick={toggle}>Toggle Filters</button>
+      {showFilters && <FiltersPanel />}
+    </>
+  )
+}
+```
+
+`showFilters` が `false` になると、パネルはアンマウントされ、すべての DOM の状態が失われます（どの `<details>` が展開されていたか、ユーザーが入力した内容、スライダーの位置など）。Activity を使うと、DOM の状態は保持されます。
+
+```tsx
+'use client'
+
+import { Activity, useReducer } from 'react'
+
+function ProductPage() {
+  const [showFilters, toggle] = useReducer((x: boolean) => !x, true)
+
+  return (
+    <>
+      <button onClick={toggle}>Toggle Filters</button>
+      <Activity mode={showFilters ? 'visible' : 'hidden'}>
+        <FiltersPanel />
+      </Activity>
+    </>
+  )
+}
+```
+
+これでフィルターのオン／オフを切り替えても、展開されているセクション、入力値、スクロール位置など、すべてが保持されます。
+
+### React 管理の state
+
+Activity がない場合、非表示/表示サイクルをまたいで state を保持するには次が必要になります:
+
+- **state のリフトアップ**: アンマウントされない親コンポーネントに state を移動する
+- **外部ストア**: context、Zustand、Redux などを使う
+
+DOM が管理する state の場合は、それも明示的に制御および同期する必要があります:
+
+- `<details>` を `open` prop を使った制御されたコンポーネントに変換する
+- スクロール位置を追跡し、再マウント時に復元する
+- すべてのフォームフィールドに対して制御された input を使う
+
+これはすぐに多くのボイラープレートコードにつながります。Activity を使うと、こうした同期の作業なしで、コンポーネント内に state（React の state と DOM の state の両方）をローカルに保持しておけるようになります。
+
+## アクティビティを含むパターン
+
+### 状態リフトの回避
+
+Activity を使わない場合、表示/非表示サイクルをまたいで状態を永続化するには、アンマウントされない親コンポーネントに状態を持ち上げる必要があります:
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+
+// 変更前: 状態を親にリフトアップ
+function Parent() {
+  const [showEditor, setShowEditor] = useState(true)
+  // Editorのアンマウント後も状態を保持するためここにホイスト
+  const [draft, setDraft] = useState('')
+  const [cursorPosition, setCursorPosition] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setShowEditor((s) => !s)}>Toggle Editor</button>
+      {showEditor && (
+        <Editor
+          draft={draft}
+          onDraftChange={setDraft}
+          cursorPosition={cursorPosition}
+          onCursorChange={setCursorPosition}
+        />
+      )}
+    </>
+  )
+}
+```
+
+`Editor` は独自の state を持てません。非表示にすると破棄されてしまうためです。Activity を使えば、state をローカルに保ったままにできます:
+
+```tsx
+'use client'
+
+import { Activity, useState } from 'react'
+
+// 変更後: stateはEditorに保持される
+function Parent() {
+  const [showEditor, setShowEditor] = useState(true)
+
+  return (
+    <>
+      <button onClick={() => setShowEditor((s) => !s)}>Toggle Editor</button>
+      <Activity mode={showEditor ? 'visible' : 'hidden'}>
+        <Editor />
+      </Activity>
+    </>
+  )
+}
+
+function Editor() {
+  // stateはここで管理される - 非表示/表示サイクルをまたいでも保持される
+  const [draft, setDraft] = useState('')
+  const [cursorPosition, setCursorPosition] = useState(0)
+
+  return <textarea value={draft} onChange={(e) => setDraft(e.target.value)} />
+}
+```
+
+親コンポーネントは、エディターの内部状態を把握しておく必要がなくなります。これによりコンポーネントごとにカプセル化が保たれ、コンポーネント間の props の受け渡しが減ります。
+
+### タブとナビゲーション
+
+よくあるパターンとして、同じデータに対して複数のビューを提供するものがあります。たとえば、リストビューとテーブルビューです。各ビューは、それぞれ独自のスクロール位置やソート順、選択中のアイテムを持つことがあります。
+
+```tsx
+'use client'
+
+import { Activity, useState } from 'react'
+
+type DataItem = { id: number; name: string }
+
+function DataViewer({ data }: { data: DataItem[] }) {
+  const [view, setView] = useState<'list' | 'table'>('list')
+
+  return (
+    <>
+      <div>
+        <button onClick={() => setView('list')}>List View</button>
+        <button onClick={() => setView('table')}>Table View</button>
+      </div>
+
+      <Activity mode={view === 'list' ? 'visible' : 'hidden'}>
+        <ListView data={data} />
+      </Activity>
+      <Activity mode={view === 'table' ? 'visible' : 'hidden'}>
+        <TableView data={data} />
+      </Activity>
+    </>
+  )
+}
+```
+
+両方のビューは `data` をレンダーして最新の状態に保ちます。ビューを切り替えると:
+
+- 各ビューでのスクロール位置が保持される
+- `TableView` のソート順やカラム幅が維持される
+- `ListView` で選択されたアイテムが選択されたままになる
+
+Activity がない場合、ビューを切り替えると一方がアンマウントされ、もう一方がマウントされるため、これらの状態はすべて失われます。重いコンポーネントツリーでは、これは切り替えのたびにすべてのレンダリング処理を再実行することも意味します。たとえば、メモ化された値の再構築やデータフェッチの再トリガーなどです。Activity を使うと、コンポーネントはマウントされたままで、実際に props や context が変化したときにのみ再レンダーされ、切り替えのたびに再レンダーされることはありません。
+
+このパターンはルートレベルのナビゲーションにも自然に拡張できます。Cache Components により、Next.js は Activity を使ってルートの状態を保持します。別のルートに移動してから戻ってきたときに、前のルートの一時的な状態（スクロール位置、フォーム入力、展開されたセクションなど）をリセットするのではなく復元できます。
+
+### 非表示コンテンツの事前レンダリング
+
+Activity は、ユーザーがまだ見ていないコンテンツを事前レンダリングできます。非表示のバウンダリは、低い優先度でレンダリングされます。Suspense と組み合わせることで、ユーザーが次に閲覧する可能性が高いコンテンツのデータを事前フェッチできます。
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+import { ExpandableComments } from './expandable-comments'
+
+async function getCommentsData() {
+  return db.comments.findMany()
+}
+
+export default function Page() {
+  const commentsPromise = getCommentsData()
+
+  return (
+    <article>
+      <h1>Post Title</h1>
+      <p>Main content visible immediately...</p>
+
+      <ExpandableComments commentsPromise={commentsPromise} />
+    </article>
+  )
+}
+```
+
+```tsx filename="app/expandable-comments.tsx"
+'use client'
+
+import { Activity, Suspense, useState, use } from 'react'
+
+type Comment = { id: string; text: string; author: string }
+
+export function ExpandableComments({
+  commentsPromise,
+}: {
+  commentsPromise: Promise<Comment[]>
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setExpanded((e) => !e)}>
+        {expanded ? 'コメントを非表示' : 'コメントを表示'}
+      </button>
+
+      <Activity mode={expanded ? 'visible' : 'hidden'}>
+        <Suspense fallback={<CommentsSkeleton />}>
+          <Comments commentsPromise={commentsPromise} />
+        </Suspense>
+      </Activity>
+    </>
+  )
+}
+
+function Comments({
+  commentsPromise,
+}: {
+  commentsPromise: Promise<Comment[]>
+}) {
+  const comments = use(commentsPromise)
+  return (
+    <ul>
+      {comments.map((c) => (
+        <li key={c.id}>{c.text}</li>
+      ))}
+    </ul>
+  )
+}
+
+function CommentsSkeleton() {
+  return <div>Loading comments...</div>
+}
+```
+
+サーバーコンポーネントはコメントのフェッチを即座に開始し、その Promise を子コンポーネントに渡します。非表示の間も、データは低い優先度でストリーミングされます。ユーザーが「コメントを表示」をクリックすると、`Comments` コンポーネントが `use()` を使って Promise を解決し、コンテンツが即座に表示されます。
+
+### 状態のリセット
+
+Activity は状態を保持するため、必要に応じて明示的にリセットする必要があります。これまでは、条件付きレンダリング（`{show && <Form />}`）やアンマウントによって、自動的に状態がリセットされていました。Activity では、いつリセットするかを自分で決める必要があります。
+
+**オプション 1: 即時にリセットする**
+
+最もシンプルな方法は、イベントハンドラー内で直接状態をリセットすることです。
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+
+async function sendMessage(formData: FormData) {
+  // 送信ロジック
+}
+
+function ContactForm() {
+  const [message, setMessage] = useState('')
+
+  async function handleSubmit(formData: FormData) {
+    await sendMessage(formData)
+    setMessage('') // 送信直後にリセット
+  }
+
+  return (
+    <form action={handleSubmit}>
+      <textarea
+        name="message"
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+      />
+      <button type="submit">送信</button>
+    </form>
+  )
+}
+```
+
+**オプション 2: 非表示時にリセットする**
+
+Effect のクリーンアップを使って、Activity がコンポーネントを非表示にしたときに state をリセットします。これにより、コンポーネントが非表示になるまで成功メッセージを表示し続けることができます。
+
+```tsx
+'use client'
+
+import { useState, useRef, useLayoutEffect, useTransition } from 'react'
+
+async function signUp(formData: FormData) {
+  // サインアップのロジック
+}
+
+function NewsletterForm() {
+  const [didSubmit, setDidSubmit] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const shouldResetRef = useRef(false)
+
+  useLayoutEffect(() => {
+    return () => {
+      if (shouldResetRef.current) {
+        setDidSubmit(false)
+        shouldResetRef.current = false
+      }
+    }
+  }, [])
+
+  return (
+    <div>
+      {!didSubmit ? (
+        <>
+          <p>ニュースレターに登録する：</p>
+          <form
+            action={(formData) => {
+              startTransition(async () => {
+                shouldResetRef.current = true
+                setDidSubmit(true)
+                await signUp(formData)
+              })
+            }}
+          >
+            <input type="email" name="email" placeholder="メールアドレス" />
+            <button type="submit" disabled={isPending}>
+              {isPending ? '登録中...' : '登録する'}
+            </button>
+          </form>
+        </>
+      ) : (
+        <p>登録ありがとうございます！</p>
+      )}
+    </div>
+  )
+}
+```
+
+送信時に `shouldResetRef.current = true` を設定し、成功メッセージを表示します。Activity がコンポーネントを非表示にすると、Effect のクリーンアップが実行されて `didSubmit` がリセットされます。次にコンポーネントが再び表示されるときには、新しい送信に備えてフォームが準備された状態になります。
+
+> **補足:** コンポーネントがグローバルスタイル（モーダル用に `<body>` に `overflow-hidden` を付けるなど）を追加している場合は、Effect に適切なクリーンアップ関数があることを確認してください。Activity では、これらのクリーンアップは非表示になったタイミングで実行されます。アンマウント時と同じように動作します。
+
+**オプション 3: key でリセットする**
+
+コンポーネントの上位に Activity の境界が存在するかどうかを、常に制御できるとは限りません。親コンポーネントやレイアウト、フレームワークが Activity でコンテンツをラップしている場合があります。コンポーネントがアンマウントを利用してステートをリセットしていた場合は、そのコンポーネントの `key` を変更することで、強制的にリセットできます。React は新しい key をまったく新しい要素として扱い、古いサブツリーを破棄して新しいインスタンスをマウントします。
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+
+function ResettableForm() {
+  const [formKey, setFormKey] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setFormKey((k) => k + 1)}>Reset Form</button>
+      <ContactForm key={formKey} />
+    </>
+  )
+}
+```
+
+`formKey` が変わると、React は `ContactForm` のサブツリー全体を破棄し、すべての React の state、DOM の state、子コンポーネントがリセットされます。
+
+適切なクリーンアップパターン（オプション 1 と 2）を採用する際には、これは多用せず必要最小限の利用にとどめてください。キーに基づくリセットは Activity による状態保持の利点を打ち消してしまうため、一時的な措置にとどめ、汎用的な解決策としては使うべきではありません。詳しくは、React ドキュメントの [キーによる state のリセット](https://react.dev/learn/preserving-and-resetting-state#option-2-resetting-state-with-a-key) および [キーによるフォームのリセット](https://react.dev/learn/preserving-and-resetting-state#resetting-a-form-with-a-key) を参照してください。
+
+## 注意点
+
+### Effect と ref のクリーンアップは実行される
+
+Activity が `hidden` になると、Effect は**クリーンアップされます**。クリーンアップ関数を返すコールバック ref がある場合も、そのクリーンアップ関数が呼び出されます。これは意図的な挙動です。非表示のコンテンツに対して、購読やタイマーが動作すべきではないためです。
+
+> **補足**: 「Effect」とは、React の [`useEffect`](https://react.dev/reference/react/useEffect) と [`useLayoutEffect`](https://react.dev/reference/react/useLayoutEffect) フックを指します。Activity がコンテンツを非表示にすると、コンポーネントがアンマウントされるときと同様に、React はこれらのフックから返されたクリーンアップ関数を実行します。
+
+```tsx
+'use client'
+
+import { useEffect } from 'react'
+
+function Timer() {
+  // Activityが非表示になるとクリーンアップが実行される
+  useEffect(() => {
+    const id = setInterval(() => console.log('tick'), 1000)
+    return () => clearInterval(id) // 非表示時に呼び出される
+  }, [])
+
+  return (
+    <div
+      ref={(node) => {
+        // refのセットアップ: 表示時に実行される
+        return () => {
+          // refのクリーンアップ: 非表示時に実行される
+        }
+      }}
+    />
+  )
+}
+```
+
+React の state と `useRef` の値は、表示・非表示のサイクルをまたいで保持されます ― 実行されるのはクリーンアップ関数だけです。非表示にするタイミングで state をリセットしたり、DOM の状態（入力値やスクロール位置など）をクリアしたりするために、これらのクリーンアップ処理を利用できます。
+
+たとえば、フォームはコールバック ref を使って、Activity によって非表示になったときにフィールドをリセットできます：
+
+```tsx
+<form
+  ref={(form) => {
+    // クリーンアップ関数 - Activityがこのコンポーネントをhiddenにしたときに実行される
+    return () => form?.reset()
+  }}
+>
+  {/* フィールド */}
+</form>
+```
+
+これは、Activity において Effect で「マウント回数」を追跡しようとすると誤解を招く、ということを意味します。Effect は初回マウント時だけでなく、非表示から表示へのすべての遷移で実行されます。初回マウントとそれ以降の表示状態の変化を区別する必要がある場合は、その状態を追跡するために ref を使用してください。
+
+```tsx
+'use client'
+
+import { useEffect, useRef } from 'react'
+
+function TrackedComponent() {
+  const hasMountedRef = useRef(false)
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      console.log('初回マウント')
+    } else {
+      console.log('再び表示された')
+    }
+  }, [])
+
+  return <div>...</div>
+}
+```
+
+`ref` は表示／非表示のサイクルをまたいで保持される（`ref` はクリーンアップされない）ため、最初のマウント以降も `hasMountedRef.current` は `true` のままです。Activity が表示されるたびに Effect が再度実行されますが、そのときには `else` ブランチが取られるようになり、初回マウント時とは異なる形で表示状態の変化を扱えるようになります。
+
+### メディア要素には明示的なクリーンアップが必要
+
+`<video>`、`<audio>`、`<iframe>` のような要素は、`display: none` にしても効果が残る副作用があります。明示的なクリーンアップ処理を追加してください:
+
+```tsx
+'use client'
+
+import { useLayoutEffect, useRef } from 'react'
+
+function VideoPlayer({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useLayoutEffect(() => {
+    const video = videoRef.current
+    return () => {
+      video?.pause()
+    }
+  }, [])
+
+  return <video ref={videoRef} src={src} controls />
+}
+```
+
+### テキストのみの子要素は何もレンダーされない
+
+Activity の子要素がテキスト（DOM 要素を含まない）だけを返す場合、`display: none` を適用する要素が存在しないため、何もレンダーされません。
+
+## Activity を使ったテスト
+
+非表示の Activity コンテンツは `display: none` になっていますが、ドキュメント内には残っています。これは Playwright、Cypress、Puppeteer などのツールを使った E2E テストに影響します:
+
+- **DOM クエリが非表示要素を見つけてしまう** - セレクタは可視状態に関係なく要素にマッチする場合があります
+- **非表示要素との操作が失敗またはタイムアウトする** - 多くのツールは操作する前に要素が可視になるまで待機します
+- **アサーションが非表示コンテンツにマッチしてしまうことがある** - 要素の存在を検証する際は、可視性を明示的に指定してください
+
+たとえば、Activity を使用したタブコンポーネントでは、表示中のタブパネルと非表示のタブパネルの両方が DOM に存在します。`page.getByText('Product Name')` のようなクエリは、両方のパネル内の要素にマッチする可能性があります。
+
+### 可視性を考慮したセレクターを使用する
+
+Playwright では、`getByRole` クエリは自動的に可視性に基づいてフィルタリングされます。
+
+```ts
+// 良い例 - getByRole は自動的に可視性でフィルタリングする
+await page.getByRole('button', { name: 'Submit' }).click()
+await page.getByRole('textbox', { name: 'Email' }).fill('test@example.com')
+
+// こちらも良い例 - getByLabel、getByPlaceholder は可視性でフィルタリングする
+await page.getByLabel('Email').fill('test@example.com')
+await page.getByPlaceholder('Search...').fill('query')
+```
+
+`getByRole` が適さない場合は、可視性フィルタリングを指定した `.locator()` を使います：
+
+```ts
+// フォールバック - 表示状態を明示的にフィルタリング
+await page.locator('.product-card').filter({ visible: true }).first().click()
+await page
+  .locator('[data-testid="timer"]')
+  .filter({ visible: true })
+  .textContent()
+
+// 非推奨 - Activity の境界内の非表示要素にマッチする可能性がある
+await page.locator('.product-card').first().click()
+```
+
+`getByRole` は、Activity、タブ付きナビゲーション、アコーディオン、その他 DOM に非表示コンテンツを保持するあらゆるパターンに対しても安定して動作します。アクセシビリティツリーをクエリするため、そこには非表示要素は含まれません。他のテストツールについては、可視性を考慮したセレクターについてのドキュメントを確認してください。たとえば Cypress では `.should('be.visible')` や `{ visible: true }` オプションを使用します。
+
+## Cache Components と Activity
+
+[Cache Components](/docs/app/getting-started/cache-components) を使ったナビゲーションで Activity を利用する場合、コンポーネントのアンマウントに依存していた一部のパターンは挙動が異なる場合があります。ドロップダウン、ダイアログ、テストといった一般的なパターンの扱いについては、[Cache Components と Activity](/docs/app/guides/activity-cache-components) を参照してください。

@@ -1,0 +1,14 @@
+---
+title: poweredByHeader
+description: Next.js はデフォルトで `x-powered-by` ヘッダーを追加します。ここでは、そのヘッダーを無効化（オプトアウト）する方法を説明します。
+---
+
+{/* このドキュメントのコンテンツは App Router と Pages Router で共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共通のコンテンツはコンポーネントでラップしないでください。 */}
+
+デフォルトでは、Next.js は `x-powered-by` ヘッダーを自動的に付与します。これを無効にするには、`next.config.js` を開き、`poweredByHeader` 設定を無効にします。
+
+```js filename="next.config.js"
+module.exports = {
+  poweredByHeader: false,
+}
+```

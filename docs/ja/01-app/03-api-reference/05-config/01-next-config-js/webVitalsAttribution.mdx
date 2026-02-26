@@ -1,0 +1,27 @@
+---
+title: webVitalsAttribution
+description: webVitalsAttribution オプションを使用して Web Vitals の問題の原因を特定する方法を学びます。
+version: experimental
+---
+
+{/* このドキュメントの内容は app ルーターと pages ルーターで共有されています。Pages Router に特有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+Web Vitals に関連する問題をデバッグする際には、問題の原因となっている箇所を特定できると役に立つことが多くあります。
+たとえば、Cumulative Layout Shift (CLS) の場合、単一の最大レイアウトシフトが発生したときに最初にシフトした要素がどれかを知りたいことがあります。
+また、Largest Contentful Paint (LCP) の場合、そのページの LCP に対応する要素を特定したいことがあります。
+LCP 要素が画像である場合、その画像リソースの URL が分かれば、最適化が必要なアセットを見つけるのに役立ちます。
+
+[attribution](https://github.com/GoogleChrome/web-vitals/blob/4ca38ae64b8d1e899028c692f94d4c56acfc996c/README.md#attribution) とも呼ばれる、Web Vitals スコアへの最大の寄与要因を特定することで、
+[PerformanceEventTiming](https://developer.mozilla.org/docs/Web/API/PerformanceEventTiming)、[PerformanceNavigationTiming](https://developer.mozilla.org/docs/Web/API/PerformanceNavigationTiming)、[PerformanceResourceTiming](https://developer.mozilla.org/docs/Web/API/PerformanceResourceTiming) のエントリのような、より詳細な情報を取得できるようになります。
+
+Attribution は Next.js ではデフォルトで無効になっていますが、`next.config.js` で次のように指定することで、**メトリックごと**に有効化できます。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    webVitalsAttribution: ['CLS', 'LCP'],
+  },
+}
+```
+
+attribution の有効な値は、[`NextWebVitalsMetric`](https://github.com/vercel/next.js/blob/442378d21dd56d6e769863eb8c2cb521a463a2e0/packages/next/shared/lib/utils.ts#L43) 型で定義されているすべての `web-vitals` メトリクスです。

@@ -1,0 +1,66 @@
+---
+title: default.js
+description: default.js ファイルの API リファレンス。
+related:
+  title: Parallel Routes についてさらに学ぶ
+  links:
+    - app/api-reference/file-conventions/parallel-routes
+---
+
+`default.js` ファイルは、フルページロード後に Next.js が [スロット](/docs/app/api-reference/file-conventions/parallel-routes#slots) のアクティブな状態を復元できない場合に、[Parallel Routes](/docs/app/api-reference/file-conventions/parallel-routes) 内でフォールバックをレンダーするために使用されます。
+
+[ソフトナビゲーション](/docs/app/getting-started/linking-and-navigating#client-side-transitions) 中、Next.js は各スロットのアクティブな _state_（サブページ）を追跡します。ただし、ハードナビゲーション（フルページロード）の場合、Next.js はアクティブな状態を復元できません。この場合、現在の URL に一致しないサブページに対して `default.js` ファイルをレンダーできます。
+
+次のフォルダ構造を考えます。`@team` スロットには `settings` ページがありますが、`@analytics` にはありません。
+
+<Image
+  alt="Parallel Routes の一致しないルート"
+  srcLight="/docs/light/parallel-routes-unmatched-routes.png"
+  srcDark="/docs/dark/parallel-routes-unmatched-routes.png"
+  width="1600"
+  height="930"
+/>
+
+`/settings` に移動すると、`@team` スロットは `settings` ページをレンダーし、`@analytics` スロットは現在アクティブなページを維持します。
+
+ページを再読み込みすると、Next.js は `@analytics` に対して `default.js` をレンダーします。`default.js` が存在しない場合、名前付きスロット（`@team`、`@analytics` など）にはエラーが返され、続行するには `default.js` を定義する必要があります。これらの状況で 404 を返すという従来の挙動を保持したい場合は、次の内容を含む `default.js` を作成できます。
+
+```tsx filename="app/@team/default.js"
+import { notFound } from 'next/navigation'
+
+export default function Default() {
+  notFound()
+}
+```
+
+さらに、`children` は暗黙的なスロットであるため、Next.js が親ページの現在の状態を復元できない場合に `children` に対するフォールバックをレンダリングするための `default.js` ファイルも作成する必要があります。`children` スロット用の `default.js` を作成しない場合、そのルートでは 404 ページが返されます。
+
+## リファレンス
+
+### `params` (optional)
+
+ルートセグメントからそのスロット配下のサブページまでの[動的ルートパラメータ](/docs/app/api-reference/file-conventions/dynamic-routes)を含むオブジェクトに解決される Promise。例えば次のようになります。
+
+```tsx filename="app/[artist]/@sidebar/default.js" switcher
+export default async function Default({
+  params,
+}: {
+  params: Promise<{ artist: string }>
+}) {
+  const { artist } = await params
+}
+```
+
+```jsx filename="app/[artist]/@sidebar/default.js" switcher
+export default async function Default({ params }) {
+  const { artist } = await params
+}
+```
+
+| 例                                         | URL          | `params`                                     |
+| ------------------------------------------ | ------------ | -------------------------------------------- |
+| `app/[artist]/@sidebar/default.js`         | `/zack`      | `Promise<{ artist: 'zack' }>`                |
+| `app/[artist]/[album]/@sidebar/default.js` | `/zack/next` | `Promise<{ artist: 'zack', album: 'next' }>` |
+
+- `params` プロップは Promise であるため、値にアクセスするには `async/await` か React の [`use`](https://react.dev/reference/react/use) 関数を使用する必要があります。
+  - バージョン 14 以前では、`params` は同期的なプロップでした。後方互換性を考慮して、Next.js 15 でも同期的にアクセスできますが、この動作は将来的に非推奨になる予定です。

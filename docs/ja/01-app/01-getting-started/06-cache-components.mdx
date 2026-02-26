@@ -1,0 +1,657 @@
+---
+title: Cache Components
+description: Cache Components を使って、静的レンダリングと動的レンダリングの利点を組み合わせる方法を学びます。
+related:
+  title: 次のステップ
+  description: Cache Components の config オプションについてさらに学びます。
+  links:
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/directives/use-cache
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/revalidateTag
+    - app/api-reference/functions/updateTag
+---
+
+> **補足:** Cache Components はオプトイン機能です。Next の設定ファイルで `cacheComponents` フラグを `true` に設定して有効化します。詳細は [Cache Components を有効化する](#enabling-cache-components) を参照してください。
+
+Cache Components を使うと、1 つのルート内で静的・キャッシュ済み・動的なコンテンツを組み合わせることができ、静的サイトの高速性と動的レンダリングの柔軟性を両立できます。
+
+サーバーレンダリングされたアプリケーションでは、通常、静的ページ（高速だが古くなりやすい）と動的ページ（新鮮だが遅い）のどちらかを選択する必要があります。処理をクライアント側に移すと、サーバー負荷は下がりますが、バンドルサイズが大きくなり、初回レンダリングが遅くなります。
+
+Cache Components は、ルートを事前レンダリングしてブラウザに即座に送信される **静的な HTML シェル** とし、動的コンテンツが準備でき次第 UI を更新することで、これらのトレードオフを解消します。
+
+<Image
+  alt="一部だけ再レンダリングされた商品ページ。静的なナビゲーションと商品情報、動的なカートとおすすめ商品が表示されている"
+  srcLight="/learn/light/thinking-in-ppr.png"
+  srcDark="/learn/dark/thinking-in-ppr.png"
+  width="1600"
+  height="632"
+/>
+
+## Cache Components によるレンダリングの仕組み
+
+ビルド時に、Next.js はルートのコンポーネントツリーをレンダリングします。コンポーネントがネットワークリソースや特定のシステム API にアクセスせず、レンダリングに受信リクエストも必要としない場合、その出力は**自動的に static shell に追加されます**。それ以外の場合は、次のいずれかの方法で処理する必要があります:
+
+- コンテンツの準備ができるまで [フォールバック UI を表示](#defer-rendering-to-request-time) するために、コンポーネントを React の [`<Suspense>`](https://react.dev/reference/react/Suspense) でラップし、レンダリングをリクエスト時まで遅延させる
+- または、[`use cache`](/docs/app/api-reference/directives/use-cache) ディレクティブを使用して結果をキャッシュし、（リクエストデータが不要な場合は）[static shell に含める](#using-use-cache)
+
+これはリクエストが到着する前の事前の段階で行われるため、これを prerendering（プレレンダリング）と呼びます。これにより、初回ページロード用の HTML と、クライアントサイドナビゲーション用のシリアライズされた [RSC Payload](/docs/app/getting-started/server-and-client-components#on-the-server) から成る static shell が生成されます。これによって、ユーザーが URL に直接アクセスする場合でも、別のページから遷移する場合でも、ブラウザは常に完全にレンダリングされたコンテンツを即座に受け取れます。
+
+Next.js では、prerendering 中に完了できないコンポーネントを明示的に扱う必要があります。それらが `<Suspense>` でラップされていない、または `use cache` が指定されていない場合、開発時およびビルド時に [`Uncached data was accessed outside of <Suspense>`](https://nextjs.org/docs/messages/blocking-route) エラーが発生します。
+
+> **補足**: キャッシュはコンポーネントレベルまたは関数レベルで適用でき、フォールバック UI は任意のサブツリーの周囲に定義できます。つまり、1 つのルートの中で静的・キャッシュ済み・動的なコンテンツを組み合わせて構成できます。
+
+<Image
+  alt="クライアント上で一部のみレンダリングされたページと、ストリーミング中のチャンクに対するローディング UI を示す図。"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+このレンダリング手法は **Partial Prerendering** と呼ばれ、Cache Components 使用時のデフォルトの挙動です。このドキュメントの残りの部分では、部分的または完全な出力のどちらを生成する場合でも、これを単に「prerendering」と呼びます。
+
+> **🎥 視聴:** Partial Prerendering が必要な理由とその仕組み → [YouTube (10 分)](https://www.youtube.com/watch?v=MTcPrTIBkpA)。
+
+## 自動的にプリレンダーされるコンテンツ
+
+同期 I/O、モジュールのインポート、純粋な計算といった処理は、プリレンダリング時に完了させることができます。これらの処理だけを使用するコンポーネントは、そのレンダー結果が静的 HTML シェルに含まれます。
+
+以下の `Page` コンポーネント内のすべての処理はレンダー中に完了するため、そのレンダー結果は自動的に静的シェルに含まれます。レイアウトとページの両方がプリレンダリングに成功すると、ルート全体が静的シェルになります。
+
+```tsx filename="page.tsx"
+import fs from 'node:fs'
+
+export default async function Page() {
+  // 同期ファイルシステム読み込み
+  const content = fs.readFileSync('./config.json', 'utf-8')
+
+  // モジュールのインポート
+  const constants = await import('./constants.json')
+
+  // 純粋な計算処理
+  const processed = JSON.parse(content).items.map((item) => item.value * 2)
+
+  return (
+    <div>
+      <h1>{constants.appName}</h1>
+      <ul>
+        {processed.map((value, i) => (
+          <li key={i}>{value}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+> **補足**: ルートが完全にプリレンダーされているかどうかは、ビルド出力のサマリを確認することで検証できます。また、ブラウザでページのソースを表示して、任意のページの静的シェルにどのようなコンテンツが含まれているかを確認することもできます。
+
+## リクエスト時までレンダリングを遅延させる
+
+プリレンダリング中に、Next.js が完了できない処理（ネットワークリクエスト、リクエストデータへのアクセス、非同期処理など）が発生した場合、それに明示的に対処する必要があります。レンダリングをリクエスト時まで遅延させるには、親コンポーネントが Suspense バウンダリを使ってフォールバック UI を提供する必要があります。フォールバックは静的シェルの一部となり、実際のコンテンツはリクエスト時に解決されます。
+
+Suspense バウンダリは、対象となるコンポーネントのできるだけ近くに配置してください。これにより、境界の外側は通常どおりプリレンダリングできるため、静的シェルに含められるコンテンツ量を最大化できます。
+
+> **補足**: Suspense バウンダリを使うと、複数の動的セクションが互いをブロックせずに並列でレンダリングされ、全体のロード時間を短縮できます。
+
+### 動的コンテンツ
+
+外部システムはコンテンツを非同期に提供しますが、完了するまでにかかる時間は予測できず、失敗する可能性もあります。これが、プリレンダリングではそれらが自動的に実行されない理由です。
+
+一般的に、各リクエストごとにソースから最新のデータが必要な場合（リアルタイムフィードやパーソナライズされたコンテンツなど）は、Suspense バウンダリとフォールバック UI を用意し、レンダリングを遅延させます。
+
+たとえば、以下の `DynamicContent` コンポーネントは、自動的にはプリレンダリングされない複数の処理を行います。
+
+```tsx filename="page.tsx"
+import { Suspense } from 'react'
+import fs from 'node:fs/promises'
+
+async function DynamicContent() {
+  // ネットワークリクエスト
+  const data = await fetch('https://api.example.com/data')
+
+  // データベースクエリ
+  const users = await db.query('SELECT * FROM users')
+
+  // 非同期ファイルシステム操作
+  const file = await fs.readFile('..', 'utf-8')
+
+  // 外部システムの遅延をシミュレート
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return <div>静的シェルには含まれない</div>
+}
+```
+
+ページ内で `DynamicContent` を使用するには、フォールバック用の UI を定義するために `<Suspense>` コンポーネントでラップします。
+
+```tsx filename="page.tsx"
+export default async function Page(props) {
+  return (
+    <>
+      <h1>静的シェルの一部</h1>
+      {/* <p>Loading..</p> は静的シェルの一部です */}
+      <Suspense fallback={<p>Loading..</p>}>
+        <DynamicContent />
+        <div>静的シェルから除外された兄弟要素</div>
+      </Suspense>
+    </>
+  )
+}
+```
+
+プリレンダリングは `fetch` リクエストの時点で停止します。リクエスト自体は開始されず、その後に続くコードも実行されません。
+
+フォールバック（`<p>Loading...</p>`）は静的シェルに含まれ、コンポーネントのコンテンツはリクエスト時にストリーミングされます。
+
+この例では、すべての処理（ネットワークリクエスト、データベースクエリ、ファイル読み取り、タイムアウト）が同じコンポーネント内で逐次実行されるため、すべて完了するまでコンテンツは表示されません。
+
+> **補足**: 頻繁に更新されない動的コンテンツの場合は、ストリーミングの代わりに `use cache` を使って動的データを静的シェルに含めることができます。例については、[プリレンダリング中](#during-prerendering) のセクションを参照してください。
+
+### ランタイムデータ
+
+リクエストコンテキストを必要とする動的データの一種で、ユーザーがリクエストを行ったときにのみ利用可能です。
+
+- [`cookies()`](/docs/app/api-reference/functions/cookies) - ユーザーのクッキーデータ
+- [`headers()`](/docs/app/api-reference/functions/headers) - リクエストヘッダー
+- [`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) - URL クエリパラメータ
+- [`params`](/docs/app/api-reference/file-conventions/page#params-optional) - 動的ルートパラメータ（[`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) を通じて少なくとも 1 つのサンプルが提供されていない場合）。詳細なパターンについては [Dynamic Routes with Cache Components](/docs/app/api-reference/file-conventions/dynamic-routes#with-cache-components) を参照してください。
+
+```tsx filename="page.tsx"
+import { cookies, headers } from 'next/headers'
+import { Suspense } from 'react'
+
+async function RuntimeData({ searchParams }) {
+  // リクエストデータへのアクセス
+  const cookieStore = await cookies()
+  const headerStore = await headers()
+  const search = await searchParams
+
+  return <div>Not in the static shell</div>
+}
+```
+
+`RuntimeData` コンポーネントを使用するには、`<Suspense>` の境界で囲みます。
+
+```tsx filename="page.tsx"
+export default async function Page(props) {
+  return (
+    <>
+      <h1>静的シェルの一部</h1>
+      {/* <p>Loading..</p> は静的シェルの一部 */}
+      <Suspense fallback={<p>Loading..</p>}>
+        <RuntimeData searchParams={props.searchParams} />
+        <div>静的シェルから除外された兄弟要素</div>
+      </Suspense>
+    </>
+  )
+}
+```
+
+上記のいずれのランタイム API にもアクセスせずに、リクエスト時点まで処理を遅延させる必要がある場合は、[`connection()`](/docs/app/api-reference/functions/connection) を使用してください。
+
+> **補足**: ランタイムデータはリクエストコンテキストを必要とするため、`use cache` でキャッシュすることはできません。ランタイム API にアクセスするコンポーネントは、必ず `<Suspense>` でラップする必要があります。ただし、ランタイムデータから値を取り出し、それらをキャッシュされた関数への引数として渡すことはできます。例については、[with runtime data](#with-runtime-data) セクションを参照してください。
+
+Cookie のようなランタイムデータを静的シェルをブロックせずに読み取る 1 つの方法は、promise をクライアント側のコンテキストプロバイダに渡すことです。例については、[Sharing data with context and React.cache](/docs/app/getting-started/server-and-client-components#sharing-data-with-context-and-reactcache) を参照してください。
+
+> **補足**: `React.cache` は、`use cache` の境界内で分離されたスコープとして動作します。詳細については、[React.cache isolation](/docs/app/api-reference/directives/use-cache#reactcache-isolation) を参照してください。
+
+### 非決定的な処理
+
+`Math.random()`、`Date.now()`、`crypto.randomUUID()` のような処理は、実行されるたびに異なる値を生成します。これらをリクエスト時に実行し（リクエストごとに一意な値を生成するため）、その動作を保証するには、動的またはランタイムのデータアクセスを行った後にこれらの処理を呼び出すことで、その意図を Cache Components に明示的に伝える必要があります。
+
+```tsx
+import { connection } from 'next/server'
+import { Suspense } from 'react'
+
+async function UniqueContent() {
+  // 明示的にリクエスト時まで遅延する
+  await connection()
+
+  // 非決定論的な操作
+  const random = Math.random()
+  const now = Date.now()
+  const date = new Date()
+  const uuid = crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+
+  return (
+    <div>
+      <p>{random}</p>
+      <p>{now}</p>
+      <p>{date.getTime()}</p>
+      <p>{uuid}</p>
+      <p>{bytes}</p>
+    </div>
+  )
+}
+```
+
+`UniqueContent` コンポーネントは処理をリクエスト時まで先送りにするため、ルート内で使用するには `<Suspense>` でラップする必要があります。
+
+```tsx filename="page.tsx"
+export default async function Page() {
+  return (
+    // <p>Loading..</p> は静的シェルの一部です
+    <Suspense fallback={<p>Loading..</p>}>
+      <UniqueContent />
+    </Suspense>
+  )
+}
+```
+
+すべてのリクエストで、乱数や日付などの値は毎回異なります。
+
+> **補足**：`use cache` を使うと、非決定的な処理をキャッシュできます。例については、[with non-deterministic operations](#with-non-deterministic-operations) セクションを参照してください。
+
+## `use cache` の使用
+
+[`use cache`](/docs/app/api-reference/directives/use-cache) ディレクティブは、非同期関数やコンポーネントの戻り値をキャッシュします。関数、コンポーネント、またはファイル単位で適用できます。
+
+引数と、親スコープからクロージャで捕捉される値は、自動的に [cache key](/docs/app/api-reference/directives/use-cache#cache-keys) の一部になります。つまり、異なる入力ごとに別々のキャッシュエントリが生成されます。これにより、パーソナライズやパラメータに応じたキャッシュ済みコンテンツが可能になります。
+
+[Dynamic content](#dynamic-content) をすべてのリクエストごとにデータソースから常に最新取得する必要がない場合、キャッシュすることで、プリレンダリング時に静的シェルにそのコンテンツを含めたり、ランタイムで複数リクエスト間で結果を再利用したりできます。
+
+キャッシュされたコンテンツは 2 つの方法で再検証できます。キャッシュの有効期限に基づき自動で行う方法と、タグを使って [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) または [`updateTag`](/docs/app/api-reference/functions/updateTag) でオンデマンドに行う方法です。
+
+> **補足**: どのようなものがキャッシュ可能か、および引数がどのように動作するかの詳細については、[シリアライズ要件と制約](/docs/app/api-reference/directives/use-cache#constraints) を参照してください。
+
+### プレレンダリング時
+
+[動的コンテンツ](#dynamic-content) は外部ソースからフェッチされますが、アクセスごとに変化することはあまりありません。商品カタログのデータは在庫の変化に応じて更新され、ブログ記事のコンテンツは公開後に変更されることはほとんどなく、過去日付のアナリティクスレポートは静的なままです。
+
+このデータが [ランタイムデータ](#runtime-data) に依存していない場合、`use cache` ディレクティブを使用して静的 HTML シェルに含めることができます。[`cacheLife`](/docs/app/api-reference/functions/cacheLife) を使って、キャッシュされたデータをどの程度の期間利用するかを定義します。
+
+再検証が行われると、静的シェルは最新のコンテンツで更新されます。オンデマンド再検証の詳細については、[タグ付けと再検証](#tagging-and-revalidating) を参照してください。
+
+```tsx filename="app/page.tsx" highlight={1,4,5}
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  'use cache'
+  cacheLife('hours')
+
+  const users = await db.query('SELECT * FROM users')
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+`cacheLife` 関数では、キャッシュプロファイル名（`'hours'`、`'days'`、`'weeks'` など）またはキャッシュの動作を制御するためのカスタム設定オブジェクトを指定できます。
+
+```tsx filename="app/page.tsx" highlight={1,4-8}
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  'use cache'
+  cacheLife({
+    stale: 3600, // staleと見なされるまで1時間
+    revalidate: 7200, // 再検証まで2時間
+    expire: 86400, // 期限切れまで1日
+  })
+
+  const users = await db.query('SELECT * FROM users')
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> **補足:** `seconds` プロファイルを使用している場合、`revalidate: 0` の場合、または `expire` が 5 分未満の場合、そのキャッシュは「短時間のキャッシュ」とみなされます。短時間のキャッシュは自動的にプリレンダーの対象から除外され、代わりに `dynamic hole` になります。そのようなキャッシュが、明示的な `cacheLife` を指定していない別の `use cache` 内にネストされている場合、誤設定を防ぐために、Next.js はプリレンダリング時にエラーを発生させます。詳細は [Prerendering behavior](/docs/app/api-reference/functions/cacheLife#prerendering-behavior) を参照してください。
+
+利用可能なプロファイルやカスタム構成オプションについては、[`cacheLife` API リファレンス](/docs/app/api-reference/functions/cacheLife) を参照してください。
+
+### ランタイムデータを使う場合
+
+ランタイムデータと [`use cache`](/docs/app/api-reference/directives/use-cache) は同じスコープ内で併用できません。ただし、ランタイム API から値を取り出し、その値をキャッシュされた関数の引数として渡すことはできます。
+
+```tsx filename="app/profile/page.tsx"
+import { cookies } from 'next/headers'
+import { Suspense } from 'react'
+
+export default function Page() {
+  // ページ自体が動的境界を作成する
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProfileContent />
+    </Suspense>
+  )
+}
+
+// コンポーネント（キャッシュなし）がランタイムデータを読み取る
+async function ProfileContent() {
+  const session = (await cookies()).get('session')?.value
+
+  return <CachedContent sessionId={session} />
+}
+
+// キャッシュされたコンポーネント/関数がデータをpropsとして受け取る
+async function CachedContent({ sessionId }: { sessionId: string }) {
+  'use cache'
+  // sessionIdがキャッシュキーの一部になる
+  const data = await fetchUserData(sessionId)
+  return <div>{data}</div>
+}
+```
+
+リクエスト時に一致するキャッシュエントリが見つからない場合は、`CachedContent` が実行され、その結果が今後のリクエストのためにキャッシュされます。
+
+### 非決定的な処理を行う場合
+
+`use cache` のスコープ内では、非決定的な処理はプリレンダリング時に実行されます。これは、すべてのユーザーに同じレンダリング結果を配信したい場合に役立ちます。
+
+```tsx
+export default async function Page() {
+  'use cache'
+
+  // 一度だけ実行され、以降はすべてのリクエストに対してキャッシュが使用される
+  const random = Math.random()
+  const random2 = Math.random()
+  const now = Date.now()
+  const date = new Date()
+  const uuid = crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+
+  return (
+    <div>
+      <p>
+        {random} and {random2}
+      </p>
+      <p>{now}</p>
+      <p>{date.getTime()}</p>
+      <p>{uuid}</p>
+      <p>{bytes}</p>
+    </div>
+  )
+}
+```
+
+キャッシュが再検証されるまで、すべてのリクエストに対して同じ乱数、タイムスタンプ、および UUID を含むルートが返されます。
+
+### タグ付けと再検証
+
+キャッシュされたデータに [`cacheTag`](/docs/app/api-reference/functions/cacheTag) でタグを付け、変更後の更新を即時に反映させたい場合は Server Actions 内で [`updateTag`](/docs/app/api-reference/functions/updateTag) を使用して再検証し、ある程度の更新遅延が許容できる場合は [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) を使用して再検証します。
+
+#### `updateTag` を使用する場合
+
+同じリクエスト内でキャッシュされたデータの有効期限を切り、その場で即座に更新する必要がある場合は、`updateTag` を使用します。
+
+```tsx filename="app/actions.ts" highlight={1,4,5,13}
+import { cacheTag, updateTag } from 'next/cache'
+
+export async function getCart() {
+  'use cache'
+  cacheTag('cart')
+  // データを取得する
+}
+
+export async function updateCart(itemId: string) {
+  'use server'
+  // itemId を使用してデータを書き込む
+  // ユーザーのカートを更新する
+  updateTag('cart')
+}
+```
+
+#### `revalidateTag` を使用する場合
+
+`revalidateTag` は、`stale-while-revalidate` の動作を維持したまま、適切にタグ付けされたキャッシュエントリーだけを無効化したい場合に使用します。これは、結果整合性を許容できる静的コンテンツに最適です。
+
+```tsx filename="app/actions.ts" highlight={1,4,5,12}
+import { cacheTag, revalidateTag } from 'next/cache'
+
+export async function getPosts() {
+  'use cache'
+  cacheTag('posts')
+  // データを取得する
+}
+
+export async function createPost(post: FormData) {
+  'use server'
+  // FormData を使用してデータを書き込む
+  revalidateTag('posts', 'max')
+}
+```
+
+詳細な説明と使用例については、[`use cache` API リファレンス](/docs/app/api-reference/directives/use-cache)を参照してください。
+
+### 何をキャッシュすべきですか？
+
+キャッシュする対象は、どのような UI のローディング状態にしたいかによって決まります。データがランタイム時の情報に依存しておらず、一定期間にわたって複数のリクエストに対して同じキャッシュ済みの値が返されても問題ない場合は、その挙動を表すために `use cache` と `cacheLife` を使用してください。
+
+更新メカニズムを備えたコンテンツ管理システムでは、より長いキャッシュ期間を持つタグの利用を検討し、`revalidateTag` を使って静的な初期 UI を「再検証が必要な状態」としてマークします。このパターンにより、キャッシュされた高速なレスポンスを維持しつつ、キャッシュの有効期限を先回りして切らしてしまうのではなく、実際にコンテンツが変更されたタイミングでのみ更新を行うことができます。
+
+## まとめ
+
+以下は、静的コンテンツ、キャッシュされた動的コンテンツ、ストリーミングされる動的コンテンツが 1 つのページ内で連携して動作する完全な例です。
+
+```tsx filename="app/blog/page.tsx"
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheLife } from 'next/cache'
+import Link from 'next/link'
+
+export default function BlogPage() {
+  return (
+    <>
+      {/* 静的コンテンツ - 自動的にプリレンダリングされる */}
+      <header>
+        <h1>Our Blog</h1>
+        <nav>
+          <Link href="/">Home</Link> | <Link href="/about">About</Link>
+        </nav>
+      </header>
+
+      {/* キャッシュされた動的コンテンツ - 静的シェルに含まれる */}
+      <BlogPosts />
+
+      {/* ランタイム動的コンテンツ - リクエスト時にストリーミングされる */}
+      <Suspense fallback={<p>Loading your preferences...</p>}>
+        <UserPreferences />
+      </Suspense>
+    </>
+  )
+}
+
+// 全ユーザーに同じブログ投稿が表示される（1時間ごとに再検証）
+async function BlogPosts() {
+  'use cache'
+  cacheLife('hours')
+
+  const res = await fetch('https://api.vercel.app/blog')
+  const posts = await res.json()
+
+  return (
+    <section>
+      <h2>Latest Posts</h2>
+      <ul>
+        {posts.slice(0, 5).map((post: any) => (
+          <li key={post.id}>
+            <h3>{post.title}</h3>
+            <p>
+              By {post.author} on {post.date}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// Cookieに基づいてユーザーごとにパーソナライズされる
+async function UserPreferences() {
+  const theme = (await cookies()).get('theme')?.value || 'light'
+  const favoriteCategory = (await cookies()).get('category')?.value
+
+  return (
+    <aside>
+      <p>Your theme: {theme}</p>
+      {favoriteCategory && <p>Favorite category: {favoriteCategory}</p>}
+    </aside>
+  )
+}
+```
+
+プリレンダリング時には、ヘッダー（静的）と API から取得されたブログ記事（`use cache` によるキャッシュ済み）が、ユーザー設定用のフォールバック UI とともに静的シェルの一部になります。
+
+ユーザーがページを訪れると、ヘッダーとブログ記事を含むこのプリレンダリング済みシェルが即座に表示されます。ユーザーのクッキーに依存するため、パーソナライズされた設定だけがリクエスト時にストリーミングされます。これにより、高速な初回ページ読み込みを維持しつつ、パーソナライズされたコンテンツも提供できます。
+
+## Metadata と Viewport
+
+`generateMetadata` と `generateViewport` は、ページまたはレイアウトのレンダリング処理の一部です。プリレンダリング時には、これらがランタイムデータやキャッシュされていない動的データにアクセスした場合、そのアクセスは残りのページ部分とは別に個別で追跡されます。
+
+ページまたはレイアウトがプリレンダリング可能であるにもかかわらず、Metadata または Viewport だけがキャッシュされていない動的データやランタイムデータにアクセスしている場合、Next.js は明示的な選択を要求します。可能であればデータをキャッシュするか、遅延レンダリングが意図的であることを示すかのどちらかです。これをどのように扱うかについては、[Metadata with Cache Components](/docs/app/api-reference/functions/generate-metadata#with-cache-components) および [Viewport with Cache Components](/docs/app/api-reference/functions/generate-viewport#with-cache-components) を参照してください。
+
+## Cache Components の有効化
+
+Cache Components（PPR を含む）を有効にするには、Next.js の設定ファイルに [`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) オプションを追加します。
+
+```ts filename="next.config.ts" highlight={4} switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" highlight={3} switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  cacheComponents: true,
+}
+
+module.exports = nextConfig
+```
+
+> **補足:** Cache Components が有効な場合、`GET` の Route Handler はページと同じプリレンダリングモデルに従います。詳しくは、[Route Handlers with Cache Components](/docs/app/getting-started/route-handlers#with-cache-components) を参照してください。
+
+## ナビゲーションは Activity を使用する
+
+[`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) フラグが有効な場合、Next.js は React の [`<Activity>`](https://react.dev/reference/react/Activity) コンポーネントを使用して、クライアントサイドのナビゲーション中もコンポーネントの状態を保持します。
+
+移動先のルートに遷移したときに前のルートをアンマウントする代わりに、Next.js は Activity モードを [`"hidden"`](https://react.dev/reference/react/Activity#activity) に設定します。これは次のことを意味します。
+
+- ルート間をナビゲートしてもコンポーネントの状態が保持される
+- 戻る操作を行うと、前のルートが状態を保ったまま再表示される
+- ルートが非表示 (`"hidden"`) になったときに副作用はクリーンアップされ、再び表示されるときに再作成される
+
+この挙動により、ユーザーがルート間を行き来する際に、UI の状態（フォーム入力値や展開されたセクションなど）を維持することで、ナビゲーション体験が向上します。
+
+> **補足**: Next.js はヒューリスティックを用いて、最近訪れたルートのうちいくつかを `"hidden"` のまま保持し、古いルートは DOM から削除して過度な肥大化を防ぎます。
+
+コンポーネントがアンマウントされずにマウントされたままになると、一部の UI パターンは異なる挙動を示します。ドロップダウン、ダイアログ、テストなどの一般的なパターンを扱う方法については、[Activity with Cache Components ガイド](/docs/app/guides/activity-cache-components)を参照してください。
+
+## ルートセグメント設定の移行
+
+Cache Components が有効になっている場合、いくつかのルートセグメントの設定オプションは不要になり、サポートもされなくなります。
+
+### `dynamic = "force-dynamic"`
+
+**不要です。** すべてのページは、デフォルトでは動的です。
+
+```tsx filename="app/page.tsx"
+// 変更前 - 不要になりました
+export const dynamic = 'force-dynamic'
+
+export default function Page() {
+  return <div>...</div>
+}
+```
+
+```tsx filename="app/page.tsx"
+// 変更後 - 削除するだけ
+export default function Page() {
+  return <div>...</div>
+}
+```
+
+### `dynamic = "force-static"`
+
+まずはこれを削除してください。開発時およびビルド時に、未処理の動的データアクセスやランタイムデータアクセスが検出されると、Next.js はエラーをスローします。そうでない場合は、[プリレンダリング](#automatically-prerendered-content)のステップで自動的に静的な HTML シェルが抽出されます。
+
+動的なデータアクセスについては、キャッシュされた動作を維持するために、データアクセス箇所のできるだけ近くに `'max'` のような長めの [`cacheLife`](/docs/app/api-reference/functions/cacheLife) を指定した [`use cache`](#using-use-cache) を追加します。必要であれば、ページまたはレイアウトの先頭に追加してください。
+
+ランタイムデータアクセス（`cookies()`, `headers()` など）の場合は、エラーによって[その処理を `Suspense` でラップする](#runtime-data)よう案内されます。最初に `force-static` を使用していたため、リクエスト時の処理が発生しないようにするにはランタイムデータアクセスを削除する必要があります。
+
+```tsx filename="app/page.tsx"
+// 変更前
+export const dynamic = 'force-static'
+
+export default async function Page() {
+  const data = await fetch('https://api.example.com/data')
+  return <div>...</div>
+}
+```
+
+```tsx filename="app/page.tsx"
+import { cacheLife } from 'next/cache'
+
+// 変更後 - 代わりに 'use cache' を使用
+export default async function Page() {
+  'use cache'
+  cacheLife('max')
+  const data = await fetch('https://api.example.com/data')
+  return <div>...</div>
+}
+```
+
+### `revalidate`
+
+**`cacheLife` に置き換えてください。** ルートセグメントの設定の代わりに、`cacheLife` 関数を使用してキャッシュの有効期間を定義します。
+
+```tsx
+// 変更前
+export const revalidate = 3600 // 1時間
+
+export default async function Page() {
+  return <div>...</div>
+}
+```
+
+```tsx filename="app/page.tsx"
+// 変更後 - cacheLifeを使用
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  'use cache'
+  cacheLife('hours')
+  return <div>...</div>
+}
+```
+
+### `fetchCache`
+
+**不要です。** `use cache` を使うと、キャッシュされるスコープ内のすべてのデータ取得が自動的にキャッシュされるため、`fetchCache` は不要になります。
+
+```tsx filename="app/page.tsx"
+// 変更前
+export const fetchCache = 'force-cache'
+```
+
+```tsx filename="app/page.tsx"
+// 変更後 - 'use cache' を使用してキャッシュの動作を制御する
+export default async function Page() {
+  'use cache'
+  // ここでのすべてのフェッチはキャッシュされる
+  return <div>...</div>
+}
+```
+
+### `runtime = 'edge'`
+
+**サポートされていません。** Cache Components を使用するには Node.js ランタイムが必要で、[Edge Runtime](/docs/app/api-reference/edge) ではエラーが発生します。

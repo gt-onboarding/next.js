@@ -1,0 +1,428 @@
+---
+title: インストール
+description: '「create-next-app」CLI を使って新しい Next.js アプリケーションを作成し、TypeScript、ESLint、モジュールパスのエイリアスを設定する方法について説明します。'
+---
+
+{/* このドキュメントのコンテンツは、App Router と Pages Router の両方で共有されています。Pages Router 固有のコンテンツを追加する場合は、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されるコンテンツはコンポーネントでラップしないでください。 */}
+
+<AppOnly>
+  新しい Next.js アプリを作成し、ローカル環境で実行します。
+
+## クイックスタート
+
+1. `my-app` という名前の新しい Next.js アプリを作成します。
+2. `cd my-app` を実行して、開発サーバーを起動します。
+3. `http://localhost:3000` にアクセスします。
+
+```bash package="pnpm"
+pnpm create next-app@latest my-app --yes
+cd my-app
+pnpm dev
+```
+
+```bash package="npm"
+npx create-next-app@latest my-app --yes
+cd my-app
+npm run dev
+```
+
+```bash package="yarn"
+yarn create next-app@latest my-app --yes
+cd my-app
+yarn dev
+```
+
+```bash package="bun"
+bun create next-app@latest my-app --yes
+cd my-app
+bun dev
+```
+
+- `--yes` を指定すると、保存済みの設定またはデフォルトを使用してプロンプトをスキップします。デフォルトのセットアップでは、TypeScript、Tailwind、ESLint、App Router、Turbopack が有効になり、インポートエイリアスとして `@/*` が設定されます。
+
+</AppOnly>
+
+## システム要件
+
+開始する前に、開発環境が次の要件を満たしていることを確認してください:
+
+- 最小 Node.js バージョン: [20.9](https://nodejs.org/)
+- 対応オペレーティングシステム: macOS、Windows（WSL を含む）、Linux
+
+## 対応ブラウザ
+
+Next.js は、追加の設定なしで最新のブラウザをサポートします。
+
+- Chrome 111+
+- Edge 111+
+- Firefox 111+
+- Safari 16.4+
+
+ポリフィルの設定方法や特定のブラウザを対象とする方法など、詳しくは [ブラウザサポート](/docs/architecture/supported-browsers) を参照してください。
+
+## CLI で作成する
+
+新しい Next.js アプリを作成する最も手早い方法は、必要な設定を自動でセットアップしてくれる [`create-next-app`](/docs/app/api-reference/cli/create-next-app) を使うことです。プロジェクトを作成するには、次を実行してください。
+
+```bash package="pnpm"
+pnpm create next-app
+```
+
+```bash package="npm"
+npx create-next-app@latest
+```
+
+```bash package="yarn"
+yarn create next-app
+```
+
+```bash package="bun"
+bun create next-app
+```
+
+インストールの実行時に、次のプロンプトが表示されます。
+
+```txt filename="Terminal"
+What is your project named? my-app
+Would you like to use the recommended Next.js defaults?
+    Yes, use recommended defaults - TypeScript, ESLint, Tailwind CSS, App Router, Turbopack
+    No, reuse previous settings
+    No, customize settings - Choose your own preferences
+```
+
+`customize settings` を選択すると、次のようなプロンプトが表示されます。
+
+```txt filename="Terminal"
+Would you like to use TypeScript? No / Yes
+Which linter would you like to use? ESLint / Biome / None
+Would you like to use React Compiler? No / Yes
+Would you like to use Tailwind CSS? No / Yes
+Would you like your code inside a `src/` directory? No / Yes
+Would you like to use App Router? (recommended) No / Yes
+Would you like to customize the import alias (`@/*` by default)? No / Yes
+What import alias would you like configured? @/*
+```
+
+プロンプトへの回答が完了すると、[`create-next-app`](/docs/app/api-reference/cli/create-next-app) がプロジェクト名のフォルダを作成し、必要な依存関係をインストールします。
+
+## 手動インストール
+
+手動で新しい Next.js アプリを作成するには、必要なパッケージをインストールします。
+
+```bash package="pnpm"
+pnpm i next@latest react@latest react-dom@latest
+```
+
+```bash package="npm"
+npm i next@latest react@latest react-dom@latest
+```
+
+```bash package="yarn"
+yarn add next@latest react@latest react-dom@latest
+```
+
+```bash package="bun"
+bun add next@latest react@latest react-dom@latest
+```
+
+> **補足**:
+>
+> - `App Router` には [React canary releases](https://react.dev/blog/2023/05/03/react-canaries) が組み込まれており、安定版の React 19 の変更に加えて、フレームワークで検証中の新機能も含まれます。ただし、ツールやエコシステムとの互換性のために、`package.json` に `react` と `react-dom` を引き続き宣言する必要があります。
+> - `Pages Router` は、`package.json` に記載された React のバージョンを使用します。
+
+次に、以下の `scripts` を `package.json` ファイルに追加します。
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
+  }
+}
+```
+
+これらのスクリプトは、アプリケーション開発のさまざまな段階に対応しています：
+
+- `next dev`: Turbopack（デフォルトのバンドラー）を使用して開発サーバーを起動します。
+- `next build`: 本番環境用にアプリケーションをビルドします。
+- `next start`: 本番サーバーを起動します。
+- `eslint`: ESLint を実行します。
+
+Turbopack は現在デフォルトのバンドラーです。Webpack を使用するには、`next dev --webpack` または `next build --webpack` を実行してください。設定の詳細は [Turbopack ドキュメント](/docs/app/api-reference/turbopack) を参照してください。
+
+<AppOnly>
+  ### `app` ディレクトリを作成する
+
+Next.js はファイルシステムベースのルーティングを使用します。つまり、アプリケーション内のルートは、ファイルの配置方法によって決まります。
+
+`app` ディレクトリを作成します。次に、`app` の中に `layout.tsx` ファイルを作成します。このファイルは [ルートレイアウト](/docs/app/api-reference/file-conventions/layout#root-layout) です。これは必須であり、`<html>` と `<body>` タグを含める必要があります。
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+初期コンテンツを含むホームページ用の `app/page.tsx` を作成します:
+
+```tsx filename="app/page.tsx" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+```
+
+ユーザーがアプリケーションのルート（`/`）にアクセスすると、`layout.tsx` と `page.tsx` の両方がレンダリングされます。
+
+<Image
+  alt="App フォルダ構造"
+  srcLight="/docs/light/app-getting-started.png"
+  srcDark="/docs/dark/app-getting-started.png"
+  width="1600"
+  height="363"
+/>
+
+> **補足**:
+>
+> - ルートレイアウトの作成を忘れた場合でも、`next dev` で開発サーバーを起動すると、Next.js が自動的にこのファイルを作成します。
+> - プロジェクトのルートで任意に [`src` フォルダ](/docs/app/api-reference/file-conventions/src-folder) を使用して、アプリケーションのコードと設定ファイルを分離できます。
+
+</AppOnly>
+
+<PagesOnly>
+
+### `pages` ディレクトリを作成する
+
+Next.js はファイルシステムベースのルーティングを使用します。つまり、アプリケーション内のルートは、ファイルの構造によって決まります。
+
+プロジェクトのルートに `pages` ディレクトリを作成します。次に、`pages` ディレクトリ内に `index.tsx` ファイルを追加します。これがホームページ（`/`）になります。
+
+```tsx filename="pages/index.tsx" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+```
+
+次に、グローバルレイアウトを定義するために、`pages/` 内に `_app.tsx` ファイルを追加します。[custom App file](/docs/pages/building-your-application/routing/custom-app) について詳しくは、こちらを参照してください。
+
+```tsx filename="pages/_app.tsx" switcher
+import type { AppProps } from 'next/app'
+
+export default function App({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />
+}
+```
+
+```jsx filename="pages/_app.js" switcher
+export default function App({ Component, pageProps }) {
+  return <Component {...pageProps} />
+}
+```
+
+最後に、サーバーからの初期レスポンスを制御するために、`pages/` 内に `_document.tsx` ファイルを追加します。[custom Document file](/docs/pages/building-your-application/routing/custom-document) について詳しくは、こちらを参照してください。
+
+```tsx filename="pages/_document.tsx" switcher
+import { Html, Head, Main, NextScript } from 'next/document'
+
+export default function Document() {
+  return (
+    <Html>
+      <Head />
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  )
+}
+```
+
+```jsx filename="pages/_document.js" switcher
+import { Html, Head, Main, NextScript } from 'next/document'
+
+export default function Document() {
+  return (
+    <Html>
+      <Head />
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  )
+}
+```
+
+</PagesOnly>
+
+### `public` フォルダを作成する（任意）
+
+プロジェクトのルートに [`public` フォルダ](/docs/app/api-reference/file-conventions/public-folder) を作成し、画像やフォントなどの静的アセットを保存します。`public` 内のファイルは、ベース URL（`/`）から始まる URL パスでコードから参照できます。
+
+これらのアセットは、ルートパス（`/`）を使って参照できます。たとえば、`public/profile.png` は `/profile.png` として参照できます。
+
+```tsx filename="app/page.tsx" highlight={4} switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image src="/profile.png" alt="Profile" width={100} height={100} />
+}
+```
+
+```jsx filename="app/page.js" highlight={4} switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image src="/profile.png" alt="Profile" width={100} height={100} />
+}
+```
+
+## 開発サーバーを起動する
+
+1. `npm run dev` を実行して開発サーバーを起動します。
+2. `http://localhost:3000` にアクセスしてアプリケーションを表示します。
+3. <AppOnly>`app/page.tsx`</AppOnly>
+   <PagesOnly>`pages/index.tsx`</PagesOnly>
+   ファイルを編集して保存し、ブラウザで更新された結果を確認します。
+
+## TypeScript をセットアップする
+
+> 必要な最小 TypeScript バージョン: `v5.1.0`
+
+Next.js には TypeScript サポートが組み込まれています。プロジェクトに TypeScript を追加するには、ファイル名を `.ts` / `.tsx` に変更して `next dev` を実行します。Next.js は必要な依存関係を自動的にインストールし、推奨の設定オプションを含む `tsconfig.json` ファイルを追加します。
+
+<AppOnly>
+
+### IDE プラグイン
+
+Next.js には、VS Code や他のコードエディタが高度な型チェックやコード補完に利用できるカスタムの TypeScript プラグインと型チェッカーが含まれています。
+
+VS Code でプラグインを有効にするには、次の手順を実行します:
+
+1. コマンドパレットを開く (`Ctrl/⌘` + `Shift` + `P`)
+2. 「TypeScript: Select TypeScript Version」と検索します
+3. 「Use Workspace Version」を選択します
+
+<Image
+  alt="TypeScript コマンドパレット"
+  srcLight="/docs/light/typescript-command-palette.png"
+  srcDark="/docs/dark/typescript-command-palette.png"
+  width="1600"
+  height="637"
+/>
+
+</AppOnly>
+
+詳しくは、[TypeScript リファレンス](/docs/app/api-reference/config/typescript) ページを参照してください。
+
+## リンティングを設定する
+
+Next.js は ESLint または Biome を使ったリンティングをサポートしています。どちらかのリンターを選び、`package.json` の scripts 経由で直接実行します。
+
+- **ESLint** を使用する（包括的なルール）:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
+  }
+}
+```
+
+- または **Biome**（高速なリンター + フォーマッター）を使用する:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "lint": "biome check",
+    "format": "biome format --write"
+  }
+}
+```
+
+このプロジェクトで以前 `next lint` を使用していた場合は、codemod を使ってスクリプトを ESLint CLI に移行してください。
+
+```bash filename="Terminal"
+npx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+ESLint を使用している場合は、明示的な設定ファイル（`eslint.config.mjs` を推奨）を作成してください。ESLint は [従来の `.eslintrc.*` と新しい `eslint.config.mjs` の両方の形式](https://eslint.org/docs/latest/use/configure/configuration-files#configuring-eslint)をサポートしています。推奨されるセットアップについては、[ESLint API リファレンス](/docs/app/api-reference/config/eslint#with-core-web-vitals)を参照してください。
+
+> **補足**: Next.js 16 以降、`next build` は自動的にリンターを実行しなくなりました。代わりに、npm スクリプトを通じてリンターを実行できます。
+
+詳細については、[ESLint Plugin](/docs/app/api-reference/config/eslint) のページを参照してください。
+
+## 絶対インポートとモジュールパスエイリアスの設定
+
+Next.js は、`tsconfig.json` および `jsconfig.json` ファイルの `"paths"` と `"baseUrl"` オプションを標準でサポートしています。
+
+これらのオプションを使用すると、プロジェクト内のディレクトリに絶対パスのエイリアスを設定でき、モジュールのインポートをより簡潔で分かりやすくできます。例えば、次のようになります。
+
+```jsx
+// 変更前
+import { Button } from '../../../components/button'
+
+// 変更後
+import { Button } from '@/components/button'
+```
+
+絶対インポートを設定するには、`tsconfig.json` または `jsconfig.json` ファイルに `baseUrl` 設定項目を追加します。例えば、次のように設定します。
+
+```json filename="tsconfig.json or jsconfig.json"
+{
+  "compilerOptions": {
+    "baseUrl": "src/"
+  }
+}
+```
+
+`baseUrl` パスの設定に加えて、`"paths"` オプションを使用してモジュールパスのエイリアスを定義できます。
+
+たとえば、次の設定では `@/components/*` を `components/*` にマッピングします。
+
+```json filename="tsconfig.json or jsconfig.json"
+{
+  "compilerOptions": {
+    "baseUrl": "src/",
+    "paths": {
+      "@/styles/*": ["styles/*"],
+      "@/components/*": ["components/*"]
+    }
+  }
+}
+```
+
+`"paths"` の各値は、`baseUrl` を基準とした相対パスです。

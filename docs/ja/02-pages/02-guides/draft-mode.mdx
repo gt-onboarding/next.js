@@ -1,0 +1,182 @@
+---
+title: Next.js で Draft Mode を使ってコンテンツをプレビューする方法
+nav_title: Draft Mode
+description: Next.js には、静的ページと動的ページを切り替える Draft Mode が用意されています。Pages Router での動作について学ぶことができます。
+---
+
+[Pages のドキュメント](/docs/pages/building-your-application/routing/pages-and-layouts)と[データ取得のドキュメント](/docs/pages/building-your-application/data-fetching)では、`getStaticProps` と `getStaticPaths` を使ってビルド時にページを事前レンダリング（**静的サイト生成**）する方法について説明しました。
+
+静的サイト生成は、ページがヘッドレス CMS からデータを取得する場合に便利です。しかし、ヘッドレス CMS 上で下書きを作成していて、その下書きをすぐにページで確認したい場合には適していません。その場合、Next.js にはビルド時ではなく **リクエスト時** にこれらのページをレンダリングし、公開済みコンテンツではなく下書きコンテンツを取得する必要があります。つまり、この特定のケースに限って静的サイト生成を無効化したいわけです。
+
+Next.js には、この問題を解決する **Draft Mode** という機能があります。ここでは、その使い方を説明します。
+
+## ステップ 1: API ルートを作成してアクセスする
+
+> Next.js の API Routes に慣れていない場合は、まず [API Routes のドキュメント](/docs/pages/building-your-application/routing/api-routes) を確認してください。
+
+まず、**API ルート**を作成します。名前は任意です（例: `pages/api/draft.ts`）。
+
+この API ルート内で、レスポンスオブジェクトに対して `setDraftMode` を呼び出す必要があります。
+
+```js
+export default function handler(req, res) {
+  // ...
+  res.setDraftMode({ enable: true })
+  // ...
+}
+```
+
+これにより、ドラフトモードを有効にするための **cookie** が設定されます。この **cookie** を含む以降のリクエストでは **Draft Mode** が有効になり、静的生成されたページの挙動が変更されます（詳細は後述します）。
+
+次のような API ルートを作成し、ブラウザから直接アクセスして手動でテストできます。
+
+```ts filename="pages/api/draft.ts"
+// ブラウザから手動でテストするためのシンプルな例
+export default function handler(req, res) {
+  res.setDraftMode({ enable: true })
+  res.end('Draft mode is enabled')
+}
+```
+
+ブラウザのデベロッパーツールを開いて `/api/draft` にアクセスすると、`Set-Cookie` レスポンスヘッダーに `__prerender_bypass` という名前のクッキーが設定されているのがわかります。
+
+### Headless CMS から安全にアクセスする
+
+実際の運用では、この API ルートは Headless CMS から _安全に_ 呼び出す必要があります。具体的な手順は使用している Headless CMS によって異なりますが、一般的な手順をいくつか紹介します。
+
+ここで説明する手順は、使用している Headless CMS が **カスタム draft URL** の設定をサポートしていることを前提としています。サポートしていない場合でも、この方法で draft URL を保護できますが、draft URL を手動で組み立ててアクセスする必要があります。
+
+**まず最初に**、任意のトークン生成ツールを使って **シークレットトークン文字列** を作成します。このシークレットは Next.js アプリと Headless CMS だけで共有されます。このシークレットによって、CMS へのアクセス権を持たないユーザーが draft URL にアクセスすることを防ぎます。
+
+**次に**、Headless CMS がカスタム draft URL の設定をサポートしている場合は、draft URL として次の値を指定します。ここでは、draft 用の API ルートが `pages/api/draft.ts` にあるものとします。
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+- `<your-site>` には、デプロイ先のドメインを指定します。
+- `<token>` には、生成したシークレットトークンを指定します。
+- `<path>` には、表示したいページのパスを指定します。例えば `/posts/foo` を表示したい場合は、`&slug=/posts/foo` を使用します。
+
+利用しているヘッドレス CMS によっては、ドラフト URL に変数を含めることで、CMS のデータに基づいて `<path>` を次のように動的に設定できる場合があります: `&slug=/posts/{entry.fields.slug}`
+
+**最後に**、ドラフト用の API ルートでは次のようにします:
+
+- secret が一致していること、および `slug` パラメータが存在することを確認します（存在しない場合はリクエストを失敗させるようにします）。
+-
+- `res.setDraftMode` を呼び出します。
+- その後、ブラウザを `slug` で指定されたパスへリダイレクトします（次の例では [307 redirect](https://developer.mozilla.org/docs/Web/HTTP/Status/307) を使用しています）。
+
+```js
+export default async (req, res) => {
+  // シークレットとnextパラメータを検証する
+  // このシークレットはこのAPIルートとCMSだけが知っている必要がある
+  if (req.query.secret !== 'MY_SECRET_TOKEN' || !req.query.slug) {
+    return res.status(401).json({ message: 'Invalid token' })
+  }
+
+  // 提供された `slug` が存在するかヘッドレスCMSに問い合わせる
+  // getPostBySlugはヘッドレスCMSへの必要なフェッチロジックを実装する
+  const post = await getPostBySlug(req.query.slug)
+
+  // slugが存在しない場合、ドラフトモードの有効化を防ぐ
+  if (!post) {
+    return res.status(401).json({ message: 'Invalid slug' })
+  }
+
+  // Cookieを設定してドラフトモードを有効にする
+  res.setDraftMode({ enable: true })
+
+  // フェッチした投稿のパスへリダイレクトする
+  // オープンリダイレクトの脆弱性を防ぐため、req.query.slugへは直接リダイレクトしない
+  res.redirect(post.slug)
+}
+```
+
+成功すると、ブラウザはドラフトモード用の Cookie を設定したうえで、表示したいパスへリダイレクトされます。
+
+## ステップ 2: `getStaticProps` を更新する
+
+次のステップは、`getStaticProps` をドラフトモードに対応させることです。
+
+`res.setDraftMode` によって Cookie が設定された状態で、`getStaticProps` を持つページにリクエストした場合、`getStaticProps` はビルド時ではなく **リクエスト時** に呼び出されます。
+
+さらに、このとき `context.draftMode` が `true` である `context` オブジェクトが `getStaticProps` に渡されます。
+
+```js
+export async function getStaticProps(context) {
+  if (context.draftMode) {
+    // 動的データ
+  }
+}
+```
+
+下書き用の API ルートで `res.setDraftMode` を使ったので、`context.draftMode` は `true` になります。
+
+`getStaticPaths` も使用している場合は、`context.params` も利用可能になります。
+
+### 下書きデータをフェッチする
+
+`context.draftMode` に基づいて異なるデータを取得するように、`getStaticProps` を更新できます。
+
+たとえば、ヘッドレス CMS で下書き用の投稿向けに別の API エンドポイントが用意されている場合があります。その場合、次のように API エンドポイントの URL を変更できます。
+
+```js
+export async function getStaticProps(context) {
+  const url = context.draftMode
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+  const res = await fetch(url)
+  // ...
+}
+```
+
+以上です！ヘッドレス CMS から、または手動で `secret` と `slug` を含む下書き用の API ルートにアクセスすると、下書きコンテンツを確認できるはずです。また、公開せずに下書きを更新した場合でも、その内容を確認できるようになります。
+
+この URL をヘッドレス CMS の下書き用 URL として設定するか、手動でアクセスすれば、下書きを確認できるようになります。
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+## 詳細
+
+### Draft Mode のクッキーを削除する
+
+デフォルトでは、Draft Mode のセッションはブラウザを閉じると終了します。
+
+Draft Mode のクッキーを手動で削除するには、`setDraftMode({ enable: false })` を呼び出す APIルートを作成します。
+
+```ts filename="pages/api/disable-draft.ts"
+export default function handler(req, res) {
+  res.setDraftMode({ enable: false })
+}
+```
+
+次に、API ルートを呼び出すために `/api/disable-draft` へリクエストを送信します。[`next/link`](/docs/pages/api-reference/components/link) を使ってこのルートを呼び出す場合は、プリフェッチ時にクッキーが誤って削除されるのを防ぐために、必ず `prefetch={false}` を指定してください。
+
+### `getServerSideProps` と併用する
+
+Draft Mode は `getServerSideProps` と連携して動作し、[`context`](/docs/pages/api-reference/functions/get-server-side-props#context-parameter) オブジェクト内で `draftMode` キーとして利用できます。
+
+> **補足**: Draft Mode を使用する場合、`Cache-Control` ヘッダーは設定しないでください。設定されていると Draft Mode からバイパスできないためです。代わりに、[ISR](/docs/pages/guides/incremental-static-regeneration) の利用を推奨します。
+
+### API Routes でも利用可能
+
+API Routes でも、リクエストオブジェクト上の `draftMode` にアクセスできます。例えば次のように使えます：
+
+```js
+export default function myApiRoute(req, res) {
+  if (req.draftMode) {
+    // 下書きデータを取得する
+  }
+}
+```
+
+### `next build` 実行ごとに固有
+
+`next build` を実行するたびに、新しいバイパス Cookie の値が生成されます。
+
+これにより、バイパス Cookie を第三者に推測されることを防ぎます。
+
+> **補足**: ローカルで HTTP を使って Draft Mode をテストするには、ブラウザでサードパーティ Cookie とローカルストレージへのアクセスを許可する必要があります。

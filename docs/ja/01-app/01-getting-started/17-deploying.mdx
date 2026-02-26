@@ -1,0 +1,83 @@
+---
+title: デプロイ
+description: Next.js アプリケーションのデプロイ方法について学びます。
+---
+
+Next.js は、Node.js サーバー、Docker コンテナ、静的エクスポート、またはさまざまなプラットフォーム上で動作するように対応させてデプロイできます。
+
+| デプロイ方法                     | 対応機能             |
+| -------------------------------- | -------------------- |
+| [Node.js server](#nodejs-server) | すべて               |
+| [Docker container](#docker)      | すべて               |
+| [Static export](#static-export)  | 一部制限あり         |
+| [Adapters](#adapters)            | プラットフォーム固有 |
+
+## Node.js server
+
+Next.js は、Node.js に対応しているあらゆるプロバイダーにデプロイできます。`package.json` に `"build"` および `"start"` スクリプトが含まれていることを確認してください：
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+次に、`npm run build` を実行してアプリケーションをビルドし、`npm run start` を実行して Node.js サーバーを起動します。このサーバーでは Next.js の全機能が利用できます。必要に応じて、[カスタムサーバー](/docs/app/guides/custom-server) に移行することもできます。
+
+Node.js へのデプロイでは、Next.js の全機能が利用できます。ご利用のインフラストラクチャ向けの[設定方法](/docs/app/guides/self-hosting)を確認してください。
+
+### テンプレート
+
+- [Flightcontrol](https://github.com/nextjs/deploy-flightcontrol)
+- [Railway](https://github.com/nextjs/deploy-railway)
+- [Replit](https://github.com/nextjs/deploy-replit)
+
+## Docker
+
+Next.js は、[Docker](https://www.docker.com/) コンテナをサポートするあらゆるプロバイダーにデプロイできます。これには、Kubernetes のようなコンテナオーケストレーターや、Docker を実行するクラウドプロバイダーが含まれます。
+
+Docker デプロイメントでは、Next.js のすべての機能がサポートされています。ご利用のインフラストラクチャ向けの[設定方法](/docs/app/guides/self-hosting)を確認してください。
+
+> **開発時の注意:** Docker は本番デプロイメントには非常に適していますが、Mac および Windows 上での開発中は、パフォーマンス向上のため Docker ではなくローカル開発（`npm run dev`）の利用を検討してください。[ローカル開発を最適化する方法について詳しくはこちら](/docs/app/guides/local-development)。
+
+### テンプレート
+
+- [Docker](https://github.com/vercel/next.js/tree/canary/examples/with-docker)
+- [Docker Multi-Environment](https://github.com/vercel/next.js/tree/canary/examples/with-docker-multi-env)
+- [DigitalOcean](https://github.com/nextjs/deploy-digitalocean)
+- [Fly.io](https://github.com/nextjs/deploy-fly)
+- [Google Cloud Run](https://github.com/nextjs/deploy-google-cloud-run)
+- [Render](https://github.com/nextjs/deploy-render)
+- [SST](https://github.com/nextjs/deploy-sst)
+
+## 静的エクスポート
+
+Next.js では、まず静的サイトや [Single-Page Application (SPA)](/docs/app/guides/single-page-applications) として始めて、後から必要に応じてサーバーを必要とする機能を利用する形にアップグレードできます。
+
+Next.js は [static exports](/docs/app/guides/static-exports) をサポートしているため、HTML/CSS/JS の静的アセットを配信できる任意の Web サーバーにデプロイおよびホストできます。これには AWS S3、Nginx、Apache などのツールが含まれます。
+
+[static export](/docs/app/guides/static-exports) として実行する場合、サーバーを必要とする Next.js の機能は**利用できません**。[詳細はこちら](/docs/app/guides/static-exports#unsupported-features)。
+
+### テンプレート
+
+- [GitHub Pages](https://github.com/nextjs/deploy-github-pages)
+
+## アダプター
+
+Next.js は、さまざまなプラットフォーム上で動作するように対応させることで、それぞれのインフラストラクチャの機能を活用できます。
+
+サポートされている Next.js 機能については、各プロバイダーのドキュメントを参照してください:
+
+- [Appwrite Sites](https://appwrite.io/docs/products/sites/quick-start/nextjs)
+- [AWS Amplify Hosting](https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components)
+- [Cloudflare](https://developers.cloudflare.com/workers/frameworks/framework-guides/nextjs)
+- [Deno Deploy](https://docs.deno.com/examples/next_tutorial)
+- [Firebase App Hosting](https://firebase.google.com/docs/app-hosting/get-started)
+- [Netlify](https://docs.netlify.com/frameworks/next-js/overview/#next-js-support-on-netlify)
+- [Vercel](https://vercel.com/docs/frameworks/nextjs)
+
+> **注意:** 現在、すべてのプラットフォームで利用可能な [Deployment Adapters API](https://github.com/vercel/next.js/discussions/77740) の開発を進めています。完了後に、独自のアダプターを作成する方法に関するドキュメントを追加します。

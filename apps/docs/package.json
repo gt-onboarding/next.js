@@ -6,12 +6,16 @@
     "dev-docs": "next dev --turbo",
     "build-docs": "next build",
     "start": "next start",
-    "postinstall": "fumadocs-mdx"
+    "postinstall": "fumadocs-mdx",
+    "translate": "gtx-cli translate --save-local"
   },
   "dependencies": {
     "fumadocs-core": "15.7.12",
     "fumadocs-mdx": "11.10.0",
     "fumadocs-ui": "15.7.12",
+    "generaltranslation": "8.1.12",
+    "gt-next": "6.12.17",
+    "gtx-cli": "2.6.26",
     "next": "15.5.8",
     "react": "19.1.1",
     "react-dom": "19.1.1"

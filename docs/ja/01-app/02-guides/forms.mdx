@@ -1,0 +1,491 @@
+---
+title: Server Actions でフォームを作成する方法
+nav_title: フォーム
+description: Next.js で React Server Actions を使ってフォームを作成する方法を学びます。
+---
+
+React Server Actions は、サーバー上で実行される [サーバー関数](https://react.dev/reference/rsc/server-functions)です。フォーム送信を処理するために、サーバーコンポーネントとクライアントコンポーネントの両方から呼び出せます。このガイドでは、Next.js で Server Actions を使ってフォームを作成する方法を説明します。
+
+## 仕組み
+
+React は HTML の [`<form>`](https://developer.mozilla.org/docs/Web/HTML/Element/form) 要素を拡張し、[`action`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/form#action) 属性で Server Actions を呼び出せるようにします。
+
+フォームで使用すると、その関数は自動的に [`FormData`](https://developer.mozilla.org/docs/Web/API/FormData/FormData) オブジェクトを受け取ります。その後、ブラウザ標準の [`FormData` メソッド](https://developer.mozilla.org/en-US/docs/Web/API/FormData#instance_methods) を使ってデータを取り出すことができます。
+
+```tsx filename="app/invoices/page.tsx" switcher
+export default function Page() {
+  async function createInvoice(formData: FormData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // データを変更する
+    // キャッシュを再検証する
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+```jsx filename="app/invoices/page.js" switcher
+export default function Page() {
+  async function createInvoice(formData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // データを変更する
+    // キャッシュを再検証する
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+> **補足:** 複数のフィールドを持つフォームを扱う場合は、JavaScript の [`Object.fromEntries()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/fromEntries) を使用してください。たとえば、`const rawFormData = Object.fromEntries(formData)` のようにします。このオブジェクトには、`$ACTION_` というプレフィックスが付いた追加のプロパティが含まれる点に注意してください。
+
+## 追加の引数を渡す
+
+フォームフィールド以外の値も、JavaScript の [`bind`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind) メソッドを使って Server Function に追加の引数として渡すことができます。たとえば、`updateUser` という Server Function に `userId` 引数を渡すには、次のようにします。
+
+```tsx filename="app/client-component.tsx" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }: { userId: string }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">Update User Name</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">Update User Name</button>
+    </form>
+  )
+}
+```
+
+Server Function は `userId` を追加の引数として受け取ります。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function updateUser(userId: string, formData: FormData) {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function updateUser(userId, formData) {}
+```
+
+> **補足**:
+>
+> - 代わりに、フォーム内で引数を hidden 型の input フィールドとして渡す方法もあります（例: `<input type="hidden" name="userId" value={userId} />`）。ただし、この値はレンダリングされた HTML の一部となり、エンコードされません。
+> - `bind` はサーバーコンポーネントとクライアントコンポーネントの両方で動作し、プログレッシブエンハンスメントをサポートします。
+
+## フォームのバリデーション
+
+フォームのバリデーションは、クライアント側またはサーバー側で行えます。
+
+- **クライアント側バリデーション**には、基本的な検証として `required` や `type="email"` などの HTML 属性を使用できます。
+- **サーバー側バリデーション**には、[zod](https://zod.dev/) のようなライブラリを使ってフォームフィールドを検証できます。たとえば、次のようにします：
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: 'Invalid Email',
+  }),
+})
+
+export default async function createUser(formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // フォームデータが無効な場合は早期リターン
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // データを変更する
+}
+```
+
+```jsx filename="app/actions.js" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: 'Invalid Email',
+  }),
+})
+
+export default async function createsUser(formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // フォームデータが無効な場合は早期リターン
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // データを変更する
+}
+```
+
+## バリデーションエラー
+
+バリデーションエラーやメッセージを表示するには、`<form>` を定義しているコンポーネントをクライアントコンポーネントにし、React の [`useActionState`](https://react.dev/reference/react/useActionState) を使用します。
+
+`useActionState` を使用すると、サーバー関数のシグネチャが変更され、最初の引数として新しい `prevState` または `initialState` パラメーターを受け取るようになります。
+
+```tsx filename="app/actions.ts" highlight={5} switcher
+'use server'
+
+import { z } from 'zod'
+
+export async function createUser(initialState: any, formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+```jsx filename="app/actions.ts" highlight={7} switcher
+'use server'
+
+import { z } from 'zod'
+
+// ...
+
+export async function createUser(initialState, formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+次に、`state` オブジェクトに基づいてエラーメッセージを条件付きで表示できます。
+
+```tsx filename="app/ui/signup.tsx" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">Email</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>Sign up</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">Email</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>Sign up</button>
+    </form>
+  )
+}
+```
+
+## 保留中の状態
+
+[`useActionState`](https://react.dev/reference/react/useActionState) フックは、アクションの実行中にローディングインジケーターを表示したり、送信ボタンを無効にしたりするために利用できる `pending` ブール値を提供します。
+
+```tsx filename="app/ui/signup.tsx" highlight={7,12} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* その他のフォーム要素 */}
+      <button disabled={pending}>Sign up</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={7,12} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* その他のフォーム要素 */}
+      <button disabled={pending}>Sign up</button>
+    </form>
+  )
+}
+```
+
+または、アクションの実行中にローディングインジケーターを表示するために、[`useFormStatus`](https://react.dev/reference/react-dom/hooks/useFormStatus) フックを使用することもできます。このフックを使用する場合は、ローディングインジケーターをレンダーするための別のコンポーネントを作成する必要があります。たとえば、アクションが保留中のときにボタンを無効化するには次のようにします:
+
+```tsx filename="app/ui/button.tsx" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      Sign Up
+    </button>
+  )
+}
+```
+
+```jsx filename="app/ui/button.js" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      Sign Up
+    </button>
+  )
+}
+```
+
+次に、`SubmitButton` コンポーネントをフォーム内にネストできます:
+
+```tsx filename="app/ui/signup.tsx" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* その他のフォーム要素 */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* その他のフォーム要素 */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+> **補足:** React 19 では、`useFormStatus` が返すオブジェクトに `data`、`method`、`action` などの追加のキーが含まれます。React 19 を使用していない場合は、`pending` キーのみが利用できます。
+
+## 楽観的アップデート
+
+React の [`useOptimistic`](https://react.dev/reference/react/useOptimistic) フックを使用すると、レスポンスを待つのではなく、Server Function の実行が完了する前に UI を楽観的に更新できます。
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = {
+  message: string
+}
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<
+    Message[],
+    string
+  >(messages, (state, newMessage) => [...state, { message: newMessage }])
+
+  const formAction = async (formData: FormData) => {
+    const message = formData.get('message') as string
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m, i) => (
+        <div key={i}>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+export function Thread({ messages }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  const formAction = async (formData) => {
+    const message = formData.get('message')
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m) => (
+        <div>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+## ネストされたフォーム要素
+
+`<button>`、`<input type="submit">`、`<input type="image">` のように、`<form>` の内側にネストされている要素から Server Actions を呼び出すことができます。これらの要素は、`formAction` プロップまたはイベントハンドラーを受け取ります。
+
+これは、1 つのフォーム内で複数の Server Actions を呼び出したい場合に便利です。たとえば、投稿を公開するだけでなく、下書きとして保存するための特定の `<button>` 要素を作成できます。詳しくは [React の `<form>` ドキュメント](https://react.dev/reference/react-dom/components/form#handling-multiple-submission-types)を参照してください。
+
+## プログラムによるフォーム送信
+
+[`requestSubmit()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit) メソッドを使うと、コードからフォーム送信をプログラム的に実行できます。たとえば、ユーザーが `⌘` + `Enter` のキーボードショートカットでフォームを送信したときにそれを検知したい場合は、`onKeyDown` イベントをリッスンできます：
+
+```tsx filename="app/entry.tsx" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/entry.js" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+これにより、最も近い祖先の `<form>` 要素で送信がトリガーされ、Server Function が呼び出されます。

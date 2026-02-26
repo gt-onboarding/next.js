@@ -1,0 +1,152 @@
+---
+title: 本番環境向けに Next.js アプリケーションを最適化する方法
+nav_title: 本番環境
+description: Next.js アプリケーションを本番環境にデプロイする前に、最高のパフォーマンスとユーザー体験を実現するための推奨事項を紹介します。
+---
+
+Next.js アプリケーションを本番環境に移行する前に、ユーザー体験、パフォーマンス、セキュリティを最大化するために検討すべき最適化やパターンがいくつかあります。
+
+このページでは、[アプリケーションの構築中](#during-development)や[本番環境に移行する前](#before-going-to-production)に参照できるベストプラクティスと、把握しておくべき[Next.js の自動最適化機能](#automatic-optimizations)について説明します。
+
+## 自動最適化
+
+これらの Next.js の最適化はデフォルトで有効になっており、追加の設定は不要です:
+
+<AppOnly>
+
+- **[サーバーコンポーネント](/docs/app/getting-started/server-and-client-components):** Next.js はデフォルトでサーバーコンポーネントを使用します。サーバーコンポーネントはサーバー上で実行され、クライアント側でのレンダリングに JavaScript を必要としません。そのため、クライアント側の JavaScript バンドルサイズには影響しません。必要に応じて、インタラクションのために[クライアントコンポーネント](/docs/app/getting-started/server-and-client-components)を使用できます。
+- **[コード分割](/docs/app/getting-started/linking-and-navigating#how-navigation-works):** サーバーコンポーネントにより、ルートセグメントごとに自動的にコード分割が行われます。適切な場合には、クライアントコンポーネントやサードパーティライブラリの[遅延ロード](/docs/app/guides/lazy-loading)も検討してください。
+- **[プリフェッチ](/docs/app/getting-started/linking-and-navigating#prefetching):** 新しいルートへのリンクがユーザーのビューポートに入ると、Next.js はバックグラウンドでそのルートをプリフェッチします。これにより、新しいルートへの画面遷移はほぼ瞬時に行われます。必要に応じて、プリフェッチを無効にすることもできます。
+- **[静的レンダリング](/docs/app/guides/caching#static-rendering):** Next.js はビルド時にサーバーコンポーネントとクライアントコンポーネントをサーバー上で静的にレンダリングし、その結果をキャッシュしてアプリケーションのパフォーマンスを向上させます。必要に応じて、特定のルートについて[ダイナミックレンダリング](/docs/app/guides/caching#dynamic-rendering)を有効にすることもできます。 {/* TODO: PPR が安定したら更新する */}
+- **[キャッシュ](/docs/app/guides/caching):** Next.js はデータリクエスト、サーバーコンポーネントおよびクライアントコンポーネントのレンダリング結果、静的アセットなどをキャッシュし、サーバーやデータベース、バックエンドサービスへのネットワークリクエスト数を削減します。必要に応じて、キャッシュを無効にすることもできます。
+
+</AppOnly>
+
+<PagesOnly>
+
+- **[コード分割](/docs/pages/building-your-application/routing/pages-and-layouts):** Next.js はアプリケーションコードをページ単位で自動的にコード分割します。これにより、画面遷移時には現在のページに必要なコードだけが読み込まれます。適切な場合には、サードパーティライブラリの[遅延ロード](/docs/pages/guides/lazy-loading)も検討してください。
+- **[プリフェッチ](/docs/pages/api-reference/components/link#prefetch):** 新しいルートへのリンクがユーザーのビューポートに入ると、Next.js はバックグラウンドでそのルートをプリフェッチします。これにより、新しいルートへの画面遷移はほぼ瞬時に行われます。必要に応じて、プリフェッチを無効にすることもできます。
+- **[Automatic Static Optimization](/docs/pages/building-your-application/rendering/automatic-static-optimization):** Next.js は、ブロッキングとなるデータ要件がない場合に、そのページが静的ページ（事前レンダー可能）であると自動的に判断します。最適化されたページはキャッシュされ、複数の CDN ロケーションからエンドユーザーに配信できます。必要に応じて、[Server-side Rendering](/docs/pages/building-your-application/data-fetching/get-server-side-props) を有効にできます。
+
+</PagesOnly>
+
+これらのデフォルト設定は、アプリケーションのパフォーマンスを向上させるとともに、各ネットワークリクエストで転送されるデータ量とコストを削減することを目的としています。
+
+## 開発中
+
+アプリケーションを開発する際は、最高のパフォーマンスとユーザーエクスペリエンスを実現するために、次の機能を利用することを推奨します。
+
+### ルーティングとレンダリング
+
+<AppOnly>
+
+- **[Layouts](/docs/app/api-reference/file-conventions/layout):** レイアウトを使用してページ間で UI を共有し、ナビゲーション時の[部分レンダリング](/docs/app/getting-started/linking-and-navigating#client-side-transitions)を有効にします。
+- **[`<Link>` component](/docs/app/api-reference/components/link):** `<Link>` コンポーネントを使用して、[クライアントサイドのナビゲーションとプリフェッチ](/docs/app/getting-started/linking-and-navigating#how-navigation-works)を行います。
+- **[エラーハンドリング](/docs/app/getting-started/error-handling):** カスタムエラーページを作成して、本番環境で発生する[キャッチオールエラー](/docs/app/getting-started/error-handling)や [404 エラー](/docs/app/api-reference/file-conventions/not-found)を適切に処理します。
+- **[クライアントコンポーネントとサーバーコンポーネント](/docs/app/getting-started/server-and-client-components#examples):** サーバーコンポーネントとクライアントコンポーネントの推奨される構成パターンに従い、クライアントサイドの JavaScript バンドルを不必要に増やさないように、[`"use client"` の境界](/docs/app/getting-started/server-and-client-components#examples#moving-client-components-down-the-tree)の配置を確認します。
+- **[Dynamic API](/docs/app/guides/caching#dynamic-rendering):** [`cookies`](/docs/app/api-reference/functions/cookies) や [`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) プロップなどの Dynamic API を使用すると、そのルート全体が[ダイナミックレンダリング](/docs/app/guides/caching#dynamic-rendering)の対象になります（[ルートレイアウト](/docs/app/api-reference/file-conventions/layout#root-layout)で使用した場合はアプリケーション全体）。Dynamic API の使用が意図したものであることを確認し、適切な箇所では `<Suspense>` の境界でラップしてください。
+
+> **補足**: [Partial Prerendering (experimental)](/blog/next-14#partial-prerendering-preview) を使用すると、ルート全体を Dynamic Rendering に切り替えることなく、ルートの一部だけを動的にレンダリングできます。
+
+</AppOnly>
+
+<PagesOnly>
+
+- **[`<Link>` component](/docs/pages/building-your-application/routing/linking-and-navigating):** `<Link>` コンポーネントを使用して、クライアントサイドのナビゲーションとプリフェッチを行います。
+- **[Custom Errors](/docs/pages/building-your-application/routing/custom-error):** [500](/docs/pages/building-your-application/routing/custom-error#500-page) や [404 エラー](/docs/pages/building-your-application/routing/custom-error#404-page) を適切に処理します。
+
+</PagesOnly>
+
+### データ取得とキャッシュ
+
+<AppOnly>
+
+- **[サーバーコンポーネント](/docs/app/getting-started/fetching-data):** サーバーコンポーネントを使用してサーバー側でデータを取得し、そのメリットを活かします。
+- **[Route Handlers](/docs/app/api-reference/file-conventions/route):** Route Handlers を使用してクライアントコンポーネントからバックエンドリソースにアクセスします。ただし、余分なサーバーリクエストを発生させないよう、サーバーコンポーネントから Route Handlers を呼び出さないでください。
+- **[ストリーミング](/docs/app/api-reference/file-conventions/loading):** Loading UI と React Suspense を使用して、サーバーからクライアントへ UI を段階的に送信し、データ取得中にルート全体がブロックされるのを防ぎます。
+- **[並列データ取得](/docs/app/getting-started/fetching-data#parallel-data-fetching):** 適切な箇所ではデータを並列に取得して、ネットワークウォーターフォールを減らします。また、必要に応じて[データのプリロード](/docs/app/getting-started/fetching-data#preloading-data)も検討してください。
+- **[データキャッシュ](/docs/app/guides/caching#data-cache):** データリクエストがキャッシュされているかどうかを確認し、必要に応じてキャッシュを利用するようにします。`fetch` を使用していないリクエストが[キャッシュ](/docs/app/api-reference/functions/unstable_cache)されていることも確認してください。
+- **[静的画像](/docs/app/api-reference/file-conventions/public-folder):** `public` ディレクトリを使用して、画像などアプリケーションの静的アセットを自動的にキャッシュします。
+
+</AppOnly>
+
+<PagesOnly>
+
+- **[API Routes](/docs/pages/building-your-application/routing/api-routes):** Route Handlers を使用してバックエンドリソースにアクセスし、機密情報がクライアントに公開されないようにします。
+- **[データキャッシュ](/docs/pages/building-your-application/data-fetching/get-static-props):** データリクエストがキャッシュされているかどうかを確認し、必要に応じてキャッシュを利用するようにします。`getStaticProps` を使用していないリクエストも、適切な場合はキャッシュされていることを確認してください。
+- **[Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration):** Incremental Static Regeneration を使用して、サイト全体を再ビルドすることなく、ビルド後の静的ページを更新します。
+- **[静的画像](/docs/pages/api-reference/file-conventions/public-folder):** `public` ディレクトリを使用して、画像などアプリケーションの静的アセットを自動的にキャッシュします。
+
+</PagesOnly>
+
+### UI とアクセシビリティ
+
+<AppOnly>
+
+- **[フォームとバリデーション](/docs/app/guides/forms)：** Server Actions を使用してフォーム送信処理、サーバーサイドでのバリデーション、およびエラー処理を行います。
+- **[グローバルエラー UI](/docs/app/api-reference/file-conventions/error#global-error)：** `app/global-error.tsx` を追加して、アプリ全体でキャッチされないエラーに対し、一貫性がありアクセシブルなフォールバック UI と復旧手段を提供します。
+- **[グローバル 404](/docs/app/api-reference/file-conventions/not-found#global-not-foundjs-experimental)：** `app/global-not-found.tsx` を追加して、アプリ全体でマッチしないルートに対してアクセシブルな 404 ページを提供します。
+
+</AppOnly>
+
+- **[Font Module](/docs/app/api-reference/components/font)：** Font Module を使用してフォントを最適化します。これにより、フォントファイルが他の静的アセットとともに自動でホスティングされ、外部ネットワークリクエストが不要になり、[レイアウトシフト](https://web.dev/articles/cls) が減少します。
+- **[`<Image>` Component](/docs/app/api-reference/components/image)：** Image Component を使用して画像を最適化します。これにより、画像が自動で最適化され、レイアウトシフトを防ぎ、WebP などのモダンなフォーマットで配信されます。
+- **[`<Script>` Component](/docs/app/guides/scripts)：** Script Component を使用してサードパーティスクリプトを最適化します。これにより、スクリプトが自動的に遅延実行され、メインスレッドのブロッキングを防ぎます。
+- **[ESLint](/docs/architecture/accessibility#linting)：** 組み込みの `eslint-plugin-jsx-a11y` プラグインを使用して、アクセシビリティの問題を早期に検出できます。
+
+### セキュリティ
+
+<AppOnly>
+
+- **[Tainting](/docs/app/api-reference/config/next-config-js/taint):** データオブジェクトや特定の値に taint を付与して、機密データがクライアントに公開されないようにします。
+- **[Server Actions](/docs/app/getting-started/updating-data):** ユーザーが Server Actions を呼び出す権限を持っていることを確認してください。推奨される[セキュリティプラクティス](/blog/security-nextjs-server-components-actions)を参照してください。
+
+</AppOnly>
+
+- **[Environment Variables](/docs/app/guides/environment-variables):** `.env.*` ファイルを `.gitignore` に追加し、公開してよい変数にのみ `NEXT_PUBLIC_` プレフィックスを付けるようにします。
+- **[Content Security Policy](/docs/app/guides/content-security-policy):** クロスサイトスクリプティング、クリックジャッキング、その他のコードインジェクション攻撃など、さまざまなセキュリティ脅威からアプリケーションを保護するために Content Security Policy の追加を検討してください。
+
+### メタデータとSEO
+
+<AppOnly>
+
+- **[Metadata API](/docs/app/getting-started/metadata-and-og-images)：** Metadata API を使用してページタイトルやディスクリプションなどを追加し、アプリケーションの検索エンジン最適化（SEO）を改善します。
+- **[Open Graph (OG) images](/docs/app/api-reference/file-conventions/metadata/opengraph-image)：** ソーシャルメディアでの共有に備えて、アプリケーション用の OG 画像を生成します。
+- **[Sitemaps](/docs/app/api-reference/functions/generate-sitemaps) と [Robots](/docs/app/api-reference/file-conventions/metadata/robots)：** サイトマップと robots ファイルを生成して、検索エンジンによるページのクロールとインデックス作成を支援します。
+
+</AppOnly>
+
+<PagesOnly>
+
+- **[`<Head>` Component](/docs/pages/api-reference/components/head)：** `next/head` コンポーネントを使用して、ページタイトルやディスクリプションなどを追加します。
+
+</PagesOnly>
+
+### 型安全性
+
+- **TypeScript と [TS Plugin](/docs/app/api-reference/config/typescript)：** 型安全性を高め、エラーを早期に検出できるように、TypeScript と TypeScript プラグインを使用します。
+
+## 本番運用に移行する前に
+
+本番運用に移行する前に、`next build` を実行してアプリケーションをローカルでビルドし、ビルドエラーを検出してから、`next start` を実行して本番環境に近い環境でアプリケーションのパフォーマンスを計測できます。
+
+### Core Web Vitals
+
+- **[Lighthouse](https://developers.google.com/web/tools/lighthouse):** ブラウザのシークレット モードで Lighthouse を実行して、ユーザーがサイトをどのように体験するかをより深く理解し、改善が必要な箇所を特定します。これはシミュレートされたテストのため、Core Web Vitals などのフィールドデータの確認と組み合わせて使用する必要があります。
+
+<AppOnly>
+
+- **[`useReportWebVitals` hook](/docs/app/api-reference/functions/use-report-web-vitals):** このフックを使用して、[Core Web Vitals](https://web.dev/articles/vitals) のデータを分析ツールに送信します。
+
+</AppOnly>
+
+### バンドルの分析
+
+[`@next/bundle-analyzer` プラグイン](/docs/app/guides/package-bundling#nextbundle-analyzer-for-webpack)を使用して、JavaScript バンドルのサイズを分析し、アプリケーションのパフォーマンスに影響を与えている可能性のある大きなモジュールや依存関係を特定します。
+
+さらに、次のツールは、新しい依存関係をアプリケーションに追加することによる影響を把握するのに役立ちます：
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost)
+- [Package Phobia](https://packagephobia.com/)
+- [Bundle Phobia](https://bundlephobia.com/)
+- [bundlejs](https://bundlejs.com/)

@@ -1,0 +1,98 @@
+---
+title: カスタムエラー
+description: 組み込みの Error ページを上書き・拡張して、カスタムエラーを処理します。
+---
+
+## 404 Page
+
+404 ページは頻繁にアクセスされる可能性があります。すべてのアクセスに対してエラーページをサーバーサイドレンダリングすると、Next.js サーバーへの負荷が増加します。その結果、コストの増大やレスポンスの低下につながる可能性があります。
+
+このような問題を避けるために、Next.js は追加のファイルを用意しなくても、デフォルトで静的な 404 ページを提供します。
+
+### 404 ページのカスタマイズ
+
+カスタム 404 ページを作成するには、`pages/404.js` ファイルを作成します。このファイルはビルド時に静的に生成されます。
+
+```jsx filename="pages/404.js"
+export default function Custom404() {
+  return <h1>404 - Page Not Found</h1>
+}
+```
+
+> **補足**: ビルド時にデータを取得する必要がある場合は、このページで [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) を使用できます。
+
+## 500 ページ
+
+すべてのアクセスごとにエラーページをサーバーサイドレンダリングすると、エラーへの応答が複雑になります。ユーザーができるだけ早くエラーに対するレスポンスを受け取れるように、Next.js では追加のファイルを用意しなくても、デフォルトで静的な 500 ページが提供されます。
+
+### 500 ページのカスタマイズ
+
+500 ページをカスタマイズするには、`pages/500.js` ファイルを作成します。このファイルはビルド時に静的に生成されます。
+
+```jsx filename="pages/500.js"
+export default function Custom500() {
+  return <h1>500 - Server-side error occurred</h1>
+}
+```
+
+> **補足**: ビルド時にデータを取得する必要がある場合は、このページでも [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) を使用できます。
+
+### より高度なエラーページのカスタマイズ
+
+500 エラーは、クライアント側とサーバー側の両方で `Error` コンポーネントによって処理されます。これをオーバーライドしたい場合は、`pages/_error.js` ファイルを作成し、次のコードを追加します：
+
+```jsx
+function Error({ statusCode }) {
+  return (
+    <p>
+      {statusCode
+        ? `An error ${statusCode} occurred on server`
+        : 'An error occurred on client'}
+    </p>
+  )
+}
+
+Error.getInitialProps = ({ res, err }) => {
+  const statusCode = res ? res.statusCode : err ? err.statusCode : 404
+  return { statusCode }
+}
+
+export default Error
+```
+
+> `pages/_error.js` は本番環境でのみ使用されます。開発環境では、エラーがどこで発生したかが分かるよう、スタックトレース付きのエラーが表示されます。
+
+### 組み込みのエラーページを再利用する
+
+組み込みのエラーページを表示したい場合は、`Error` コンポーネントをインポートして使用できます。
+
+```jsx
+import Error from 'next/error'
+
+export async function getServerSideProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const errorCode = res.ok ? false : res.status
+  const json = await res.json()
+
+  return {
+    props: { errorCode, stars: json.stargazers_count },
+  }
+}
+
+export default function Page({ errorCode, stars }) {
+  if (errorCode) {
+    return <Error statusCode={errorCode} />
+  }
+
+  return <div>Next stars: {stars}</div>
+}
+```
+
+`Error` コンポーネントは、`statusCode` と一緒にテキストメッセージを渡したい場合、`title` をプロパティとして受け取ることもできます。
+
+カスタムの `Error` コンポーネントを使用している場合は、必ずそちらをインポートしてください。`next/error` は、Next.js で使用されるデフォルトのコンポーネントをエクスポートします。
+
+### 注意事項
+
+- `Error` は現在、Next.js の [データ取得メソッド](/docs/pages/building-your-application/data-fetching)（[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) や [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) など）をサポートしていません。
+- `_error` は `_app` と同様に予約済みのパス名です。`_error` はエラーページのカスタムレイアウトや動作を定義するために使用されます。`/_error` に [ルーティング](/docs/pages/building-your-application/routing) 経由で直接アクセスしたり、[カスタムサーバー](/docs/pages/guides/custom-server) でレンダリングした場合には、404 を返します。

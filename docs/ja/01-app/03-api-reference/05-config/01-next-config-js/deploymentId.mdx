@@ -1,0 +1,80 @@
+---
+title: deploymentId
+description: バージョン不整合の防止とキャッシュバスティングに使用されるデプロイメント識別子を設定します。
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router で共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有部分のコンテンツは、コンポーネントでラップしないでください。 */}
+
+`deploymentId` オプションを使用すると、デプロイメントの識別子を設定できます。この識別子は、ローリングデプロイ時の[バージョンスキュー](/docs/app/guides/self-hosting#version-skew)保護とキャッシュバスティングに使用されます。
+
+```js filename="next.config.js"
+module.exports = {
+  deploymentId: 'my-deployment-id',
+}
+```
+
+`NEXT_DEPLOYMENT_ID` 環境変数でデプロイ ID を指定することもできます。
+
+```bash
+NEXT_DEPLOYMENT_ID=my-deployment-id next build
+```
+
+> **補足:** 両方が設定されている場合は、`next.config.js` の `deploymentId` の値が `NEXT_DEPLOYMENT_ID` 環境変数よりも優先されます。
+
+## 仕組み
+
+`deploymentId` が設定されていると、Next.js は次のことを行います:
+
+1. 静的アセット URL（JavaScript、CSS、画像）に `?dpl=<deploymentId>` を付加する
+2. クライアントサイドのナビゲーションリクエストに `x-deployment-id` ヘッダーを追加する
+3. ナビゲーションレスポンスに `x-nextjs-deployment-id` ヘッダーを追加する
+4. `<html>` 要素に `data-dpl-id` 属性を挿入する
+
+クライアントが、自身のデプロイメント ID とサーバー側の ID（レスポンスヘッダー経由）との不一致を検出した場合、クライアントサイドのナビゲーションではなくハードナビゲーション（ページ全体のリロード）を実行します。これにより、ユーザーは常に同一のデプロイメントバージョンからアセット <AppOnly>およびサーバー関数</AppOnly> を受け取れるようになります。
+
+> **補足:** Next.js は、受信リクエストに含まれる `?dpl=` クエリパラメータを読み取りません。このクエリパラメータは、ルーティングのためではなく、キャッシュバスティング（ブラウザや CDN が最新のアセットを取得することを保証するため）に使用されます。バージョンを考慮したルーティングが必要な場合は、ホスティングプロバイダーや CDN のドキュメントを参照し、デプロイメントベースのルーティングの実装方法を確認してください。
+
+## ユースケース
+
+### ローリングデプロイ
+
+ローリングデプロイ中は、一部のサーバーインスタンスでは新しいバージョンが実行されている一方で、他のインスタンスではまだ古いバージョンが動作している場合があります。`deploymentId` がない場合、ユーザーは古いアセットと新しいアセットが混在した状態で受け取ってしまい、エラーの原因となることがあります。
+
+各デプロイごとに一貫した `deploymentId` を設定すると、次のことが保証されます:
+
+<AppOnly>
+
+- クライアントは常に対応するデプロイバージョンからアセットをリクエストする
+- 不一致が発生した場合、正しいアセットを取得するためにページ全体の再読み込みが行われる
+- サーバー関数が異なるデプロイ間でも正しく動作する
+
+</AppOnly>
+
+<PagesOnly>
+
+- クライアントは常に対応するデプロイバージョンからアセットをリクエストする
+- 不一致が発生した場合、正しいアセットを取得するためにページ全体の再読み込みが行われる
+
+</PagesOnly>
+
+### マルチサーバー環境
+
+ロードバランサーの背後で複数の Next.js アプリケーションインスタンスを実行する場合、同じデプロイメントに属するすべてのインスタンスは同じ `deploymentId` を使用する必要があります。
+
+```js filename="next.config.js"
+module.exports = {
+  deploymentId: process.env.DEPLOYMENT_VERSION || process.env.GIT_SHA,
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                              |
+| ---------- | --------------------------------------------------------------------- |
+| `v14.1.4`  | `deploymentId` がトップレベルの設定オプションとして安定化されました。 |
+| `v13.4.10` | `experimental.deploymentId` が導入されました。                        |
+
+## 関連情報
+
+- [セルフホスティング - バージョンの不整合](/docs/app/guides/self-hosting#version-skew)
+- [generateBuildId](/docs/app/api-reference/config/next-config-js/generateBuildId)

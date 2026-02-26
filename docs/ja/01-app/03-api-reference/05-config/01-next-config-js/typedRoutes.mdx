@@ -1,0 +1,17 @@
+---
+title: typedRoutes
+description: 静的に型付けされたリンクのサポートを有効にします。
+---
+
+> **注意:** このオプションは安定版になったため、`experimental.typedRoutes` ではなく `typedRoutes` を使用してください。
+
+これは [静的に型付けされたリンク](/docs/app/api-reference/config/typescript#statically-typed-links) のサポートを有効にします。この機能を利用するには、プロジェクトで TypeScript を使用している必要があります。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  typedRoutes: true,
+}
+
+module.exports = nextConfig
+```

@@ -1,0 +1,162 @@
+---
+title: Next.js で PostCSS を設定する方法
+nav_title: PostCSS
+description: Next.js が追加する PostCSS の設定やプラグインを、独自の設定やプラグインで拡張します。
+---
+
+## デフォルトの動作
+
+Next.js は [組み込みの CSS サポート](/docs/app/getting-started/css) のために、CSS を PostCSS を使ってコンパイルします。
+
+設定なしのデフォルト状態では、Next.js は CSS をコンパイルする際に次の変換を行います:
+
+- [Autoprefixer](https://github.com/postcss/autoprefixer) により、CSS のルールにベンダープレフィックスが自動的に追加されます (IE11 までサポート)。
+- [Cross-browser Flexbox bugs](https://github.com/philipwalton/flexbugs) が修正され、[仕様](https://www.w3.org/TR/css-flexbox-1/)どおりに動作するようになります。
+- 新しい CSS 機能は、Internet Explorer 11 との互換性のために自動的にコンパイルされます:
+  - [`all` Property](https://developer.mozilla.org/docs/Web/CSS/all)
+  - [Break Properties](https://developer.mozilla.org/docs/Web/CSS/break-after)
+  - [`font-variant` Property](https://developer.mozilla.org/docs/Web/CSS/font-variant)
+  - [Gap Properties](https://developer.mozilla.org/docs/Web/CSS/gap)
+  - [Media Query Ranges](https://developer.mozilla.org/docs/Web/CSS/Media_Queries/Using_media_queries#Syntax_improvements_in_Level_4)
+
+デフォルトでは、[CSS Grid](https://www.w3.org/TR/css-grid-1/) と [Custom Properties](https://developer.mozilla.org/docs/Web/CSS/var) (CSS 変数) は IE11 をサポートするようには **コンパイルされません**。
+
+[CSS Grid Layout](https://developer.mozilla.org/docs/Web/CSS/grid) を IE11 向けにコンパイルするには、CSS ファイルの先頭に次のコメントを記述します:
+
+```css
+/* autoprefixer grid: autoplace */
+```
+
+プロジェクト全体で [CSS Grid Layout](https://developer.mozilla.org/docs/Web/CSS/grid) の IE11 サポートを有効にすることもできます。以下の（折りたたまれている）設定で autoprefixer を構成してください。
+詳細は後述の「[Customizing Plugins](#customizing-plugins)」を参照してください。
+
+<details>
+  <summary>クリックして CSS Grid Layout を有効にするための設定を表示</summary>
+
+```json filename="postcss.config.json"
+{
+  "plugins": [
+    "postcss-flexbugs-fixes",
+    [
+      "postcss-preset-env",
+      {
+        "autoprefixer": {
+          "flexbox": "no-2009",
+          "grid": "autoplace"
+        },
+        "stage": 3,
+        "features": {
+          "custom-properties": false
+        }
+      }
+    ]
+  ]
+}
+```
+
+</details>
+
+CSS 変数は [安全にコンパイルすることができない](https://github.com/MadLittleMods/postcss-css-variables#caveats) ため、コンパイルされません。
+どうしても変数を使う必要がある場合は、[Sass](https://sass-lang.com/) によってコンパイル時に取り除かれる [Sass variables](https://sass-lang.com/documentation/variables) などの利用を検討してください。
+
+## 対象ブラウザのカスタマイズ
+
+Next.js では、[Autoprefixer](https://github.com/postcss/autoprefixer) やコンパイル後の CSS 機能で使用する対象ブラウザを、[Browserslist](https://github.com/browserslist/browserslist) を通して設定できます。
+
+browserslist をカスタマイズするには、次のように `package.json` に `browserslist` キーを定義します:
+
+```json filename="package.json"
+{
+  "browserslist": [">0.3%", "not dead", "not op_mini all"]
+}
+```
+
+[browsersl.ist](https://browsersl.ist/?q=%3E0.3%25%2C+not+ie+11%2C+not+dead%2C+not+op_mini+all) ツールを使うと、どのブラウザを対象としているかを可視化できます。
+
+## CSS Modules
+
+CSS Modules をサポートするために特別な設定を行う必要はありません。ファイルで CSS Modules を有効にするには、そのファイル名の拡張子を `.module.css` に変更します。
+
+詳しくは、[Next.js における CSS Modules のサポート](/docs/app/getting-started/css)を参照してください。
+
+## プラグインのカスタマイズ
+
+> **警告:** カスタムの PostCSS 設定ファイルを定義すると、Next.js は [デフォルトの動作](#default-behavior) を**完全に無効**にします。
+> 必要な機能がすべてコンパイルされるように、[Autoprefixer](https://github.com/postcss/autoprefixer) を含めて手動で設定してください。
+> また、カスタム設定に含まれているプラグインはすべて手動でインストールする必要があります（例: `npm install postcss-flexbugs-fixes postcss-preset-env`）。
+
+PostCSS の設定をカスタマイズするには、プロジェクトのルートに `postcss.config.json` ファイルを作成してください。
+
+以下は、Next.js が使用するデフォルトの設定です:
+
+```json filename="postcss.config.json"
+{
+  "plugins": [
+    "postcss-flexbugs-fixes",
+    [
+      "postcss-preset-env",
+      {
+        "autoprefixer": {
+          "flexbox": "no-2009"
+        },
+        "stage": 3,
+        "features": {
+          "custom-properties": false
+        }
+      }
+    ]
+  ]
+}
+```
+
+> **補足**: Next.js では、ファイル名を `.postcssrc.json` にしたり、`package.json` 内の `postcss` キーから設定を読み込むこともできます。
+
+また、`postcss.config.js` ファイルで PostCSS を設定することもできます。これは、環境に応じてプラグインを条件付きで適用したい場合に便利です。
+
+```js filename="postcss.config.js"
+module.exports = {
+  plugins:
+    process.env.NODE_ENV === 'production'
+      ? [
+          'postcss-flexbugs-fixes',
+          [
+            'postcss-preset-env',
+            {
+              autoprefixer: {
+                flexbox: 'no-2009',
+              },
+              stage: 3,
+              features: {
+                'custom-properties': false,
+              },
+            },
+          ],
+        ]
+      : [
+          // 開発環境ではトランスフォームなし
+        ],
+}
+```
+
+> **補足**: Next.js では、このファイル名を `.postcssrc.js` にすることもできます。
+
+PostCSS プラグインをインポートするのに **`require()` を使用しないでください**。プラグインは文字列として指定する必要があります。
+
+> **補足**: 同じプロジェクト内で `postcss.config.js` を他の Next.js 以外のツールでも利用できるようにする必要がある場合は、代わりに相互運用性のあるオブジェクトベースの形式を使用する必要があります:
+>
+> ```js
+> module.exports = {
+>   plugins: {
+>     'postcss-flexbugs-fixes': {},
+>     'postcss-preset-env': {
+>       autoprefixer: {
+>         flexbox: 'no-2009',
+>       },
+>       stage: 3,
+>       features: {
+>         'custom-properties': false,
+>       },
+>     },
+>   },
+> }
+> ```

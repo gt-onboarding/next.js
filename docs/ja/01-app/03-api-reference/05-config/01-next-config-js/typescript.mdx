@@ -1,0 +1,58 @@
+---
+title: typescript
+description: 本番ビルド時に Next.js が TypeScript エラーをどのように処理するかを設定し、カスタム tsconfig ファイルを指定します。
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共通です。Pages Router 専用のコンテンツを追加する場合は、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用します。共通のコンテンツはコンポーネントでラップしないでください。 */}
+
+`next.config.js` の `typescript` オプションで TypeScript の挙動を設定します:
+
+```js filename="next.config.js"
+module.exports = {
+  typescript: {
+    ignoreBuildErrors: false,
+    tsconfigPath: 'tsconfig.json',
+  },
+}
+```
+
+## オプション
+
+| オプション          | 型        | デフォルト        | 説明                                                            |
+| ------------------- | --------- | ----------------- | --------------------------------------------------------------- |
+| `ignoreBuildErrors` | `boolean` | `false`           | TypeScript エラーがあっても本番ビルドを完了できるようにします。 |
+| `tsconfigPath`      | `string`  | `'tsconfig.json'` | カスタムの `tsconfig.json` ファイルへのパス。                   |
+
+## `ignoreBuildErrors`
+
+プロジェクトに TypeScript のエラーが存在する場合、Next.js の**本番ビルド**（`next build`）は失敗します。
+
+アプリケーションにエラーがある状態でも、Next.js にあえて本番コードを生成させたい場合は、組み込みの型チェック処理を無効化できます。
+
+無効化する場合は、ビルドやデプロイプロセスの一環として必ず型チェックを実行するようにしてください。そうしないと非常に危険です。
+
+```js filename="next.config.js"
+module.exports = {
+  typescript: {
+    // !! 警告 !!
+    // プロジェクトに型エラーがある場合でも、本番ビルドを強制的に
+    // 成功させます。
+    // !! 警告 !!
+    ignoreBuildErrors: true,
+  },
+}
+```
+
+## `tsconfigPath`
+
+ビルドやツールで使用する TypeScript 設定ファイルを切り替えます:
+
+```js filename="next.config.js"
+module.exports = {
+  typescript: {
+    tsconfigPath: 'tsconfig.build.json',
+  },
+}
+```
+
+詳細については、[TypeScript の設定](/docs/app/api-reference/config/typescript#custom-tsconfig-path)を参照してください。

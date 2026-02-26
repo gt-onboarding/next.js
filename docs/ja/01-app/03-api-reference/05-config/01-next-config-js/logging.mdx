@@ -1,0 +1,189 @@
+---
+title: logging
+description: 開発モードで Next.js を実行する際のターミナルでのログ出力の挙動を設定します。fetch のログ、受信リクエスト、ブラウザのコンソールログをターミナルへ転送する設定を含みます。
+---
+
+{/* このドキュメントの内容は App Router と Pages Router で共有されています。Pages Router 固有の内容を追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有される内容はコンポーネントでラップしないでください。 */}
+
+## オプション
+
+<AppOnly>
+
+### フェッチ
+
+開発モードで Next.js を実行しているときに、ログレベルと完全な URL をコンソールに出力するかどうかを設定できます。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+}
+```
+
+[サーバーコンポーネントの HMR キャッシュ](/docs/app/api-reference/config/next-config-js/serverComponentsHmrCache) から復元される `fetch` リクエストは、デフォルトではログに記録されません。ただし、`logging.fetches.hmrRefreshes` を `true` に設定することで有効化できます。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    fetches: {
+      hmrRefreshes: true,
+    },
+  },
+}
+```
+
+### サーバー関数
+
+開発中は、[サーバー関数](https://react.dev/reference/rsc/server-functions) の呼び出しがデフォルトでログに記録されます。これを無効にするには、`logging.serverFunctions` を `false` に設定します。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    serverFunctions: false,
+  },
+}
+```
+
+有効になっている場合、ターミナルには各サーバー関数の呼び出しが、その関数名、引数、および実行時間とともに表示されます:
+
+```bash filename="Terminal"
+POST /
+  └─ ƒ myAction(arg1, arg2) in 5ms app/actions.ts
+```
+
+</AppOnly>
+
+### Incoming Requests
+
+デフォルトでは、開発中はすべての受信リクエストがコンソールにログ出力されます。`incomingRequests` オプションを使用して、どのリクエストを無視するかを制御できます。
+これは開発時にのみログ出力されるため、このオプションは本番ビルドには影響しません。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    incomingRequests: {
+      ignore: [/\api\/v1\/health/],
+    },
+  },
+}
+```
+
+また、`incomingRequests` を `false` に設定すると、受信リクエストのログ記録を無効にできます。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    incomingRequests: false,
+  },
+}
+```
+
+### ブラウザコンソールログ
+
+開発中に、ブラウザのコンソールログ（`console.log`、`console.warn`、`console.error` など）をターミナルにも出力できます。これにより、ブラウザの開発者ツールを開かなくてもクライアント側のコードをデバッグできます。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    browserToTerminal: true,
+  },
+}
+```
+
+#### オプション
+
+`browserToTerminal` オプションには、次の値を指定できます。
+
+| 値        | 説明                                                         |
+| --------- | ------------------------------------------------------------ |
+| `'warn'`  | デフォルトで警告とエラーのみを転送します                     |
+| `'error'` | エラーのみを転送します                                       |
+| `true`    | すべてのコンソール出力（log, info, warn, error）を転送します |
+| `false`   | ブラウザーのログ転送を無効にします                           |
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    browserToTerminal: 'warn',
+  },
+}
+```
+
+#### ソース位置
+
+有効にすると、ブラウザーのログにはデフォルトでソース位置情報（ファイルパスおよび行番号）が含まれます。たとえば次のようになります。
+
+<AppOnly>
+
+```tsx filename="app/page.tsx" highlight={8}
+'use client'
+
+export default function Home() {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        console.log('Hello World')
+      }}
+    >
+      Click me
+    </button>
+  )
+}
+```
+
+ボタンをクリックすると、ターミナルに次のメッセージが出力されます：
+
+```bash filename="Terminal"
+[browser] Hello World (app/page.tsx:8:17)
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/index.tsx" highlight={6}
+export default function Home() {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        console.log('Hello World')
+      }}
+    >
+      Click me
+    </button>
+  )
+}
+```
+
+ボタンをクリックすると、ターミナルに次のメッセージが出力されます：
+
+```bash filename="Terminal"
+[browser] Hello World (pages/index.tsx:6:17)
+```
+
+</PagesOnly>
+
+### ログの無効化
+
+さらに、`logging` を `false` に設定すると、開発時のログ出力を無効化できます。
+
+```js filename="next.config.js"
+module.exports = {
+  logging: false,
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                                           |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `v16.2.0`  | `browserToTerminal` を追加（`experimental.browserDebugInfoInTerminal` から移行）   |
+| `v15.4.0`  | `experimental.browserDebugInfoInTerminal` を導入                                   |
+| `v15.2.0`  | `incomingRequests` を追加                                                          |
+| `v15.0.0`  | `logging: false` オプションを追加、App Router 向けに `fetches.hmrRefreshes` を追加 |
+| `v14.0.0`  | App Router 向けの `logging.fetches` を安定版に移行                                 |

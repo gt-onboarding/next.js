@@ -1,0 +1,309 @@
+---
+title: パッケージバンドルの最適化
+nav_title: パッケージバンドル
+description: Turbopack 用の Next.js Bundle Analyzer と、Webpack 用の `@next/bundle-analyzer` プラグインを使って、アプリケーションのサーバー／クライアント向けバンドルを分析・最適化する方法を学びます。
+related:
+  description: 本番環境向けにアプリケーションを最適化する方法についてさらに学びます。
+  links:
+    - app/guides/production-checklist
+---
+
+バンドリングは、アプリケーションコードとその依存関係を、クライアントとサーバー向けの最適化された出力ファイルにまとめるプロセスです。バンドルサイズが小さいほど読み込みが速くなり、JavaScript の実行時間が短縮され、[Core Web Vitals](https://web.dev/articles/vitals) が改善され、サーバーのコールドスタート時間も短くなります。
+
+Next.js はコード分割やツリーシェイキングなどの手法によって、自動的にバンドルを最適化します。ただし、場合によってはバンドルを手動で最適化する必要が生じることがあります。
+
+アプリケーションのバンドルを分析するためのツールは 2 つあります:
+
+- [Next.js Bundle Analyzer for Turbopack (experimental)](#nextjs-bundle-analyzer-experimental)
+- [Webpack 用 `@next/bundle-analyzer` プラグイン](#nextbundle-analyzer-for-webpack)
+
+このガイドでは、それぞれのツールの使い方と、[大きなバンドルを最適化する方法](#optimizing-large-bundles)について説明します。
+
+## Next.js Bundle Analyzer（実験的機能）
+
+> v16.1 以降で利用可能です。[専用の GitHub ディスカッション](https://github.com/vercel/next.js/discussions/86731)でフィードバックを共有でき、[turbopack-bundle-analyzer-demo.vercel.sh](https://turbopack-bundle-analyzer-demo.vercel.sh/) でデモを確認できます。
+
+Next.js Bundle Analyzer は、Turbopack のモジュールグラフと統合されています。サーバーおよびクライアントの各モジュールを、正確な import トレースとともに確認できるため、サイズの大きい依存関係を見つけやすくなります。インタラクティブな Bundle Analyzer のデモを開き、モジュールグラフを探索してください。
+
+### ステップ 1: Turbopack Bundle Analyzer を実行する
+
+まず、次のコマンドを実行し、ブラウザでインタラクティブなビューを開きます。
+
+```bash filename="Terminal" package="npm"
+npx next experimental-analyze
+```
+
+```bash filename="Terminal" package="yarn"
+yarn next experimental-analyze
+```
+
+```bash filename="Terminal" package="pnpm"
+pnpm next experimental-analyze
+```
+
+```bash filename="Terminal" package="bun"
+bunx next experimental-analyze
+```
+
+### ステップ 2: モジュールのフィルタリングと確認
+
+UI 内では、ルート、環境（client または server）、タイプ（JavaScript、CSS、JSON）ごとにフィルタリングしたり、ファイル名で検索したりできます。
+
+<Video
+  caption="Next.js バンドルアナライザー UI のウォークスルー"
+  src="/videos/bundle-analyzer.mp4"
+  width={1708}
+  height={1080}
+/>
+
+### ステップ 3: import チェーンを使ってモジュールをトレースする
+
+ツリーマップでは、各モジュールが長方形として表示されます。モジュールのサイズは、その長方形の面積で表されます。
+
+モジュールをクリックすると、そのサイズを確認し、完全な import チェーンをたどり、アプリケーション内のどこで使用されているかを正確に確認できます。
+
+<Image
+  caption="Next.js Bundle Analyzer の import チェーンビュー"
+  srcLight="/docs/light/bundle-analyzer.png"
+  srcDark="/docs/dark/bundle-analyzer.png"
+  width={1600}
+  height={874}
+/>
+
+### ステップ 4: 共有や差分比較のために出力をディスクに書き込む
+
+分析結果をチームメンバーと共有したり、最適化前後のバンドルサイズを比較したい場合は、インタラクティブなビューをスキップし、`--output` フラグを指定して分析結果を静的ファイルとして保存できます。
+
+```bash filename="Terminal" package="npm"
+npx next experimental-analyze --output
+```
+
+```bash filename="Terminal" package="yarn"
+yarn next experimental-analyze --output
+```
+
+```bash filename="Terminal" package="pnpm"
+pnpm next experimental-analyze --output
+```
+
+```bash filename="Terminal" package="bun"
+bunx next experimental-analyze --output
+```
+
+このコマンドは出力を `.next/diagnostics/analyze` ディレクトリに書き出します。結果を比較するために、このディレクトリを別の場所にコピーできます。
+
+```bash filename="Terminal"
+cp -r .next/diagnostics/analyze ./analyze-before-refactor
+```
+
+> Bundle Analyzer にはさらに多くのオプションが用意されています。すべてのオプションについては Next.js CLI リファレンスドキュメントを参照してください。
+
+## `@next/bundle-analyzer` for Webpack
+
+[`@next/bundle-analyzer`](https://www.npmjs.com/package/@next/bundle-analyzer) は、アプリケーションバンドルのサイズ管理に役立つプラグインです。各パッケージとその依存関係のサイズを視覚的に示すレポートを生成します。この情報を使って、大きな依存関係を削除したり、コードを分割したり、あるいは[遅延読み込み](/docs/app/guides/lazy-loading)したりできます。
+
+### ステップ 1: インストール
+
+次のコマンドを実行して、プラグインをインストールします:
+
+```bash package="pnpm"
+pnpm add @next/bundle-analyzer
+```
+
+```bash package="npm"
+npm install @next/bundle-analyzer
+```
+
+```bash package="yarn"
+yarn add @next/bundle-analyzer
+```
+
+```bash package="bun"
+bun add @next/bundle-analyzer
+```
+
+次に、バンドルアナライザーの設定を `next.config.js` に追加します。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+module.exports = withBundleAnalyzer(nextConfig)
+```
+
+### ステップ 2: レポートの生成
+
+次のコマンドを実行してバンドルを解析します:
+
+```bash
+ANALYZE=true npm run build
+# または
+ANALYZE=true yarn build
+# または
+ANALYZE=true pnpm build
+```
+
+このレポートを実行すると、ブラウザで新しいタブが3つ開くので、それぞれを確認できます。
+
+## 大きなバンドルの最適化
+
+大きなモジュールを特定したら、解決方法はユースケースによって異なります。以下に、一般的な原因とその対処方法を示します。
+
+### 多数のエクスポートを持つパッケージ
+
+何百ものモジュールをエクスポートするパッケージ（アイコンやユーティリティライブラリなど）を使用している場合、`next.config.js` ファイル内の [`optimizePackageImports`](/docs/app/api-reference/config/next-config-js/optimizePackageImports) オプションを使うことで、それらのインポートの解決処理を最適化できます。このオプションは、_実際に_ 使用しているモジュールだけを読み込みつつ、多数の名前付きエクスポートを使ったインポート文をそのまま記述できるようにします。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    optimizePackageImports: ['icon-library'],
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **補足:** Next.js は一部のライブラリを自動的に最適化するため、それらを `optimizePackageImports` のリストに含める必要はありません。サポートされているパッケージの[一覧](/docs/app/api-reference/config/next-config-js/optimizePackageImports)を参照してください。
+
+### クライアント側での重い処理
+
+クライアント側バンドルが大きくなる一般的な原因は、クライアントコンポーネント内で高コストなレンダリング処理を行っていることです。これは、構文ハイライト、チャート描画、Markdown 解析など、データを UI に変換するためだけに存在するライブラリでよく発生します。
+
+その処理にブラウザの API やユーザーとのインタラクションが不要であれば、サーバーコンポーネントで実行できます。
+
+この例では、Prism ベースのシンタックスハイライターがクライアントコンポーネント内で動作しています。最終的な出力は単なる `<code>` ブロックであるにもかかわらず、構文ハイライト用ライブラリ全体がクライアントの JavaScript バンドルに含まれてしまいます。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+'use client'
+
+import Highlight from 'prism-react-renderer'
+import theme from 'prism-react-renderer/themes/github'
+
+export default function Page() {
+  const code = `export function hello() {
+    console.log("hi")
+  }`
+
+  return (
+    <article>
+      <h1>Blog Post Title</h1>
+
+      {/* prismパッケージとそのトークン化ロジックはクライアントに配信される */}
+      <Highlight code={code} language="tsx" theme={theme}>
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre className={className} style={style}>
+            <code>
+              {tokens.map((line, i) => (
+                <div key={i} {...getLineProps({ line })}>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({ token })} />
+                  ))}
+                </div>
+              ))}
+            </code>
+          </pre>
+        )}
+      </Highlight>
+    </article>
+  )
+}
+```
+
+このような実装では、結果が静的な HTML であっても、クライアントがハイライト用ライブラリをダウンロードして実行する必要があるため、バンドルサイズが増加します。
+
+代わりに、ハイライト処理のロジックを Server Component に移し、最終的な HTML をサーバー側でレンダリングします。クライアントには、レンダリング済みのマークアップだけが送られます。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { codeToHtml } from 'shiki'
+
+export default async function Page() {
+  const code = `export function hello() {
+    console.log("hi")
+  }`
+
+  // Shikiパッケージはサーバー上で実行され、クライアント向けにバンドルされることはありません。
+  const highlightedHtml = await codeToHtml(code, {
+    lang: 'tsx',
+    theme: 'github-dark',
+  })
+
+  return (
+    <article>
+      <h1>Blog Post Title</h1>
+
+      {/* クライアントにはプレーンなマークアップが渡されます */}
+      <pre>
+        <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+      </pre>
+    </article>
+  )
+}
+```
+
+<AppOnly>
+  ### 特定のパッケージをバンドル対象から除外する
+
+サーバーコンポーネントや Route Handlers 内でインポートされたパッケージは、Next.js によって自動的にバンドルされます。
+
+`next.config.js` の [`serverExternalPackages`](/docs/app/api-reference/config/next-config-js/serverExternalPackages) オプションを使用して、特定のパッケージをバンドル対象から除外できます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['package-name'],
+}
+
+module.exports = nextConfig
+```
+
+</AppOnly>
+
+<PagesOnly>
+  ### 事前バンドルされていない外部パッケージ
+
+デフォルトでは、アプリケーションにインポートされたパッケージはバンドルされません。たとえば、monorepo や `node_modules` からインポートされる場合など、外部パッケージが事前バンドルされていない場合はパフォーマンスに影響する可能性があります。
+
+特定のパッケージをバンドルするには、`next.config.js` の [`transpilePackages`](/docs/app/api-reference/config/next-config-js/transpilePackages) オプションを使用できます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  transpilePackages: ['package-name'],
+}
+
+module.exports = nextConfig
+```
+
+すべてのパッケージを自動的にバンドルするには、`next.config.js` の [`bundlePagesRouterDependencies`](/docs/pages/api-reference/config/next-config-js/bundlePagesRouterDependencies) オプションを使用できます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  bundlePagesRouterDependencies: true,
+}
+
+module.exports = nextConfig
+```
+
+### 特定のパッケージをバンドル対象から除外する
+
+バンドルに含めるべきでないパッケージを特定した場合、`next.config.js` の [`serverExternalPackages`](/docs/pages/api-reference/config/next-config-js/serverExternalPackages) オプションを使用して、それらのパッケージを自動バンドルの対象から除外できます。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // 外部パッケージを自動的にバンドルする:
+  bundlePagesRouterDependencies: true,
+  // 特定のパッケージをバンドル対象から除外する:
+  serverExternalPackages: ['package-name'],
+}
+
+module.exports = nextConfig
+```
+
+</PagesOnly>

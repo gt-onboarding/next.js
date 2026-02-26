@@ -1,0 +1,398 @@
+---
+title: turbopack
+description: Turbopack 固有のオプションを使用して Next.js を設定する
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router の両方で共有されています。Pages Router 専用のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有コンテンツはコンポーネントでラップしないでください。 */}
+
+`turbopack` オプションを使用すると、さまざまなファイルの変換方法やモジュールの解決方法を変更するように [Turbopack](/docs/app/api-reference/turbopack) をカスタマイズできます。
+
+> **補足**: `turbopack` オプションは、Next.js 13.0.0 から 15.2.x までは `experimental.turbo` という名前でした。`experimental.turbo` オプションは Next.js 16 で削除されます。
+>
+> 以前のバージョンの Next.js を使用している場合は、`npx @next/codemod@latest next-experimental-turbo-to-turbopack .` を実行して、設定を自動的に移行してください。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  turbopack: {
+    // ...
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  turbopack: {
+    // ...
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **補足**:
+>
+> - Next.js 用の Turbopack では、組み込み機能のためにローダーやローダー設定を用意する必要はありません。Turbopack には CSS とモダンな JavaScript のコンパイル機能が組み込まれているため、`@babel/preset-env` を使用している場合、`css-loader`、`postcss-loader`、`babel-loader` を別途用意する必要はありません。
+
+## リファレンス
+
+### オプション
+
+`turbopack` 構成では、次のオプションが利用できます:
+
+| オプション          | 説明                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `root`              | アプリケーションのルートディレクトリを設定します。絶対パスで指定します。                                                                  |
+| `rules`             | Turbopack 実行時に適用する、サポート対象の webpack ローダーのリストです。                                                                 |
+| `resolveAlias`      | エイリアスされたインポートを、対応する読み込み先モジュールにマッピングします。                                                            |
+| `resolveExtensions` | ファイルをインポートするときに解決対象とする拡張子のリストです。                                                                          |
+| `debugIds`          | JavaScript バンドルとソースマップ内で [debug IDs](https://github.com/tc39/ecma426/blob/main/proposals/debug-id.md) の生成を有効にします。 |
+
+### サポートされているローダー
+
+次のローダーは、Turbopack の webpack ローダー実装で動作することが確認されています。ここに記載されていない多くの webpack ローダーも同様に動作するはずです:
+
+- [`babel-loader`](https://www.npmjs.com/package/babel-loader) [_(Babel の設定ファイルが見つかった場合は自動的に設定されます)_](/docs/app/api-reference/turbopack#language-features)
+- [`@svgr/webpack`](https://www.npmjs.com/package/@svgr/webpack)
+- [`svg-inline-loader`](https://www.npmjs.com/package/svg-inline-loader)
+- [`yaml-loader`](https://www.npmjs.com/package/yaml-loader)
+- [`string-replace-loader`](https://www.npmjs.com/package/string-replace-loader)
+- [`raw-loader`](https://www.npmjs.com/package/raw-loader)
+- [`sass-loader`](https://www.npmjs.com/package/sass-loader) [_(自動的に設定されます)_](/docs/app/api-reference/turbopack#css-and-styling)
+- [`graphql-tag/loader`](https://www.npmjs.com/package/graphql-tag)
+
+#### 未サポートの Webpack ローダー機能
+
+Turbopack は webpack ローダーを実行するために [`loader-runner`](https://github.com/webpack/loader-runner) ライブラリを使用しており、標準的なローダー API のほとんどを提供します。しかし、いくつかの機能はサポートされていません。
+
+**モジュール読み込み:**
+
+- [`importModule`](https://webpack.js.org/api/loaders/#thisimportmodule) - サポートなし
+- [`loadModule`](https://webpack.js.org/api/loaders/#thisloadmodule) - サポートなし
+
+**ファイルシステムと出力:**
+
+- [`fs`](https://webpack.js.org/api/loaders/#thisfs) - 一部サポート: 現在は `fs.readFile` のみ実装されています。
+- [`emitFile`](https://webpack.js.org/api/loaders/#thisemitfile) - サポートなし
+
+**コンテキストプロパティ:**
+
+- [`version`](https://webpack.js.org/api/loaders/#thisversion) - サポートなし
+- [`mode`](https://webpack.js.org/api/loaders/#thismode) - サポートなし
+- [`target`](https://webpack.js.org/api/loaders/#thistarget) - サポートなし
+
+**ユーティリティ:**
+
+- [`utils`](https://webpack.js.org/api/loaders/#thisutils) - サポートなし
+- [`resolve`](https://webpack.js.org/api/loaders/#thisresolve) - サポートなし（代わりに [`getResolve`](https://webpack.js.org/api/loaders/#thisgetresolve) を使用してください）
+
+これらの機能のいずれかに致命的に依存しているローダーをお使いの場合は、Issue を報告してください。
+
+## 使用例
+
+### ルートディレクトリ
+
+Turbopack はモジュールを解決する際の基準としてルートディレクトリを使用します。プロジェクトのルート外にあるファイルは解決されません。
+
+プロジェクトルートの外にあるファイルを解決しない理由は、キャッシュ検証を改善し、ファイルシステム監視のオーバーヘッドを減らし、必要な解決ステップの数を減らすためです。
+
+Next.js はプロジェクトのルートディレクトリを自動的に検出します。次のいずれかのファイルを探すことで特定します：
+
+- `pnpm-lock.yaml`
+- `package-lock.json`
+- `yarn.lock`
+- `bun.lock`
+- `bun.lockb`
+
+たとえばワークスペースを使用していない場合など、別のプロジェクト構成になっている場合は、`root` オプションを手動で設定できます：
+
+```js filename="next.config.js"
+const path = require('path')
+module.exports = {
+  turbopack: {
+    root: path.join(__dirname, '..'),
+  },
+}
+```
+
+`npm link`、`yarn link`、`pnpm link` などを使用してプロジェクトルート外にあるリンク済み依存関係からファイルを解決できるようにするには、`turbopack.root` を、プロジェクトとリンク済み依存関係の両方を含む親ディレクトリに設定する必要があります。
+
+これによりファイルシステム監視の対象範囲は広がりますが、リンク済みパッケージを並行して開発している場合など、通常は開発時にのみ必要になります。
+
+### webpack ローダーの設定
+
+組み込みの機能だけでは足りず追加のローダーのサポートが必要な場合、多くの webpack ローダーはすでに Turbopack で動作します。ただし、現在いくつか制限があります:
+
+- webpack loader API の中核となる一部のみが実装されています。現時点では、いくつかの一般的なローダーをカバーするには十分な範囲が実装されており、今後さらに API サポートを拡張していく予定です。
+- JavaScript コードを返すローダーのみがサポートされています。スタイルシートや画像などのファイルを変換するローダーは、現時点ではサポートされていません。
+- webpack ローダーに渡すオプションは、プレーンな JavaScript のプリミティブ、オブジェクト、および配列でなければなりません。例えば、`require()` したプラグインモジュールをオプション値として渡すことはできません。
+
+ローダーを設定するには、インストールしたローダーの名前と任意のオプションを `next.config.js` に追加し、拡張子をローダーのリストにマッピングします。ルールは定義された順に評価されます。
+
+以下は [`@svgr/webpack`](https://www.npmjs.com/package/@svgr/webpack) ローダーを使った例で、`.svg` ファイルをインポートし、それらを React コンポーネントとしてレンダリングできるようにします。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+}
+```
+
+> **補足**: `rules` オブジェクトで使用されるグロブは、`/` 文字を含まない限りファイル名に基づいてマッチします。グロブに `/` が含まれている場合は、プロジェクト相対のファイルパス全体に基づいてマッチします。Windows のファイルパスは、Unix 形式の `/` 区切りに正規化されます。
+>
+> Turbopack は、[Rust の `globset` ライブラリ](https://docs.rs/globset/latest/globset/) を改変したバージョンを使用しています。
+
+設定オプションを必要とするローダーでは、文字列ではなくオブジェクト形式を使用できます。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: [
+          {
+            loader: '@svgr/webpack',
+            options: {
+              icon: true,
+            },
+          },
+        ],
+        as: '*.js',
+      },
+    },
+  },
+}
+```
+
+> **補足**: Next.js 13.4.4 より前のバージョンでは、`turbopack.rules` は `turbo.loaders` という名前で、`*.mdx` のようなパターンではなく `.mdx` のようなファイル拡張子のみを受け付けていました。
+
+### webpack ローダーの高度な条件指定
+
+高度な `condition` 構文を使用して、ローダーを適用する対象をさらに細かく制御できます。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    rules: {
+      // '*' はすべてのファイルパスにマッチするが、condition で
+      // ルールの適用範囲を制限する。
+      '*': {
+        condition: {
+          all: [
+            // 'foreign' は組み込みの condition。
+            { not: 'foreign' },
+            // 'path' には RegExp またはグロブ文字列を指定できる。RegExp は
+            // プロジェクトルートからの相対ファイルパス全体の任意の位置にマッチする。
+            { path: /^img\/[0-9]{3}\// },
+            {
+              any: [
+                { path: '*.svg' },
+                // 'query' はクエリ文字列全体の任意の位置にマッチする。
+                // クエリ文字列は空の場合も、`?` で始まる場合もある。
+                { query: /[?&]svgr(?=&|$)/ },
+                // 'content' は常に RegExp であり、ファイル内の
+                // 任意の位置にマッチする。
+                { content: /\<svg\W/ },
+              ],
+            },
+          ],
+        },
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+}
+```
+
+- サポートされているブール演算子は `{all: [...]}`、`{any: [...]}`、`{not: ...}` です。
+- サポートされているカスタマイズ可能な演算子は `{path: string | RegExp}`、`{content: RegExp}`、`{query: string | RegExp}`、`{contentType: string | RegExp}` です。同じオブジェクト内で複数の演算子が指定された場合、それらは暗黙の `and` として動作します。
+  - `path` はプロジェクトルートからの相対パスに対してマッチします。string はグロブパターンとして扱われ、RegExp はパスへの部分一致に使用できます。
+  - `content` はファイル内容の任意の場所にマッチします。
+  - `query` は import のクエリ文字列（例：`import './file?foo'` の `?foo`）にマッチします。string は完全一致である必要があり、RegExp はクエリ文字列への部分一致に使用できます。
+  - `contentType` はリソースの MIME コンテンツタイプ（例：`data:text/plain,...` のような data URL 由来のもの）にマッチします。string はグロブパターン（例：`text/*`、`image/*`）として扱われ、RegExp はコンテンツタイプへの部分一致に使用できます。
+
+加えて、いくつかの組み込み条件がサポートされています：
+
+- `browser`：クライアント側で実行されるコードにマッチします。サーバー側コードは `{not: 'browser'}` を使用してマッチできます。
+- `foreign`：`node_modules` 内のコードや、一部の Next.js の内部コードにマッチします。通常、ローダーの適用範囲は `{not: 'foreign'}` に制限するのが望ましいです。これにより、ローダーが呼び出されるファイル数を減らしてパフォーマンスを向上できます。
+- `development`：`next dev` 使用時にマッチします。
+- `production`：`next build` 使用時にマッチします。
+- `node`：デフォルトの Node.js ランタイム上で実行されるコードにマッチします。
+- `edge-light`：[Edge runtime](/docs/app/api-reference/edge) 上で実行されるコードにマッチします。
+
+Rules はオブジェクト、またはオブジェクトの配列にすることができます。配列は、互いに排他的な条件を表現する際に有用です：
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    rules: {
+      '*.svg': [
+        {
+          condition: 'browser',
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+        {
+          condition: { not: 'browser' },
+          loaders: [require.resolve('./custom-svg-loader.js')],
+          as: '*.js',
+        },
+      ],
+    },
+  },
+}
+```
+
+> **補足**: すべてのマッチングルールは、定義された順序で実行されます。
+
+### モジュールタイプ
+
+ローダーを使用せずに、モジュールタイプを直接指定できます。これは、webpack の [`type`](https://webpack.js.org/configuration/module/#ruletype) オプションと同様に、ファイルの処理方法を変更する際に便利です。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    rules: {
+      '*.svg': {
+        type: 'asset',
+      },
+    },
+  },
+}
+```
+
+`type: 'asset'` を使用すると、ファイルをインポートした際にそのファイルの URL が返されます。
+
+```tsx filename="app/page.tsx"
+import svgUrl from './icon.svg'
+
+export default function Page() {
+  return <img src={svgUrl} alt="Icon" />
+}
+```
+
+`type` オプションは `loaders` と組み合わせて使用できます。まず `loaders` が実行され、その結果が指定された `type` に従って処理されます。
+
+利用可能なモジュールタイプは次のとおりです:
+
+| 型           | 説明                                                                      |
+| ------------ | ------------------------------------------------------------------------- |
+| `asset`      | ファイルを出力して URL を返す（webpack の `asset/resource` のような動作） |
+| `ecmascript` | JavaScript として処理                                                     |
+| `typescript` | TypeScript として処理                                                     |
+| `css`        | CSS として処理                                                            |
+| `css-module` | CSS Module として処理                                                     |
+| `wasm`       | WebAssembly として処理                                                    |
+| `raw`        | 生のコンテンツを文字列として返す                                          |
+| `bytes`      | コンテンツをバイト列としてインライン化する                                |
+
+### import attributes を使ったインライン loader 設定
+
+Turbopack loader は、`with` 句（import attributes）を使って個々の import に適用できます。これは `turbopack.rules` でグローバルに指定するのではなく、import 単位で指定されます。
+
+特定の import にだけ loader を適用し、その型のすべてのファイルには影響を与えたくない場合に便利です。
+
+```tsx filename="app/page.tsx"
+// .txt ファイルを JavaScript モジュールとしてインポートするために raw loader を適用する
+import rawText from '../data.txt' with { turbopackLoader: 'raw-loader', turbopackAs: '*.js' }
+
+export default function Page() {
+  return <p>{rawText}</p>
+}
+```
+
+次のインポート属性がサポートされています：
+
+| 属性                     | 説明                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `turbopackLoader`        | 適用するローダー（例: `'raw-loader'`）。                                                                                 |
+| `turbopackLoaderOptions` | ローダーオプションを表す JSON 文字列（例: `'{"search":"X","replace":"Y"}'`）。                                           |
+| `turbopackAs`            | 出力のリネームパターン（`turbopack.rules[].as` と同じ）。例えば、`'*.js'` はローダーの出力を JavaScript として扱います。 |
+| `turbopackModuleType`    | 出力のモジュールタイプを設定します（`turbopack.rules[].type` と同じ）。                                                  |
+
+オプション付きローダーでは、`turbopackLoaderOptions` を通じて JSON でエンコードされた文字列を渡します：
+
+```tsx filename="app/page.tsx"
+import value from '../data.js' with { turbopackLoader: 'string-replace-loader', turbopackLoaderOptions: '{"search":"PLACEHOLDER","replace":"replaced value"}' }
+```
+
+> **補足**: `turbopackLoader` を使ったインポート属性は Turbopack 固有の機能であり、webpack ではサポートされていません。この機能を利用するには、インポート文で `assert` ではなく `with` キーワードを使用する必要があります。
+
+### エイリアスの解決
+
+Turbopack は、webpack の [`resolve.alias`](https://webpack.js.org/configuration/resolve/#resolvealias) 設定と同様に、エイリアスを使用してモジュール解決の方法を変更するように構成できます。
+
+`next.config.js` でエイリアスによる解決を設定するには、インポートされるパターンを新しい参照先にマッピングします。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    resolveAlias: {
+      underscore: 'lodash',
+      mocha: { browser: 'mocha/browser-entry.js' },
+    },
+  },
+}
+```
+
+これは `underscore` パッケージのインポートを `lodash` パッケージへのエイリアスとして扱います。言い換えると、`import underscore from 'underscore'` は `underscore` ではなく `lodash` モジュールを読み込みます。
+
+Turbopack はまた、Node.js の[条件付きエクスポート](https://nodejs.org/docs/latest-v18.x/api/packages.html#conditional-exports)と同様に、このフィールドを使った条件付きエイリアスもサポートしています。現時点では `browser` 条件のみがサポートされています。上記の例では、Turbopack がブラウザー環境をターゲットにしている場合、`mocha` モジュールのインポートは `mocha/browser-entry.js` として解決されます。
+
+### カスタム拡張子の解決
+
+Turbopack は、webpack の [`resolve.extensions`](https://webpack.js.org/configuration/resolve/#resolveextensions) 設定と同様に、カスタム拡張子を持つモジュールを解決するように設定できます。
+
+解決対象の拡張子を設定するには、`next.config.js` 内の `resolveExtensions` フィールドを使用します。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    resolveExtensions: ['.mdx', '.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
+  },
+}
+```
+
+これは、指定されたリストで元の resolve extensions 設定を置き換えます。デフォルトの拡張子は必ず含めてください。
+
+アプリを webpack から Turbopack に移行する方法の詳細やガイドラインについては、[webpack 互換性に関する Turbopack のドキュメント](https://turbo.build/pack/docs/migrating-from-webpack)を参照してください。
+
+### デバッグ ID
+
+Turbopack は、JavaScript バンドルおよびソースマップ内で [デバッグ ID](https://github.com/tc39/ecma426/blob/main/proposals/debug-id.md) を生成するように構成できます。
+
+デバッグ ID を構成するには、`next.config.js` の `debugIds` フィールドを使用します。
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    debugIds: true,
+  },
+}
+```
+
+このオプションは、互換性を確保するために、デバッグ ID 用のポリフィルを自動的に JavaScript バンドルに追加します。デバッグ ID は、`globalThis._debugIds` というグローバル変数として利用できます。
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                     |
+| ---------- | ------------------------------------------------------------ |
+| `16.2.0`   | `turbopackLoader` のインポート属性が追加されました。         |
+| `16.2.0`   | `turbopack.rules.*.type` が追加されました。                  |
+| `16.2.0`   | `turbopack.rules.*.condition.contentType` が追加されました。 |
+| `16.2.0`   | `turbopack.rules.*.condition.query` が追加されました。       |
+| `16.0.0`   | `turbopack.debugIds` が追加されました。                      |
+| `16.0.0`   | `turbopack.rules.*.condition` が追加されました。             |
+| `15.3.0`   | `experimental.turbo` は `turbopack` に変更されました。       |
+| `13.0.0`   | `experimental.turbo` が導入されました。                      |

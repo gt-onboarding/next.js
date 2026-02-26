@@ -1,0 +1,159 @@
+---
+title: 出力
+description: Next.js は各ページごとに必要なファイルを自動的に解析して特定し、アプリケーションを簡単にデプロイできるようにします。ここではその仕組みについて説明します。
+---
+
+{/* このドキュメントの内容は、App Router と Pages Router の両方で共有されています。Pages Router に特有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有されるコンテンツはコンポーネントでラップしないでください。 */}
+
+ビルド時に、Next.js は各ページとその依存関係を自動的にトレースし、本番環境向けのアプリケーションをデプロイするために必要なすべてのファイルを特定します。
+
+この機能により、デプロイのサイズを大幅に削減できます。以前は、Docker でデプロイする際に `next start` を実行するには、パッケージの `dependencies` に含まれるすべての依存関係をインストールしておく必要がありました。Next.js 12 以降では、`.next/` ディレクトリ内の Output File Tracing 機能を活用することで、必要なファイルだけを含めることができます。
+
+さらに、この機能により、さまざまな問題を引き起こし、不要な重複も生み出す非推奨の `serverless` ターゲットを使用する必要もなくなります。
+
+## 仕組み
+
+`next build` の実行中、Next.js は [`@vercel/nft`](https://github.com/vercel/nft) を使用して、`import`、`require`、および `fs` の使用状況を静的に解析し、ページが読み込む可能性のあるすべてのファイルを特定します。
+
+Next.js の本番サーバーについても、必要なファイルがトレースされ、その結果が `.next/next-server.js.nft.json` に出力されます。このファイルは本番環境で活用できます。
+
+`.next` 出力ディレクトリに出力される `.nft.json` ファイルを活用するには、各トレースに含まれる、`.nft.json` ファイルからの相対パスで記載されたファイル一覧を読み取り、それらをデプロイ先にコピーします。
+
+## トレースされたファイルの自動コピー
+
+Next.js では、本番デプロイに必要なファイルと、`node_modules` 内の一部のファイルだけをコピーした `standalone` フォルダーを自動的に作成できます。
+
+この自動コピー機能を利用するには、`next.config.js` で有効にします。
+
+```js filename="next.config.js"
+module.exports = {
+  output: 'standalone',
+}
+```
+
+これにより、`.next/standalone` にフォルダーが作成され、`node_modules` をインストールすることなく単独でデプロイできるようになります。
+
+さらに、`next start` の代わりに使用できる最小限の `server.js` ファイルも出力されます。このミニマルなサーバーは、デフォルトでは `public` や `.next/static` フォルダーをコピーしません。これらは本来、CDN によって処理されることが望ましいためです。ただし、これらのフォルダーを手動で `standalone/public` および `standalone/.next/static` フォルダーにコピーすれば、その後は `server.js` ファイルが自動的にこれらを配信します。
+
+これらを手動でコピーするには、`next build` 実行後に `cp` コマンドラインツールを使用できます：
+
+```bash filename="Terminal"
+cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+```
+
+ローカルで最小構成の `server.js` ファイルを起動するには、次のコマンドを実行します。
+
+```bash filename="Terminal"
+node .next/standalone/server.js
+```
+
+<AppOnly>
+  > **補足**: > > *
+  プロジェクトで特定のポートやホスト名で待ち受ける必要がある場合は、`server.js`
+  を実行する前に `PORT` または `HOSTNAME`
+  環境変数を設定できます。たとえば、`PORT=8080 HOSTNAME=0.0.0.0 node server.js`
+  を実行すると、`http://0.0.0.0:8080` でサーバーが起動します。
+</AppOnly>
+
+<PagesOnly>
+  > **補足**: > > * `next.config.js` は `next build`
+  の実行時に読み込まれ、その内容が `server.js`
+  の出力ファイルにシリアライズされます。 > *
+  プロジェクトで特定のポートやホスト名で待ち受ける必要がある場合は、`server.js`
+  を実行する前に `PORT` または `HOSTNAME`
+  環境変数を設定できます。たとえば、`PORT=8080 HOSTNAME=0.0.0.0 node server.js`
+  を実行すると、`http://0.0.0.0:8080` でサーバーが起動します。
+</PagesOnly>
+
+## 注意事項
+
+- モノレポ構成でトレースを行う場合、デフォルトではプロジェクトディレクトリがトレース対象として使用されます。`next build packages/web-app` を実行する場合、`packages/web-app` がトレースのルートとなり、そのフォルダ外のファイルはトレース対象に含まれません。このフォルダの外にあるファイルも含めたい場合は、`next.config.js` 内で `outputFileTracingRoot` を設定できます。
+
+```js filename="packages/web-app/next.config.js"
+const path = require('path')
+
+module.exports = {
+  // モノレポのベースから2階層上のファイルを含める
+  outputFileTracingRoot: path.join(__dirname, '../../'),
+}
+```
+
+- Next.js が必須ファイルを含め損ねたり、未使用ファイルを誤って含めてしまうケースがあります。そういった場合には、`next.config.js` の `outputFileTracingExcludes` および `outputFileTracingIncludes` をそれぞれ利用できます。各オプションは、キーとして **ルートグロブ**（[picomatch](https://www.npmjs.com/package/picomatch#basic-globbing) によってルートパス（例: `/api/hello`）にマッチされるもの）を、値として **プロジェクトルートから解決されるグロブパターン**（トレースに含める／除外するファイルを指定するもの）を持つオブジェクトを受け取ります。
+
+> **補足**:
+> モノレポの場合、`project root` は必ずしも monorepo 全体のルートではなく、Next.js プロジェクトルート（next.config.js を含むフォルダ。例: packages/web-app）を指します。
+
+```js filename="next.config.js"
+module.exports = {
+  outputFileTracingExcludes: {
+    '/api/hello': ['./un-necessary-folder/**/*'],
+  },
+  outputFileTracingIncludes: {
+    '/api/another': ['./necessary-folder/**/*'],
+    '/api/login/\\[\\[\\.\\.\\.slug\\]\\]': [
+      './node_modules/aws-crt/dist/bin/**/*',
+    ],
+  },
+}
+```
+
+`src/` ディレクトリを使用しても、これらのオプションの指定方法は変わりません:
+
+- **キー** は引き続きルートパス（`'/api/hello'`、`'/products/[id]'` など）に対応します。
+- **値** はプロジェクトルートを基準に解決されるため、`src/` 配下のパスを参照できます。
+
+```js filename="next.config.js"
+module.exports = {
+  outputFileTracingIncludes: {
+    '/products/*': ['src/lib/payments/**/*'],
+    '/*': ['src/config/runtime/**/*.json'],
+  },
+  outputFileTracingExcludes: {
+    '/api/*': ['src/temp/**/*', 'public/large-logs/**/*'],
+  },
+}
+```
+
+グローバルキー `'/*'` を使用して、すべてのルートを対象にすることもできます。
+
+```js filename="next.config.js"
+module.exports = {
+  outputFileTracingIncludes: {
+    '/*': ['src/i18n/locales/**/*.json'],
+  },
+}
+```
+
+これらのオプションはサーバートレースに適用され、サーバートレースファイルを生成しないルートには影響しません:
+
+- Edge Runtime のルートには影響しません。
+- 完全に静的なページには影響しません。
+
+モノレポの場合や、`app` フォルダの外側にあるファイルを含める必要がある場合は、`outputFileTracingRoot` と includes を組み合わせて使用します:
+
+```js filename="next.config.js"
+const path = require('path')
+
+module.exports = {
+  // モノレポのルートからトレースする
+  outputFileTracingRoot: path.join(__dirname, '../../'),
+  outputFileTracingIncludes: {
+    '/route1': ['../shared/assets/**/*'],
+  },
+}
+```
+
+> **補足**:
+>
+> - クロスプラットフォーム互換性のため、パターンには `/`（スラッシュ）を優先して使用してください。
+> - トレースが大きくなりすぎないように、パターンはできるだけ狭く絞ってください（リポジトリルートでの `**/*` の使用は避けてください）。
+
+ネイティブ／ランタイムアセット向けによく使われる include パターンの例:
+
+```js filename="next.config.js"
+module.exports = {
+  outputFileTracingIncludes: {
+    '/*': ['node_modules/sharp/**/*', 'node_modules/aws-crt/dist/bin/**/*'],
+  },
+}
+```

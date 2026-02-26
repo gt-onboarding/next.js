@@ -1,0 +1,529 @@
+---
+title: opengraph-image と twitter-image
+description: Open Graph 画像と Twitter 画像のファイル規約に関する API リファレンス。
+---
+
+`opengraph-image` と `twitter-image` のファイル規約を使うと、ルートセグメントごとに Open Graph 画像と Twitter 画像を設定できます。
+
+これらは、ユーザーがサイトへのリンクをソーシャルネットワークやメッセージングアプリで共有したときに表示される画像を設定するのに役立ちます。
+
+Open Graph 画像と Twitter 画像を設定する方法は 2 通りあります：
+
+- [画像ファイルを使用する (.jpg, .png, .gif)](#image-files-jpg-png-gif)
+- [コードを使用して画像を生成する (.js, .ts, .tsx)](#generate-images-using-code-js-ts-tsx)
+
+## 画像ファイル (.jpg, .png, .gif)
+
+セグメント内に `opengraph-image` または `twitter-image` の画像ファイルを配置して、そのルートセグメントで共有される画像を設定します。
+
+Next.js はファイルを処理し、アプリの `<head>` 要素に適切なタグを自動的に追加します。
+
+| ファイル命名規則                                | サポートされるファイル形式      |
+| ----------------------------------------------- | ------------------------------- |
+| [`opengraph-image`](#opengraph-image)           | `.jpg`, `.jpeg`, `.png`, `.gif` |
+| [`twitter-image`](#twitter-image)               | `.jpg`, `.jpeg`, `.png`, `.gif` |
+| [`opengraph-image.alt`](#opengraph-imagealttxt) | `.txt`                          |
+| [`twitter-image.alt`](#twitter-imagealttxt)     | `.txt`                          |
+
+> **補足**:
+>
+> `twitter-image` のファイルサイズは [5MB](https://developer.x.com/en/docs/x-for-websites/cards/overview/summary) を超えてはいけません。また、`opengraph-image` のファイルサイズは [8MB](https://developers.facebook.com/docs/sharing/webmasters/images) を超えてはいけません。画像ファイルのサイズがこれらの制限を超えると、ビルドが失敗します。
+
+### `opengraph-image`
+
+任意のルートセグメントに `opengraph-image.(jpg|jpeg|png|gif)` という画像ファイルを追加します。
+
+```html filename="<head> output"
+<meta property="og:image" content="<generated>" />
+<meta property="og:image:type" content="<generated>" />
+<meta property="og:image:width" content="<generated>" />
+<meta property="og:image:height" content="<generated>" />
+```
+
+### `twitter-image`
+
+任意のルートセグメントに `twitter-image.(jpg|jpeg|png|gif)` 画像ファイルを追加します。
+
+```html filename="<head> output"
+<meta name="twitter:image" content="<generated>" />
+<meta name="twitter:image:type" content="<generated>" />
+<meta name="twitter:image:width" content="<generated>" />
+<meta name="twitter:image:height" content="<generated>" />
+```
+
+### `opengraph-image.alt.txt`
+
+対応する `opengraph-image.(jpg|jpeg|png|gif)` 画像の代替テキストを記述した `opengraph-image.alt.txt` ファイルを、同じルートセグメント内に追加します。
+
+```txt filename="opengraph-image.alt.txt"
+About Acme
+```
+
+```html filename="<head> output"
+<meta property="og:image:alt" content="About Acme" />
+```
+
+### `twitter-image.alt.txt`
+
+`twitter-image.(jpg|jpeg|png|gif)` 画像の alt テキストとなる `twitter-image.alt.txt` ファイルを、その画像と同じルートセグメントに追加します。
+
+```txt filename="twitter-image.alt.txt"
+About Acme
+```
+
+```html filename="<head> output"
+<meta property="twitter:image:alt" content="About Acme" />
+```
+
+## コードを使用して画像を生成する (.js, .ts, .tsx)
+
+[画像ファイル](#image-files-jpg-png-gif) を使用するだけでなく、コードを使ってプログラムで画像を**生成**することもできます。
+
+`opengraph-image` または `twitter-image` ルートを作成し、そのルートで関数を default export することで、ルートセグメントの共有用画像を生成できます。
+
+| ファイル命名規則  | サポートされるファイルタイプ |
+| ----------------- | ---------------------------- |
+| `opengraph-image` | `.js`, `.ts`, `.tsx`         |
+| `twitter-image`   | `.js`, `.ts`, `.tsx`         |
+
+> **補足**:
+>
+> - 生成された画像は、デフォルトでは [**静的最適化**](/docs/app/guides/caching#static-rendering)（ビルド時に生成されキャッシュされる）されますが、[Dynamic APIs](/docs/app/guides/caching#dynamic-rendering) や非キャッシュデータを使用している場合は除きます。
+> - [`generateImageMetadata`](/docs/app/api-reference/functions/generate-image-metadata) を使用すると、同じファイル内で複数の画像を生成できます。
+> - `opengraph-image.js` と `twitter-image.js` は特別な Route Handler であり、[Dynamic API](/docs/app/guides/caching#dynamic-apis) や [dynamic config](/docs/app/guides/caching#segment-config-options) オプションを使用しない限り、デフォルトでキャッシュされます。
+
+画像を生成する最も簡単な方法は、`next/og` の [ImageResponse](/docs/app/api-reference/functions/image-response) API を使用することです。
+
+```tsx filename="app/about/opengraph-image.tsx" switcher
+import { ImageResponse } from 'next/og'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+// 画像メタデータ
+export const alt = 'About Acme'
+export const size = {
+  width: 1200,
+  height: 630,
+}
+
+export const contentType = 'image/png'
+
+// 画像生成
+export default async function Image() {
+  // フォント読み込み、process.cwd() はNext.jsプロジェクトのディレクトリ
+  const interSemiBold = await readFile(
+    join(process.cwd(), 'assets/Inter-SemiBold.ttf')
+  )
+
+  return new ImageResponse(
+    (
+      // ImageResponse JSX要素
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        About Acme
+      </div>
+    ),
+    // ImageResponseオプション
+    {
+      // エクスポートしたopengraph-imageのサイズ設定を
+      // ImageResponseの幅と高さにも流用できます。
+      ...size,
+      fonts: [
+        {
+          name: 'Inter',
+          data: interSemiBold,
+          style: 'normal',
+          weight: 400,
+        },
+      ],
+    }
+  )
+}
+```
+
+```jsx filename="app/about/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+// 画像メタデータ
+export const alt = 'About Acme'
+export const size = {
+  width: 1200,
+  height: 630,
+}
+
+export const contentType = 'image/png'
+
+// 画像生成
+export default async function Image() {
+  // フォント読み込み、process.cwd() はNext.jsプロジェクトのルートディレクトリ
+  const interSemiBold = await readFile(
+    join(process.cwd(), 'assets/Inter-SemiBold.ttf')
+  )
+
+  return new ImageResponse(
+    (
+      // ImageResponse JSX要素
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        About Acme
+      </div>
+    ),
+    // ImageResponseオプション
+    {
+      // エクスポートしたopengraph-imageのsize設定を
+      // ImageResponseの幅と高さにも流用できます。
+      ...size,
+      fonts: [
+        {
+          name: 'Inter',
+          data: interSemiBold,
+          style: 'normal',
+          weight: 400,
+        },
+      ],
+    }
+  )
+}
+```
+
+```html filename="<head> output"
+<meta property="og:image" content="<generated>" />
+<meta property="og:image:alt" content="About Acme" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+```
+
+### Props
+
+デフォルトエクスポートされた関数は、次の props を受け取ります。
+
+#### `params` (optional)
+
+ルートセグメントから、`opengraph-image` または `twitter-image` セグメントが配置されているセグメントまでの[動的ルートパラメーター](/docs/app/api-reference/file-conventions/dynamic-routes)オブジェクトを含むオブジェクトへと解決される Promise。
+
+> **補足**: [`generateImageMetadata`](/docs/app/api-reference/functions/generate-image-metadata) を使用する場合、この関数は、`generateImageMetadata` が返すアイテムのいずれかの `id` 値へと解決される `id` プロップ（Promise）も受け取ります。
+
+```tsx filename="app/shop/[slug]/opengraph-image.tsx" switcher
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/shop/[slug]/opengraph-image.js" switcher
+export default async function Image({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+| ルート                                     | URL         | `params`                           |
+| ------------------------------------------ | ----------- | ---------------------------------- |
+| `app/shop/opengraph-image.js`              | `/shop`     | `undefined`                        |
+| `app/shop/[slug]/opengraph-image.js`       | `/shop/1`   | `Promise<{ slug: '1' }>`           |
+| `app/shop/[tag]/[item]/opengraph-image.js` | `/shop/1/2` | `Promise<{ tag: '1', item: '2' }>` |
+
+### 戻り値
+
+デフォルトエクスポート関数は `Blob` | `ArrayBuffer` | `TypedArray` | `DataView` | `ReadableStream` | `Response` のいずれかを返す必要があります。
+
+> **補足**: `ImageResponse` はこの戻り値の型を満たします。
+
+### Config exports
+
+`opengraph-image` または `twitter-image` ルートから `alt`、`size`、`contentType` 変数をエクスポートすることで、画像メタデータをオプションとして設定できます。
+
+| オプション                    | 型                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`alt`](#alt)                 | `string`                                                                                                         |
+| [`size`](#size)               | `{ width: number; height: number }`                                                                              |
+| [`contentType`](#contenttype) | `string` - [画像 MIME タイプ](https://developer.mozilla.org/docs/Web/HTTP/Basics_of_HTTP/MIME_types#image_types) |
+
+#### `alt`
+
+```tsx filename="opengraph-image.tsx | twitter-image.tsx" switcher
+export const alt = 'My images alt text'
+
+export default function Image() {}
+```
+
+```jsx filename="opengraph-image.js | twitter-image.js" switcher
+export const alt = 'My images alt text'
+
+export default function Image() {}
+```
+
+```html filename="<head> output"
+<meta property="og:image:alt" content="My images alt text" />
+```
+
+#### `size`
+
+```tsx filename="opengraph-image.tsx | twitter-image.tsx" switcher
+export const size = { width: 1200, height: 630 }
+
+export default function Image() {}
+```
+
+```jsx filename="opengraph-image.js | twitter-image.js" switcher
+export const size = { width: 1200, height: 630 }
+
+export default function Image() {}
+```
+
+```html filename="<head> output"
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+```
+
+#### `contentType`
+
+```tsx filename="opengraph-image.tsx | twitter-image.tsx" switcher
+export const contentType = 'image/png'
+
+export default function Image() {}
+```
+
+```jsx filename="opengraph-image.js | twitter-image.js" switcher
+export const contentType = 'image/png'
+
+export default function Image() {}
+```
+
+```html filename="<head> output"
+<meta property="og:image:type" content="image/png" />
+```
+
+#### ルートセグメント設定
+
+`opengraph-image` と `twitter-image` は、Pages や Layouts と同じ [ルートセグメント設定](/docs/app/api-reference/file-conventions/route-segment-config) オプションを使用できる、専用の [Route Handlers](/docs/app/api-reference/file-conventions/route) です。
+
+### 使用例
+
+#### 外部データを使用する
+
+この例では、`params` オブジェクトと外部データを使用して画像を生成します。
+
+> **補足**:
+> デフォルトでは、この生成された画像は[静的に最適化](/docs/app/guides/caching#static-rendering)されます。この挙動を変更するには、個々の `fetch` の [`options`](/docs/app/api-reference/functions/fetch) や、ルートセグメントの [オプション](/docs/app/api-reference/file-conventions/route-segment-config#revalidate) を設定できます。
+
+```tsx filename="app/posts/[slug]/opengraph-image.tsx" switcher
+import { ImageResponse } from 'next/og'
+
+export const alt = 'About Acme'
+export const size = {
+  width: 1200,
+  height: 630,
+}
+export const contentType = 'image/png'
+
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = await fetch(`https://.../posts/${slug}`).then((res) =>
+    res.json()
+  )
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          fontSize: 48,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    ),
+    {
+      ...size,
+    }
+  )
+}
+```
+
+```jsx filename="app/posts/[slug]/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+
+export const alt = 'About Acme'
+export const size = {
+  width: 1200,
+  height: 630,
+}
+export const contentType = 'image/png'
+
+export default async function Image({ params }) {
+  const { slug } = await params
+  const post = await fetch(`https://.../posts/${slug}`).then((res) =>
+    res.json()
+  )
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          fontSize: 48,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    ),
+    {
+      ...size,
+    }
+  )
+}
+```
+
+#### Node.js ランタイムとローカルアセットの使用
+
+これらの例では、Node.js ランタイムを使用してファイルシステムからローカル画像を取得し、`<img>` の `src` 属性に Base64 文字列または `ArrayBuffer` として渡します。ローカルアセットは、サンプルのソースファイルではなく、プロジェクトルートを基準とした場所に配置してください。
+
+```tsx filename="app/opengraph-image.tsx" switcher
+import { ImageResponse } from 'next/og'
+import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+export default async function Image() {
+  const logoData = await readFile(join(process.cwd(), 'logo.png'), 'base64')
+  const logoSrc = `data:image/png;base64,${logoData}`
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img src={logoSrc} height="100" />
+      </div>
+    )
+  )
+}
+```
+
+```jsx filename="app/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+export default async function Image() {
+  const logoData = await readFile(join(process.cwd(), 'logo.png'), 'base64')
+  const logoSrc = `data:image/png;base64,${logoData}`
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img src={logoSrc} height="100" />
+      </div>
+    )
+  )
+}
+```
+
+`<img>` 要素の `src` 属性に `ArrayBuffer` を渡すことは、HTML 仕様には含まれていません。`next/og` が使用するレンダリングエンジンはこれをサポートしていますが、TypeScript の型定義は仕様に準拠しているため、この[機能](https://github.com/vercel/satori/issues/606#issuecomment-2144000453)を使用するには `@ts-expect-error` ディレクティブなどが必要です。
+
+```tsx filename="app/opengraph-image.tsx" switcher
+import { ImageResponse } from 'next/og'
+import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+export default async function Image() {
+  const logoData = await readFile(join(process.cwd(), 'logo.png'))
+  const logoSrc = Uint8Array.from(logoData).buffer
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* @ts-expect-error Satori は実行時に <img src> へ ArrayBuffer/型付き配列を受け付ける */}
+        <img src={logoSrc} height="100" />
+      </div>
+    )
+  )
+}
+```
+
+```jsx filename="app/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+export default async function Image() {
+  const logoData = await readFile(join(process.cwd(), 'logo.png'))
+  const logoSrc = Uint8Array.from(logoData).buffer
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img src={logoSrc} height="100" />
+      </div>
+    )
+  )
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更点                                                                     |
+| ---------- | -------------------------------------------------------------------------- |
+| `v16.0.0`  | `params` がオブジェクトに解決される Promise として返されるようになりました |
+| `v13.3.0`  | `opengraph-image` と `twitter-image` が導入されました                      |

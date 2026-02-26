@@ -1,0 +1,202 @@
+---
+title: ルートハンドラー
+nav_title: ルートハンドラー
+description: ルートハンドラーの使い方を学ぶ
+related:
+  title: API リファレンス
+  description: ルートハンドラーについて詳しく学ぶ
+  links:
+    - app/api-reference/file-conventions/route
+    - app/guides/backend-for-frontend
+---
+
+## Route Handlers
+
+Route Handlers を使用すると、特定のルートに対して、Web の [Request](https://developer.mozilla.org/docs/Web/API/Request) および [Response](https://developer.mozilla.org/docs/Web/API/Response) API を用いたカスタムリクエストハンドラーを作成できます。
+
+<Image
+  alt="Route.js の特別なファイル"
+  srcLight="/docs/light/route-special-file.png"
+  srcDark="/docs/dark/route-special-file.png"
+  width="1600"
+  height="444"
+/>
+
+> **補足**: Route Handlers は `app` ディレクトリ内でのみ利用可能です。`pages` ディレクトリ内の [API Routes](/docs/pages/building-your-application/routing/api-routes) と同等の機能であり、API Routes と Route Handlers を併用する**必要はありません**。
+
+### 規約
+
+Route Handlers は、`app` ディレクトリ内の [`route.js|ts` ファイル](/docs/app/api-reference/file-conventions/route) に定義されます。
+
+```ts filename="app/api/route.ts" switcher
+export async function GET(request: Request) {}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET(request) {}
+```
+
+Route Handlers は、`page.js` や `layout.js` と同様に、`app` ディレクトリ内の任意の階層にネストできます。ただし、同じルートセグメント内に `page.js` が存在する場合、そのセグメントに `route.js` ファイルを置くことはできません。
+
+### サポートされている HTTP メソッド
+
+次の [HTTP メソッド](https://developer.mozilla.org/docs/Web/HTTP/Methods) がサポートされています：`GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD`、`OPTIONS`。サポートされていないメソッドがリクエストされた場合、Next.js は `405 Method Not Allowed` レスポンスを返します。
+
+### 拡張された `NextRequest` と `NextResponse` API
+
+ネイティブの [Request](https://developer.mozilla.org/docs/Web/API/Request) と [Response](https://developer.mozilla.org/docs/Web/API/Response) API をサポートするだけでなく、Next.js はそれらを拡張した [`NextRequest`](/docs/app/api-reference/functions/next-request) と [`NextResponse`](/docs/app/api-reference/functions/next-response) を提供し、高度なユースケースに対応するための便利なヘルパー機能を備えています。
+
+### キャッシュ
+
+Route Handler はデフォルトではキャッシュされません。ただし、`GET` メソッドに対してはキャッシュを明示的に有効化できます。その他のサポートされている HTTP メソッドはキャッシュ**されません**。`GET` メソッドをキャッシュするには、Route Handler ファイル内で `export const dynamic = 'force-static'` のような [ルート設定オプション](/docs/app/api-reference/file-conventions/route-segment-config#dynamic) を使用します。
+
+```ts filename="app/items/route.ts" switcher
+export const dynamic = 'force-static'
+
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+```js filename="app/items/route.js" switcher
+export const dynamic = 'force-static'
+
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+> **補足**: 他の対応している HTTP メソッドは、同じファイル内でキャッシュされる `GET` メソッドと並んで定義されていても、キャッシュ**されません**。
+
+#### Cache Components の使用時
+
+[Cache Components](/docs/app/getting-started/cache-components) が有効な場合、`GET` Route Handlers はアプリケーション内の通常の UI ルートと同じモデルに従います。デフォルトではリクエストごとに実行され、動的なデータや実行時のデータにアクセスしない場合はプリレンダーされます。また、`use cache` を使用して静的なレスポンスに動的データを含めることができます。
+
+**静的な例** - 動的または実行時データにアクセスしないため、ビルド時にプリレンダーされます:
+
+```tsx filename="app/api/project-info/route.ts"
+export async function GET() {
+  return Response.json({
+    projectName: 'Next.js',
+  })
+}
+```
+
+**動的な例** - 非決定的な処理を行います。ビルド中に `Math.random()` が呼び出されると、その時点でプリレンダリングが停止し、以降はリクエスト時のレンダリングに切り替わります。
+
+```tsx filename="app/api/random-number/route.ts"
+export async function GET() {
+  return Response.json({
+    randomNumber: Math.random(),
+  })
+}
+```
+
+**ランタイム データの例** - リクエスト固有のデータにアクセスします。`headers()` のようなランタイム API が呼び出されると、その時点でプリレンダリングは終了します：
+
+```tsx filename="app/api/user-agent/route.ts"
+import { headers } from 'next/headers'
+
+export async function GET() {
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent')
+
+  return Response.json({ userAgent })
+}
+```
+
+> **豆知識**: `GET` ハンドラーがネットワークリクエストやデータベースクエリ、非同期ファイルシステム操作、リクエストオブジェクトのプロパティ（`req.url`、`request.headers`、`request.cookies`、`request.body` など）、[`cookies()`](/docs/app/api-reference/functions/cookies)、[`headers()`](/docs/app/api-reference/functions/headers)、[`connection()`](/docs/app/api-reference/functions/connection) といったランタイム API、または非決定的な処理にアクセスした場合、プリレンダリングは停止します。
+
+**キャッシュされた例** - データベースクエリなどの動的データにアクセスしますが、`use cache` でキャッシュすることで、それをプリレンダリングされたレスポンスに含めることができます:
+
+```tsx filename="app/api/products/route.ts"
+import { cacheLife } from 'next/cache'
+
+export async function GET() {
+  const products = await getProducts()
+  return Response.json(products)
+}
+
+async function getProducts() {
+  'use cache'
+  cacheLife('hours')
+
+  return await db.query('SELECT * FROM products')
+}
+```
+
+> **補足**: `use cache` は Route Handler の関数本体内では直接使用できません。ヘルパー関数として切り出してください。キャッシュ済みのレスポンスは、新しいリクエストが到着した際に、`cacheLife` に従って再検証されます。
+
+### 特別な Route Handler
+
+[`sitemap.ts`](/docs/app/api-reference/file-conventions/metadata/sitemap)、[`opengraph-image.tsx`](/docs/app/api-reference/file-conventions/metadata/opengraph-image)、[`icon.tsx`](/docs/app/api-reference/file-conventions/metadata/app-icons) のような特別な Route Handler や、その他の [metadata ファイル](/docs/app/api-reference/file-conventions/metadata) は、Dynamic API や dynamic config オプションを使用しない限り、デフォルトでは静的なままです。
+
+### ルートの解決
+
+`route` は、最も低レベルなルーティングの基本単位と考えることができます。
+
+- `page` と違い、レイアウトやクライアントサイドナビゲーションには **参加しません**。
+- `page.js` と同じルートに `route.js` ファイルを置くことは **できません**。
+
+| Page                 | Route              | Result                   |
+| -------------------- | ------------------ | ------------------------ |
+| `app/page.js`        | `app/route.js`     | <Cross size={18} /> 競合 |
+| `app/page.js`        | `app/api/route.js` | <Check size={18} /> 有効 |
+| `app/[user]/page.js` | `app/api/route.js` | <Check size={18} /> 有効 |
+
+各 `route.js` または `page.js` ファイルは、そのルートに対するすべての HTTP メソッドを処理します。
+
+```ts filename="app/page.ts" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+
+// 競合
+// `app/route.ts`
+export async function POST(request: Request) {}
+```
+
+```js filename="app/page.js" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+
+// 競合
+// `app/route.js`
+export async function POST(request) {}
+```
+
+Route Handlers がどのように [フロントエンドアプリケーションを補完するか](/docs/app/guides/backend-for-frontend) について詳しく知るか、Route Handlers の [API リファレンス](/docs/app/api-reference/file-conventions/route) を参照してください。
+
+### Route Context Helper
+
+TypeScript では、グローバルに利用可能な [`RouteContext`](/docs/app/api-reference/file-conventions/route#route-context-helper) ヘルパーを使って、ルートハンドラーの `context` 引数に型を付けることができます。
+
+```ts filename="app/users/[id]/route.ts" switcher
+import type { NextRequest } from 'next/server'
+
+export async function GET(_req: NextRequest, ctx: RouteContext<'/users/[id]'>) {
+  const { id } = await ctx.params
+  return Response.json({ id })
+}
+```
+
+> **補足**
+>
+> - 型は `next dev`、`next build`、または `next typegen` のいずれかの実行時に生成されます。

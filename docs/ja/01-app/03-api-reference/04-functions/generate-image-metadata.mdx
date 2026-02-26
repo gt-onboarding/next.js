@@ -1,0 +1,274 @@
+---
+title: generateImageMetadata
+description: 1 つの Metadata API の専用ファイルで複数の画像を生成する方法を説明します。
+related:
+  title: 次のステップ
+  description: すべての Metadata API オプションを確認します。
+  links:
+    - app/api-reference/file-conventions/metadata
+---
+
+`generateImageMetadata` を使用すると、1 つの画像の異なるバージョンを生成したり、1 つのルートセグメントに対して複数の画像を返したりできます。これは、アイコンなどのメタデータ値をハードコーディングしたくない場合に便利です。
+
+## パラメーター
+
+`generateImageMetadata` 関数は次の引数を受け取ります:
+
+#### `params` (optional)
+
+ルート（root）セグメントから、`generateImageMetadata` が呼び出されるセグメントまでの[動的ルートパラメーター](/docs/app/api-reference/file-conventions/dynamic-routes)を含むオブジェクトです。
+
+```tsx filename="icon.tsx" switcher
+export function generateImageMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  // ...
+}
+```
+
+```jsx filename="icon.js" switcher
+export function generateImageMetadata({ params }) {
+  // ...
+}
+```
+
+| ルート                          | URL         | `params`                  |
+| ------------------------------- | ----------- | ------------------------- |
+| `app/shop/icon.js`              | `/shop`     | `undefined`               |
+| `app/shop/[slug]/icon.js`       | `/shop/1`   | `{ slug: '1' }`           |
+| `app/shop/[tag]/[item]/icon.js` | `/shop/1/2` | `{ tag: '1', item: '2' }` |
+
+## 戻り値
+
+`generateImageMetadata` 関数は、`alt` や `size` などの画像メタデータを含むオブジェクトの配列（`array`）を返す必要があります。さらに、各要素には、画像生成関数の props に Promise として渡される `id` 値が **必ず** 含まれていなければなりません。
+
+| 画像メタデータオブジェクト | 型                                  |
+| -------------------------- | ----------------------------------- |
+| `id`                       | `string` (必須)                     |
+| `alt`                      | `string`                            |
+| `size`                     | `{ width: number; height: number }` |
+| `contentType`              | `string`                            |
+
+```tsx filename="icon.tsx" switcher
+import { ImageResponse } from 'next/og'
+
+export function generateImageMetadata() {
+  return [
+    {
+      contentType: 'image/png',
+      size: { width: 48, height: 48 },
+      id: 'small',
+    },
+    {
+      contentType: 'image/png',
+      size: { width: 72, height: 72 },
+      id: 'medium',
+    },
+  ]
+}
+
+export default async function Icon({ id }: { id: Promise<string | number> }) {
+  const iconId = await id
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 88,
+          background: '#000',
+          color: '#fafafa',
+        }}
+      >
+        Icon {iconId}
+      </div>
+    )
+  )
+}
+```
+
+```jsx filename="icon.js" switcher
+import { ImageResponse } from 'next/og'
+
+export function generateImageMetadata() {
+  return [
+    {
+      contentType: 'image/png',
+      size: { width: 48, height: 48 },
+      id: 'small',
+    },
+    {
+      contentType: 'image/png',
+      size: { width: 72, height: 72 },
+      id: 'medium',
+    },
+  ]
+}
+
+export default async function Icon({ id }) {
+  const iconId = await id
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 88,
+          background: '#000',
+          color: '#fafafa',
+        }}
+      >
+        Icon {iconId}
+      </div>
+    )
+  )
+}
+```
+
+## 画像生成関数の props
+
+`generateImageMetadata` を使用する場合、デフォルトエクスポートされた画像生成関数は次の props を受け取ります。
+
+#### `id`
+
+`generateImageMetadata` によって返されるアイテムのいずれかの `id` 値に解決される Promise です。`id` は、`generateImageMetadata` から返された内容に応じて `string` または `number` になります。
+
+```tsx filename="icon.tsx" switcher
+export default async function Icon({ id }: { id: Promise<string | number> }) {
+  const iconId = await id
+  // iconId を使用して画像を生成する
+}
+```
+
+```jsx filename="icon.js" switcher
+export default async function Icon({ id }) {
+  const iconId = await id
+  // iconIdを使用して画像を生成する
+}
+```
+
+#### `params` (任意)
+
+ルートセグメントから、画像が配置されているセグメントまでの [ダイナミックルートパラメータ](/docs/app/api-reference/file-conventions/dynamic-routes) を含むオブジェクトに解決される Promise です。
+
+```tsx filename="icon.tsx" switcher
+export default async function Icon({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // slugを使用して画像を生成する
+}
+```
+
+```jsx filename="icon.js" switcher
+export default async function Icon({ params }) {
+  const { slug } = await params
+  // slugを使用して画像を生成する
+}
+```
+
+### 使用例
+
+#### 外部データの使用
+
+この例では、`params` オブジェクトと外部データを使用して、あるルートセグメント用に複数の [Open Graph 画像](/docs/app/api-reference/file-conventions/metadata/opengraph-image) を生成します。
+
+```tsx filename="app/products/[id]/opengraph-image.tsx" switcher
+import { ImageResponse } from 'next/og'
+import { getCaptionForImage, getOGImages } from '@/app/utils/images'
+
+export async function generateImageMetadata({
+  params,
+}: {
+  params: { id: string }
+}) {
+  const images = await getOGImages(params.id)
+
+  return images.map((image, idx) => ({
+    id: idx,
+    size: { width: 1200, height: 600 },
+    alt: image.text,
+    contentType: 'image/png',
+  }))
+}
+
+export default async function Image({
+  params,
+  id,
+}: {
+  params: Promise<{ id: string }>
+  id: Promise<number>
+}) {
+  const productId = (await params).id
+  const imageId = await id
+  const text = await getCaptionForImage(productId, imageId)
+
+  return new ImageResponse(
+    (
+      <div
+        style={
+          {
+            // ...
+          }
+        }
+      >
+        {text}
+      </div>
+    )
+  )
+}
+```
+
+```jsx filename="app/products/[id]/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+import { getCaptionForImage, getOGImages } from '@/app/utils/images'
+
+export async function generateImageMetadata({ params }) {
+  const images = await getOGImages(params.id)
+
+  return images.map((image, idx) => ({
+    id: idx,
+    size: { width: 1200, height: 600 },
+    alt: image.text,
+    contentType: 'image/png',
+  }))
+}
+
+export default async function Image({ params, id }) {
+  const productId = (await params).id
+  const imageId = await id
+  const text = await getCaptionForImage(productId, imageId)
+
+  return new ImageResponse(
+    (
+      <div
+        style={
+          {
+            // ...
+          }
+        }
+      >
+        {text}
+      </div>
+    )
+  )
+}
+```
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| `v16.0.0`  | Image 生成関数に渡される `id` が、`string` または `number` に解決される Promise に変更されました。 |
+| `v16.0.0`  | Image 生成関数に渡される `params` が、オブジェクトに解決される Promise に変更されました。          |
+| `v13.3.0`  | `generateImageMetadata` が導入されました。                                                         |

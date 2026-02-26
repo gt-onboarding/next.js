@@ -1,0 +1,70 @@
+---
+title: クライアントサイドでのデータフェッチ
+description: クライアントサイドでのデータフェッチについて、そしてキャッシュ、再検証、フォーカスの追跡、一定間隔での再フェッチなどを処理するデータフェッチ用の React Hook ライブラリである SWR の使い方を学びます。
+---
+
+クライアントサイドでのデータフェッチは、ページが SEO 用のインデックス登録を必要としない場合、データを事前レンダリングする必要がない場合、またはページのコンテンツを頻繁に更新する必要がある場合に有効です。サーバーサイドレンダリング API とは異なり、クライアントサイドでのデータフェッチはコンポーネントレベルで使用できます。
+
+ページレベルで行う場合、データは実行時にフェッチされ、データの変化に応じてページのコンテンツが更新されます。コンポーネントレベルで使用する場合、データはコンポーネントのマウント時にフェッチされ、データの変化に応じてコンポーネントのコンテンツが更新されます。
+
+クライアントサイドでのデータフェッチを使用すると、アプリケーションのパフォーマンスやページの読み込み速度に影響する可能性があることに注意が必要です。これは、データフェッチがコンポーネントやページのマウント時に行われ、データがキャッシュされないためです。
+
+## useEffect を使ったクライアント側でのデータフェッチ
+
+次の例は、`useEffect` フックを使ってクライアント側でデータをフェッチする方法を示します。
+
+```jsx
+import { useState, useEffect } from 'react'
+
+function Profile() {
+  const [data, setData] = useState(null)
+  const [isLoading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/profile-data')
+      .then((res) => res.json())
+      .then((data) => {
+        setData(data)
+        setLoading(false)
+      })
+  }, [])
+
+  if (isLoading) return <p>Loading...</p>
+  if (!data) return <p>No profile data</p>
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <p>{data.bio}</p>
+    </div>
+  )
+}
+```
+
+## SWR を使ったクライアントサイドでのデータフェッチ
+
+Next.js の開発チームは、データフェッチのための React Hook ライブラリ [**SWR**](https://swr.vercel.app/) を開発しました。クライアントサイドでデータを取得する場合には、これを**強く推奨**します。キャッシュ、再検証、フォーカスの追跡、一定間隔での再フェッチなどを処理してくれます。
+
+上の例と同じものを使って、今度は SWR を使ってプロフィールデータを取得してみましょう。SWR はデータを自動的にキャッシュし、古くなったときに自動的に再検証します。
+
+SWR の使い方の詳細については、[SWR ドキュメント](https://swr.vercel.app/docs/getting-started) を参照してください。
+
+```jsx
+import useSWR from 'swr'
+
+const fetcher = (...args) => fetch(...args).then((res) => res.json())
+
+function Profile() {
+  const { data, error } = useSWR('/api/profile-data', fetcher)
+
+  if (error) return <div>Failed to load</div>
+  if (!data) return <div>Loading...</div>
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <p>{data.bio}</p>
+    </div>
+  )
+}
+```

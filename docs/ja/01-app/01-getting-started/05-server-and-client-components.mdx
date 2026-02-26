@@ -1,0 +1,778 @@
+---
+title: サーバーコンポーネントとクライアントコンポーネント
+description: React のサーバーコンポーネントとクライアントコンポーネントを使って、アプリケーションの一部をサーバー側またはクライアント側でレンダーする方法を学びます。
+related:
+  title: 次のステップ
+  description: このページで取り上げている API についてさらに学びましょう。
+  links:
+    - app/api-reference/directives/use-client
+---
+
+デフォルトでは、レイアウトとページは [サーバーコンポーネント](https://react.dev/reference/rsc/server-components)であり、サーバー上でデータをフェッチして UI の一部をレンダーし、その結果を任意でキャッシュしてクライアントへストリーミングできます。インタラクティビティやブラウザ API が必要な場合は、[クライアントコンポーネント](https://react.dev/reference/rsc/use-client)を使用して機能を段階的に追加できます。
+
+このページでは、Next.js におけるサーバーコンポーネントとクライアントコンポーネントの動作と、その使い分けについて説明し、アプリケーション内でそれらをどのように組み合わせて使うかの例を示します。
+
+## サーバーコンポーネントとクライアントコンポーネントをいつ使うべきか？
+
+クライアント環境とサーバー環境では、できることが異なります。サーバーコンポーネントとクライアントコンポーネントを使うことで、ユースケースに応じて、それぞれの環境でロジックを実行できます。
+
+**クライアントコンポーネント** を使うのは、次のような場合です:
+
+- [State](https://react.dev/learn/managing-state) や [event handlers](https://react.dev/learn/responding-to-events) が必要な場合。例: `onClick`, `onChange`。
+- [Lifecycle logic](https://react.dev/learn/lifecycle-of-reactive-effects) が必要な場合。例: `useEffect`。
+- ブラウザ専用の API が必要な場合。例: `localStorage`, `window`, `Navigator.geolocation` など。
+- [Custom hooks](https://react.dev/learn/reusing-logic-with-custom-hooks) を使う場合。
+
+**サーバーコンポーネント** を使うのは、次のような場合です:
+
+- データベースや API から、元のデータソースに近い場所でデータをフェッチしたい場合。
+- API キーやトークン、その他のシークレットを、クライアントに公開せずに扱いたい場合。
+- ブラウザに送信する JavaScript の量を減らしたい場合。
+- [First Contentful Paint (FCP)](https://web.dev/fcp/) を改善し、コンテンツをクライアントへ段階的にストリーミングしたい場合。
+
+例えば、`<Page>` コンポーネントは投稿に関するデータをフェッチするサーバーコンポーネントで、そのデータを props として、クライアント側のインタラクションを処理する `<LikeButton>` に渡します。
+
+```tsx filename="app/[id]/page.tsx" highlight={1,17} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const post = await getPost(id)
+
+  return (
+    <div>
+      <main>
+        <h1>{post.title}</h1>
+        {/* ... */}
+        <LikeButton likes={post.likes} />
+      </main>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/[id]/page.js" highlight={1,12} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({ params }) {
+  const post = await getPost(params.id)
+
+  return (
+    <div>
+      <main>
+        <h1>{post.title}</h1>
+        {/* ... */}
+        <LikeButton likes={post.likes} />
+      </main>
+    </div>
+  )
+}
+```
+
+```tsx filename="app/ui/like-button.tsx" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function LikeButton({ likes }: { likes: number }) {
+  // ...
+}
+```
+
+```jsx filename="app/ui/like-button.js" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function LikeButton({ likes }) {
+  // ...
+}
+```
+
+## Next.js におけるサーバーコンポーネントとクライアントコンポーネントの仕組み
+
+### サーバー上での動作
+
+サーバー上では、Next.js は React の API を使ってレンダリングを制御します。レンダリング処理は、各ルートセグメント（[layouts and pages](/docs/app/getting-started/layouts-and-pages)）ごとにチャンクに分割されます。
+
+- **サーバーコンポーネント** は、React Server Component Payload（RSC Payload）と呼ばれる特別なデータ形式にレンダリングされます。
+- **クライアントコンポーネント** と RSC Payload は、HTML を[事前レンダリング](/docs/app/guides/caching#rendering-strategies)するために使用されます。
+
+> **React Server Component Payload（RSC）とは？**
+>
+> RSC Payload は、レンダリング済みの React サーバーコンポーネントツリーをコンパクトなバイナリで表現したものです。クライアント側では React によって、ブラウザの DOM を更新するために使用されます。RSC Payload には次の情報が含まれます：
+>
+> - サーバーコンポーネントのレンダリング結果
+> - クライアントコンポーネントがレンダリングされる位置のプレースホルダーと、その JavaScript ファイルへの参照
+> - サーバーコンポーネントからクライアントコンポーネントに渡されるすべての props
+
+### クライアント側（初回ロード時）
+
+その後、クライアント側では次のように処理されます。
+
+1. **HTML** によって、ルートの高速な非インタラクティブなプレビューがユーザーに即座に表示されます。
+2. **RSC Payload** によって、クライアントコンポーネントとサーバーコンポーネントのコンポーネントツリーの整合性を取ります。
+3. **JavaScript** を使用してクライアントコンポーネントをハイドレーションし、アプリケーションをインタラクティブにします。
+
+> **ハイドレーションとは？**
+>
+> ハイドレーションは、静的な HTML をインタラクティブにするために、React が [イベントハンドラー](https://react.dev/learn/responding-to-events) を DOM にアタッチする処理です。
+
+### 2 回目以降のナビゲーション
+
+2 回目以降のナビゲーションでは、
+
+- **RSC Payload** は事前取得されキャッシュされるため、即座に画面遷移できます。
+- **クライアントコンポーネント** は、サーバーでレンダリングされた HTML を介さず、完全にクライアント側でレンダリングされます。
+
+## 例
+
+### クライアントコンポーネントの使用
+
+ファイルの先頭、import 文よりも前に [`"use client"`](https://react.dev/reference/react/use-client) ディレクティブを追加することで、クライアントコンポーネントを作成できます。
+
+```tsx filename="app/ui/counter.tsx" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>{count} likes</p>
+      <button onClick={() => setCount(count + 1)}>Click me</button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/ui/counter.js" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>{count} likes</p>
+      <button onClick={() => setCount(count + 1)}>Click me</button>
+    </div>
+  )
+}
+```
+
+`"use client"` は、Server と Client のモジュールグラフ（ツリー）の **境界** を宣言するために使われます。
+
+一度ファイルに `"use client"` が指定されると、**そのファイルからインポートされるモジュールと、その子コンポーネントはすべてクライアントバンドルの一部とみなされます**。これは、クライアント用のコンポーネントすべてにこのディレクティブを追加する必要はないことを意味します。
+
+### JS バンドルサイズの削減
+
+クライアント JavaScript のバンドルサイズを削減するには、UI の大部分をクライアントコンポーネントとしてマークするのではなく、特定のインタラクティブなコンポーネントにだけ `'use client'` を指定します。
+
+たとえば `<Layout>` コンポーネントには、ロゴやナビゲーションリンクといった静的な要素がほとんどですが、その中にインタラクティブな検索バーが含まれています。`<Search />` はインタラクティブでありクライアントコンポーネントである必要がありますが、それ以外のレイアウト部分はサーバーコンポーネントのままにできます。
+
+```tsx filename="app/layout.tsx" highlight={12} switcher
+// クライアントコンポーネント
+import Search from './search'
+// サーバーコンポーネント
+import Logo from './logo'
+
+// Layout はデフォルトでサーバーコンポーネント
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <Search />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" highlight={12} switcher
+// クライアントコンポーネント
+import Search from './search'
+// サーバーコンポーネント
+import Logo from './logo'
+
+// Layout はデフォルトでサーバーコンポーネント
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <Search />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```tsx filename="app/ui/search.tsx" highlight={1} switcher
+'use client'
+
+export default function Search() {
+  // ...
+}
+```
+
+```jsx filename="app/ui/search.js" highlight={1} switcher
+'use client'
+
+export default function Search() {
+  // ...
+}
+```
+
+### サーバーコンポーネントからクライアントコンポーネントへのデータ受け渡し
+
+サーバーコンポーネントからクライアントコンポーネントへは、props を使ってデータを渡すことができます。
+
+```tsx filename="app/[id]/page.tsx" highlight={1,12} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const post = await getPost(id)
+
+  return <LikeButton likes={post.likes} />
+}
+```
+
+```jsx filename="app/[id]/page.js" highlight={1,7} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({ params }) {
+  const post = await getPost(params.id)
+
+  return <LikeButton likes={post.likes} />
+}
+```
+
+```tsx filename="app/ui/like-button.tsx" highlight={1} switcher
+'use client'
+
+export default function LikeButton({ likes }: { likes: number }) {
+  // ...
+}
+```
+
+```jsx filename="app/ui/like-button.js" highlight={1} switcher
+'use client'
+
+export default function LikeButton({ likes }) {
+  // ...
+}
+```
+
+また別の方法として、[`use` API](https://react.dev/reference/react/use) を使用してサーバーコンポーネントからクライアントコンポーネントへデータをストリーミングすることもできます。[例](/docs/app/getting-started/fetching-data#streaming-data-with-the-use-api)を参照してください。
+
+> **補足**: クライアントコンポーネントに渡される props は、React によって[シリアライズ可能](https://react.dev/reference/react/use-server#serializable-parameters-and-return-values)である必要があります。
+
+### サーバーコンポーネントとクライアントコンポーネントの混在
+
+サーバーコンポーネントをクライアントコンポーネントへの props として渡すことができます。これにより、クライアントコンポーネントの中にサーバーでレンダーされた UI を視覚的にネストできます。
+
+よくあるパターンとして、`children` を使用して `<ClientComponent>` 内に _スロット_ を作成します。たとえば、サーバー上でデータをフェッチする `<Cart>` コンポーネントを、クライアント側の state を使って表示・非表示を切り替える `<Modal>` コンポーネントの内側に配置するケースです。
+
+```tsx filename="app/ui/modal.tsx" switcher
+'use client'
+
+export default function Modal({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/ui/modal.js" switcher
+'use client'
+
+export default function Modal({ children }) {
+  return <div>{children}</div>
+}
+```
+
+次に、親のサーバーコンポーネント（例: `<Page>`）で、`<Modal>` の子として `<Cart>` を渡せます：
+
+```tsx filename="app/page.tsx"  highlight={7} switcher
+import Modal from './ui/modal'
+import Cart from './ui/cart'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Cart />
+    </Modal>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={7} switcher
+import Modal from './ui/modal'
+import Cart from './ui/cart'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Cart />
+    </Modal>
+  )
+}
+```
+
+このパターンでは、props として渡されるものも含め、すべてのサーバーコンポーネントがあらかじめサーバー上でレンダーされます。生成された RSC ペイロードには、コンポーネントツリー内のどこにクライアントコンポーネントをレンダーすべきかを示す参照情報が含まれます。
+
+### コンテキストプロバイダー
+
+[React コンテキスト](https://react.dev/learn/passing-data-deeply-with-context) は、現在のテーマなどのグローバルな状態を共有するためによく使われます。しかし、サーバーコンポーネントでは React コンテキストはサポートされていません。
+
+コンテキストを利用するには、`children` を受け取るクライアントコンポーネントを作成します:
+
+```tsx filename="app/theme-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+```jsx filename="app/theme-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+次にそれを Server Component（例: `layout`）にインポートします：
+
+```tsx filename="app/layout.tsx" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+これでサーバーコンポーネントからプロバイダを直接レンダリングできるようになり、アプリ全体の他のすべてのクライアントコンポーネントでこのコンテキストを利用できるようになります。
+
+> **補足**: プロバイダはツリーの中で可能な限り深い位置にレンダリングするべきです。`ThemeProvider` がドキュメント全体ではなく `{children}` だけをラップしていることに注目してください。こうすることで、Next.js がサーバーコンポーネントの静的な部分を最適化しやすくなります。
+
+### コンテキストと React.cache を使ったデータ共有
+
+[`React.cache`](https://react.dev/reference/react/cache) とコンテキストプロバイダーを組み合わせることで、取得したデータをサーバーコンポーネントとクライアントコンポーネントの両方で共有できます。
+
+データを取得するキャッシュされた関数を作成します：
+
+```ts filename="app/lib/user.ts" switcher
+import { cache } from 'react'
+
+export const getUser = cache(async () => {
+  const res = await fetch('https://api.example.com/user')
+  return res.json()
+})
+```
+
+```js filename="app/lib/user.js" switcher
+import { cache } from 'react'
+
+export const getUser = cache(async () => {
+  const res = await fetch('https://api.example.com/user')
+  return res.json()
+})
+```
+
+Promise を保持するコンテキストプロバイダを作成します。
+
+```tsx filename="app/user-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+type User = {
+  id: string
+  name: string
+}
+
+export const UserContext = createContext<Promise<User> | null>(null)
+
+export default function UserProvider({
+  children,
+  userPromise,
+}: {
+  children: React.ReactNode
+  userPromise: Promise<User>
+}) {
+  return <UserContext value={userPromise}>{children}</UserContext>
+}
+```
+
+```jsx filename="app/user-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const UserContext = createContext(null)
+
+export default function UserProvider({ children, userPromise }) {
+  return <UserContext value={userPromise}>{children}</UserContext>
+}
+```
+
+レイアウトでは、`await` せずに Promise をそのままプロバイダーに渡します:
+
+```tsx filename="app/layout.tsx" switcher
+import UserProvider from './user-provider'
+import { getUser } from './lib/user'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const userPromise = getUser() // awaitしない
+
+  return (
+    <html>
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import UserProvider from './user-provider'
+import { getUser } from './lib/user'
+
+export default function RootLayout({ children }) {
+  const userPromise = getUser() // awaitしない
+
+  return (
+    <html>
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+クライアントコンポーネントでは、コンテキストからの Promise を解決するために [`use()`](https://react.dev/reference/react/use) を使用し、フォールバック UI を提供するために `<Suspense>` でラップします。
+
+```tsx filename="app/ui/profile.tsx" switcher
+'use client'
+
+import { use, useContext } from 'react'
+import { UserContext } from '../user-provider'
+
+export function Profile() {
+  const userPromise = useContext(UserContext)
+  if (!userPromise) {
+    throw new Error('useContext は UserProvider 内で使用する必要があります')
+  }
+  const user = use(userPromise)
+  return <p>ようこそ、{user.name}</p>
+}
+```
+
+```jsx filename="app/ui/profile.js" switcher
+'use client'
+
+import { use, useContext } from 'react'
+import { UserContext } from '../user-provider'
+
+export function Profile() {
+  const userPromise = useContext(UserContext)
+  if (!userPromise) {
+    throw new Error('useContext は UserProvider 内で使用する必要があります')
+  }
+  const user = use(userPromise)
+  return <p>ようこそ、{user.name}</p>
+}
+```
+
+```tsx filename="app/page.tsx" switcher
+import { Suspense } from 'react'
+import { Profile } from './ui/profile'
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>プロフィールを読み込み中...</div>}>
+      <Profile />
+    </Suspense>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Suspense } from 'react'
+import { Profile } from './ui/profile'
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>プロフィールを読み込み中...</div>}>
+      <Profile />
+    </Suspense>
+  )
+}
+```
+
+また、サーバーコンポーネントからは `getUser()` を直接呼び出せます。
+
+```tsx filename="app/dashboard/page.tsx" switcher
+import { getUser } from '../lib/user'
+
+export default async function DashboardPage() {
+  const user = await getUser() // キャッシュ済み - 同一リクエスト、重複フェッチなし
+  return <h1>Dashboard for {user.name}</h1>
+}
+```
+
+```jsx filename="app/dashboard/page.js" switcher
+import { getUser } from '../lib/user'
+
+export default async function DashboardPage() {
+  const user = await getUser() // キャッシュ済み - 同一リクエスト内、重複フェッチなし
+  return <h1>Dashboard for {user.name}</h1>
+}
+```
+
+`getUser` は `React.cache` でラップされているため、同一リクエスト内での複数回の呼び出しは、サーバーコンポーネントから直接呼び出された場合でも、クライアントコンポーネント内でコンテキスト経由で解決された場合でも、同じメモ化済みの結果を返します。
+
+> **補足**: `React.cache` のスコープは現在のリクエストに限定されます。各リクエストはそれぞれ独立したメモ化スコープを持ち、リクエスト間で共有されることはありません。
+
+### サードパーティコンポーネント
+
+クライアント側でのみ利用可能な機能に依存するサードパーティコンポーネントを使用する場合は、そのコンポーネントをクライアントコンポーネントでラップすることで、期待どおりに動作させることができます。
+
+たとえば、`<Carousel />` は `acme-carousel` パッケージからインポートできます。このコンポーネントは `useState` を使用していますが、まだ `"use client"` ディレクティブがありません。
+
+`<Carousel />` をクライアントコンポーネント内で使用すれば、期待どおりに動作します。
+
+```tsx filename="app/gallery.tsx" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+      {/* クライアントコンポーネント内で使用されているため、Carouselは正常に動作します */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/gallery.js" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+      {/*  Client Component 内で使用されているため、動作します */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+しかし、これをそのまま Server Component 内で使用しようとすると、エラーが発生します。これは、Next.js には `<Carousel />` がクライアント専用の機能を使っていることがわからないためです。
+
+これを解決するには、クライアント専用の機能に依存するサードパーティ製コンポーネントを、自分のクライアントコンポーネントでラップします。
+
+```tsx filename="app/carousel.tsx" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+```jsx filename="app/carousel.js" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+これで、Server Component の中で `<Carousel />` を直接使用できます。
+
+```tsx filename="app/page.tsx" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+      {/*  CarouselはClient Componentであるため動作する */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+      {/*  CarouselはClient Componentなので動作する */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+> **ライブラリ作者へのアドバイス**
+>
+> コンポーネントライブラリを作成している場合、クライアント専用の機能に依存するエントリーポイントには `"use client"` ディレクティブを追加してください。これにより、ライブラリ利用者はラッパーを作成することなく、そのコンポーネントをサーバーコンポーネント内にインポートできるようになります。
+>
+> なお、一部のバンドラは `"use client"` ディレクティブを削除してしまう可能性がある点に注意してください。`"use client"` ディレクティブを含めるように `esbuild` を設定する例は、[React Wrap Balancer](https://github.com/shuding/react-wrap-balancer/blob/main/tsup.config.ts#L10-L13) と [Vercel Analytics](https://github.com/vercel/analytics/blob/main/packages/web/tsup.config.js#L26-L30) のリポジトリで確認できます。
+
+### 環境汚染の防止
+
+JavaScript モジュールは、サーバーコンポーネントとクライアントコンポーネントの両方から共有して利用できます。そのため、サーバー専用のコードを誤ってクライアント側でインポートしてしまう可能性があります。例えば、次の関数を考えてみましょう。
+
+```ts filename="lib/data.ts" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+```js filename="lib/data.js" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+この関数には、クライアントに決して公開してはならない `API_KEY` が含まれています。
+
+Next.js では、`NEXT_PUBLIC_` というプレフィックスが付いた環境変数のみがクライアント用バンドルに含まれます。プレフィックスが付いていない変数は、Next.js によって空文字列に置き換えられます。
+
+その結果、`getData()` をクライアント側でインポートして実行できたとしても、期待どおりには動作しません。
+
+クライアントコンポーネントで誤って使用されるのを防ぐには、[`server-only` パッケージ](https://www.npmjs.com/package/server-only)を使用できます。
+
+次に、サーバー専用コードを含むファイルでこのパッケージをインポートします。
+
+```js filename="lib/data.js"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+これで、そのモジュールをクライアントコンポーネントにインポートしようとすると、ビルド時にエラーになります。
+
+対応する [`client-only` パッケージ](https://www.npmjs.com/package/client-only)は、`window` オブジェクトにアクセスするコードなど、クライアント専用ロジックを含むモジュールをマークするために使用できます。
+
+Next.js では、`server-only` や `client-only` のインストールは **任意** です。ただし、Lint ルールで不要な依存関係が警告される場合は、問題を避けるためにそれらをインストールしておいてもかまいません。
+
+```bash package="npm"
+npm install server-only
+```
+
+```bash package="yarn"
+yarn add server-only
+```
+
+```bash package="pnpm"
+pnpm add server-only
+```
+
+```bash package="bun"
+bun add server-only
+```
+
+Next.js は、モジュールが誤った環境で使用された際に、より明確なエラーメッセージを提供するために、`server-only` と `client-only` のインポートを内部的に処理します。npm 上のこれらのパッケージに含まれる内容は、Next.js では使用されません。
+
+また、Next.js は、[`noUncheckedSideEffectImports`](https://www.typescriptlang.org/tsconfig/#noUncheckedSideEffectImports) が有効な TypeScript 設定向けに、`server-only` および `client-only` 用の独自の型定義も提供します。

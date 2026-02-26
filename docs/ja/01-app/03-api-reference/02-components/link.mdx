@@ -1,0 +1,1341 @@
+---
+title: Link コンポーネント
+description: 組み込みの `next/link` コンポーネントで高速なクライアントサイドナビゲーションを可能にします。
+---
+
+{/* このドキュメントのコンテンツは App Router と Pages Router の両方で共有されています。Pages Router 固有のコンテンツを追加するには、`<PagesOnly>Content</PagesOnly>` コンポーネントを使用できます。共有コンテンツはコンポーネントでラップしないでください。 */}
+
+`<Link>` は React コンポーネントで、HTML の `<a>` 要素を拡張し、[prefetching](/docs/app/getting-started/linking-and-navigating#prefetching) とルート間のクライアントサイドナビゲーションを提供します。Next.js でルート間を移動するための主要な手段です。
+
+基本的な使い方:
+
+<AppOnly>
+  ```tsx filename="app/page.tsx" switcher
+  import Link from 'next/link'
+
+export default function Page() {
+return <Link href="/dashboard">Dashboard</Link>
+}
+
+````
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return <Link href="/dashboard">Dashboard</Link>
+}
+````
+
+</AppOnly>
+
+<PagesOnly>
+  ```tsx filename="pages/index.tsx" switcher
+  import Link from 'next/link'
+
+export default function Home() {
+return <Link href="/dashboard">Dashboard</Link>
+}
+
+````
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return <Link href="/dashboard">Dashboard</Link>
+}
+````
+
+</PagesOnly>
+
+## リファレンス
+
+`<Link>` コンポーネントには次の props を指定できます:
+
+<PagesOnly>
+
+| プロパティ                  | 例                       | 型                | 必須 |
+| --------------------------- | ------------------------ | ----------------- | ---- |
+| [`href`](#href-required)    | `href="/dashboard"`      | String or Object  | Yes  |
+| [`as`](#as)                 | `as="/post/abc"`         | String or Object  | -    |
+| [`replace`](#replace)       | `replace={false}`        | Boolean           | -    |
+| [`scroll`](#scroll)         | `scroll={false}`         | Boolean           | -    |
+| [`prefetch`](#prefetch)     | `prefetch={false}`       | Boolean           | -    |
+| [`shallow`](#shallow)       | `shallow={false}`        | Boolean           | -    |
+| [`locale`](#locale)         | `locale="fr"`            | String or Boolean | -    |
+| [`onNavigate`](#onnavigate) | `onNavigate={(e) => {}}` | Function          | -    |
+
+</PagesOnly>
+
+<AppOnly>
+
+| プロパティ                  | 例                       | 型               | 必須 |
+| --------------------------- | ------------------------ | ---------------- | ---- |
+| [`href`](#href-required)    | `href="/dashboard"`      | String or Object | Yes  |
+| [`replace`](#replace)       | `replace={false}`        | Boolean          | -    |
+| [`scroll`](#scroll)         | `scroll={false}`         | Boolean          | -    |
+| [`prefetch`](#prefetch)     | `prefetch={false}`       | Boolean or null  | -    |
+| [`onNavigate`](#onnavigate) | `onNavigate={(e) => {}}` | Function         | -    |
+
+</AppOnly>
+
+> **補足**: `className` や `target="_blank"` などの `<a>` タグの属性は `<Link>` に props として指定でき、基盤となる `<a>` 要素に渡されます。
+
+### `href` (必須)
+
+移動先のパスまたは URL。
+
+<AppOnly>
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+// /about?name=test に移動
+export default function Page() {
+  return (
+    <Link
+      href={{
+        pathname: '/about',
+        query: { name: 'test' },
+      }}
+    >
+      About
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+// /about?name=test に移動
+export default function Page() {
+  return (
+    <Link
+      href={{
+        pathname: '/about',
+        query: { name: 'test' },
+      }}
+    >
+      About
+    </Link>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+// /about?name=test に移動
+export default function Home() {
+  return (
+    <Link
+      href={{
+        pathname: '/about',
+        query: { name: 'test' },
+      }}
+    >
+      About
+    </Link>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+// /about?name=test に移動
+export default function Home() {
+  return (
+    <Link
+      href={{
+        pathname: '/about',
+        query: { name: 'test' },
+      }}
+    >
+      About
+    </Link>
+  )
+}
+```
+
+</PagesOnly>
+
+### `replace`
+
+**デフォルトは `false` です。** `true` の場合、`next/link` は新しい URL を [ブラウザーの履歴](https://developer.mozilla.org/docs/Web/API/History_API)スタックに追加するのではなく、現在の履歴エントリを置き換えます。
+
+<AppOnly>
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/dashboard" replace>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/dashboard" replace>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" replace>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" replace>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+</PagesOnly>
+
+### `scroll`
+
+**デフォルトは `true` です。** Next.js の `<Link>` のデフォルトのスクロール動作は、**ブラウザの戻る/進む操作と同様にスクロール位置を維持すること**です。新しい [Page](/docs/app/api-reference/file-conventions/page) に遷移したとき、Page がビューポート内で可視である限り、スクロール位置はそのまま保持されます。ただし、Page がビューポート内に表示されていない場合、Next.js は最初の Page 要素の先頭までスクロールします。
+
+`scroll = {false}` の場合、Next.js は最初の Page 要素までスクロールしようとしません。
+
+> **補足**: Next.js はスクロール動作を管理する前に、`scroll: false` かどうかをチェックします。スクロールが有効な場合、ナビゲーションに関連する DOM ノードを特定し、各トップレベル要素を検査します。スクロール不可能な要素や、レンダリングされた HTML を持たない要素はすべてスキップされます。これには、`position: sticky` や `position: fixed` の要素、`getBoundingClientRect` の計算結果として非表示と判断される要素などが含まれます。Next.js はその後、ビューポート内で可視なスクロール可能要素を特定するまで兄弟要素を順にたどります。
+
+<AppOnly>
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/dashboard" scroll={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/dashboard" scroll={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" scroll={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" scroll={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+</PagesOnly>
+
+### `prefetch`
+
+<AppOnly>
+
+プリフェッチは、`<Link />` コンポーネントがユーザーのビューポート内に入ったとき（初期表示時またはスクロール時）に行われます。Next.js は、クライアントサイドナビゲーションのパフォーマンスを向上させるために、バックグラウンドでリンク先のルート（`href` で指定）とそのデータをプリフェッチして読み込みます。プリフェッチされたデータが、ユーザーが `<Link />` にホバーした時点で有効期限切れになっている場合、Next.js は再度プリフェッチを試みます。**プリフェッチは本番環境でのみ有効です**。
+
+`prefetch` プロップには、次の値を渡すことができます:
+
+- **`"auto"` または `null`（デフォルト）**: ルートが静的か動的かによってプリフェッチの挙動が変わります。静的ルートの場合、そのルート全体（すべてのデータを含む）がプリフェッチされます。動的ルートの場合は、[`loading.js`](/docs/app/api-reference/file-conventions/loading#instant-loading-states) 境界を持つ直近のセグメントまでの部分的なルートがプリフェッチされます。
+- `true`: 静的ルートと動的ルートの両方で、ルート全体がプリフェッチされます。
+- `false`: ビューポートに入ったときやホバー時のいずれの場合も、プリフェッチは一切行われません。
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/dashboard" prefetch={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/dashboard" prefetch={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+プリフェッチは、`<Link />` コンポーネントがユーザーのビューポート内に入ったとき（初期表示時またはスクロールによって）に行われます。Next.js はバックグラウンドでリンク先のルート（`href` で指定）とデータをプリフェッチして読み込み、クライアントサイドでのナビゲーションのパフォーマンスを向上させます。**プリフェッチは本番環境でのみ有効です**。
+
+`prefetch` プロパティには次の値を渡すことができます:
+
+- **`true`（デフォルト）**: ルート全体とそのデータがプリフェッチされます。
+- `false`: ビューポートに入ったときにはプリフェッチせず、ホバー時にプリフェッチします。ホバー時のフェッチも完全になくしたい場合は、`<a>` タグの使用や、ホバー時のプリフェッチも無効化できる App Router の[段階的な導入](/docs/app/guides/migrating/app-router-migration)を検討してください。
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" prefetch={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" prefetch={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+### `shallow`
+
+現在のページのパスを更新しても、[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)、[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)、[`getInitialProps`](/docs/pages/api-reference/functions/get-initial-props) は再実行されません。デフォルトは `false` です。
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" shallow={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/dashboard" shallow={false}>
+      Dashboard
+    </Link>
+  )
+}
+```
+
+### `locale`
+
+アクティブなロケールは自動的に先頭に付与されます。`locale` によって、別のロケールを指定できます。`false` の場合、デフォルトの動作が無効になるため、`href` にロケールを含める必要があります。
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <>
+      {/* デフォルトの動作: ロケールが先頭に付与される */}
+      <Link href="/dashboard">Dashboard (with locale)</Link>
+
+      {/* ロケールの付与を無効化 */}
+      <Link href="/dashboard" locale={false}>
+        Dashboard (without locale)
+      </Link>
+
+      {/* 別のロケールを指定 */}
+      <Link href="/dashboard" locale="fr">
+        Dashboard (French)
+      </Link>
+    </>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <>
+      {/* デフォルトの動作: ロケールが先頭に付与される */}
+      <Link href="/dashboard">Dashboard (with locale)</Link>
+
+      {/* ロケールの付与を無効化 */}
+      <Link href="/dashboard" locale={false}>
+        Dashboard (without locale)
+      </Link>
+
+      {/* 別のロケールを指定 */}
+      <Link href="/dashboard" locale="fr">
+        Dashboard (French)
+      </Link>
+    </>
+  )
+}
+```
+
+### `as`
+
+ブラウザの URL バーに表示されるパスに対する任意のデコレーターです。Next.js 9.5.3 より前は、これは動的ルートに使用されていました。どのように動作していたかは[以前のドキュメント](https://github.com/vercel/next.js/blob/v9.5.2/docs/api-reference/next/link.md#dynamic-routes)を参照してください。
+
+このパスが `href` に指定されたものと異なる場合、[以前のドキュメント](https://github.com/vercel/next.js/blob/v9.5.2/docs/api-reference/next/link.md#dynamic-routes)に示されているように、従来の `href` / `as` の動作が使用されます。
+
+</PagesOnly>
+
+### `onNavigate`
+
+クライアントサイドのナビゲーション時に呼び出されるイベントハンドラーです。ハンドラーには `preventDefault()` メソッドを含むイベントオブジェクトが渡され、必要に応じてナビゲーションをキャンセルできます。
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link
+      href="/dashboard"
+      onNavigate={(e) => {
+        // SPAナビゲーション時のみ実行される
+        console.log('Navigating...')
+
+        // 必要に応じてナビゲーションをキャンセルする
+        // e.preventDefault()
+      }}
+    >
+      Dashboard
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link
+      href="/dashboard"
+      onNavigate={(e) => {
+        // SPAナビゲーション時のみ実行される
+        console.log('Navigating...')
+
+        // 必要に応じてナビゲーションをキャンセルする
+        // e.preventDefault()
+      }}
+    >
+      Dashboard
+    </Link>
+  )
+}
+```
+
+> **補足**: `onClick` と `onNavigate` は似ているように見えますが、目的が異なります。`onClick` はすべてのクリックイベントで実行されますが、`onNavigate` はクライアントサイドのナビゲーション時にのみ実行されます。主な違いは次のとおりです:
+>
+> - モディファイアキー（`Ctrl`/`Cmd` + クリック）を使用した場合、新しいタブでの遷移については Next.js が既定のナビゲーション動作を抑制するため、`onClick` は実行されますが `onNavigate` は実行されません。
+> - 外部 URL では、`onNavigate` はクライアントサイドかつ同一オリジンのナビゲーションにのみ適用されるため、トリガーされません。
+> - `download` 属性を持つリンクは、ブラウザがリンク先の URL をダウンロードとして扱うため、`onClick` では動作しますが `onNavigate` では動作しません。
+
+## 例
+
+次の例では、さまざまなシナリオで `<Link>` コンポーネントを使用する方法を示します。
+
+<AppOnly>
+
+### 動的ルートセグメントへのリンク
+
+[動的セグメント](/docs/app/api-reference/file-conventions/dynamic-routes)へリンクする場合、[テンプレートリテラルと補間](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Template_literals)を使ってリンクのリストを生成できます。たとえば、ブログ投稿のリストを生成するには次のようにします。
+
+```tsx filename="app/blog/post-list.tsx" switcher
+import Link from 'next/link'
+
+interface Post {
+  id: number
+  title: string
+  slug: string
+}
+
+export default function PostList({ posts }: { posts: Post[] }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```jsx filename="app/blog/post-list.js" switcher
+import Link from 'next/link'
+
+export default function PostList({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### アクティブなリンクの判定
+
+[`usePathname()`](/docs/app/api-reference/functions/use-pathname) を使用して、リンクがアクティブかどうかを判定できます。たとえば、アクティブなリンクにクラスを追加するには、現在の `pathname` がリンクの `href` と一致するかどうかをチェックします。
+
+```tsx filename="app/ui/nav-links.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export function Links() {
+  const pathname = usePathname()
+
+  return (
+    <nav>
+      <Link className={`link ${pathname === '/' ? 'active' : ''}`} href="/">
+        Home
+      </Link>
+
+      <Link
+        className={`link ${pathname === '/about' ? 'active' : ''}`}
+        href="/about"
+      >
+        About
+      </Link>
+    </nav>
+  )
+}
+```
+
+```jsx filename="app/ui/nav-links.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export function Links() {
+  const pathname = usePathname()
+
+  return (
+    <nav>
+      <Link className={`link ${pathname === '/' ? 'active' : ''}`} href="/">
+        Home
+      </Link>
+
+      <Link
+        className={`link ${pathname === '/about' ? 'active' : ''}`}
+        href="/about"
+      >
+        About
+      </Link>
+    </nav>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+### 動的ルートセグメントへのリンク
+
+[動的ルートセグメント](/docs/pages/building-your-application/routing/dynamic-routes#convention)に対しては、テンプレートリテラルを使ってリンクのパスを作成すると便利です。
+
+たとえば、動的ルート `pages/blog/[slug].js` へのリンクのリストを生成できます。
+
+```tsx filename="pages/blog/index.tsx" switcher
+import Link from 'next/link'
+
+function Posts({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```jsx filename="pages/blog/index.js" switcher
+import Link from 'next/link'
+
+function Posts({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export default Posts
+```
+
+</PagesOnly>
+
+### 特定の`id`へのスクロール
+
+ナビゲーション時に特定の`id`までスクロールしたい場合は、URL の末尾に `#` 付きのハッシュリンクを追加するか、`href` プロップにハッシュリンクを渡します。これは、`<Link>` が `<a>` 要素としてレンダーされるため可能になっています。
+
+```jsx
+<Link href="/dashboard#settings">Settings</Link>
+
+// 出力
+<a href="/dashboard#settings">Settings</a>
+```
+
+<AppOnly>
+  > **補足**: > > * ナビゲーション時に対象の
+  [Page](/docs/app/api-reference/file-conventions/page)
+  がビューポート内に表示されていない場合、Next.js
+  はそのページまで自動的にスクロールします。
+</AppOnly>
+
+<PagesOnly>
+  ### URL オブジェクトを渡す
+
+`Link` は URL オブジェクトも受け取ることができ、それを自動的にフォーマットして URL 文字列を生成します。
+
+```tsx filename="pages/index.ts" switcher
+import Link from 'next/link'
+
+function Home() {
+  return (
+    <ul>
+      <li>
+        <Link
+          href={{
+            pathname: '/about',
+            query: { name: 'test' },
+          }}
+        >
+          About us
+        </Link>
+      </li>
+      <li>
+        <Link
+          href={{
+            pathname: '/blog/[slug]',
+            query: { slug: 'my-post' },
+          }}
+        >
+          Blog Post
+        </Link>
+      </li>
+    </ul>
+  )
+}
+
+export default Home
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+function Home() {
+  return (
+    <ul>
+      <li>
+        <Link
+          href={{
+            pathname: '/about',
+            query: { name: 'test' },
+          }}
+        >
+          About us
+        </Link>
+      </li>
+      <li>
+        <Link
+          href={{
+            pathname: '/blog/[slug]',
+            query: { slug: 'my-post' },
+          }}
+        >
+          Blog Post
+        </Link>
+      </li>
+    </ul>
+  )
+}
+
+export default Home
+```
+
+上記の例では、次のリンクになります。
+
+- あらかじめ定義されたルート: `/about?name=test`
+- [動的ルート](/docs/pages/building-your-application/routing/dynamic-routes#convention): `/blog/my-post`
+
+[Node.js の URL モジュールのドキュメント](https://nodejs.org/api/url.html#url_url_strings_and_url_objects) で定義されているすべてのプロパティを使用できます。
+
+</PagesOnly>
+
+### push ではなく URL を置き換える
+
+`Link` コンポーネントのデフォルト動作は、新しい URL を `history` スタックに `push` することです。次の例のように、新しい履歴エントリが追加されないようにするには、`replace` プロパティを使用します:
+
+<AppOnly>
+
+```tsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/about" replace>
+      About us
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/about" replace>
+      About us
+    </Link>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/about" replace>
+      About us
+    </Link>
+  )
+}
+```
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/about" replace>
+      About us
+    </Link>
+  )
+}
+```
+
+</PagesOnly>
+
+### ページ上部へのスクロールを無効にする
+
+<AppOnly>
+
+Next.js の `<Link>` のデフォルトのスクロール動作は **スクロール位置を維持すること**であり、これはブラウザが戻る・進むナビゲーションを扱う方法と同様です。新しい [Page](/docs/app/api-reference/file-conventions/page) に移動したときも、その Page がビューポート内に表示されている限り、スクロール位置はそのまま維持されます。
+
+ただし、Page がビューポート内に表示されていない場合、Next.js は最初の Page 要素の先頭までスクロールします。この挙動を無効にしたい場合は、`<Link>` コンポーネントに `scroll={false}` を渡すか、`router.push()` または `router.replace()` に `scroll: false` を渡します。
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/#hashid" scroll={false}>
+      ページ先頭へのスクロールを無効にする
+    </Link>
+  )
+}
+```
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <Link href="/#hashid" scroll={false}>
+      ページ先頭へのスクロールを無効にする
+    </Link>
+  )
+}
+```
+
+`router.push()` または `router.replace()` を使用する場合:
+
+```jsx
+// useRouter
+import { useRouter } from 'next/navigation'
+
+const router = useRouter()
+
+router.push('/dashboard', { scroll: false })
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+`Link` のデフォルト動作は、ページの先頭までスクロールすることです。ハッシュが定義されている場合は、通常の `<a>` タグと同様に、特定の id までスクロールします。ページ先頭やハッシュ位置へのスクロールを防ぐには、`scroll={false}` を `Link` に追加します。
+
+```jsx filename="pages/index.js" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/#hashid" scroll={false}>
+      ページ先頭へのスクロールを無効にする
+    </Link>
+  )
+}
+```
+
+```tsx filename="pages/index.tsx" switcher
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <Link href="/#hashid" scroll={false}>
+      ページ先頭へのスクロールを無効にする
+    </Link>
+  )
+}
+```
+
+</PagesOnly>
+
+### スクロールオフセットとスティッキーヘッダー
+
+Next.js はスクロール先を特定する際に `position: sticky` や `position: fixed` の要素をスキップするため、ナビゲーション後にコンテンツがスティッキーヘッダーの裏側に隠れてしまうことがあります。たとえば、レイアウトにスティッキーヘッダーがある場合は次のようになります。
+
+```tsx filename="app/layout.tsx" switcher
+import './globals.css'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <header className="sticky top-0 h-16 bg-white">
+          {/* ナビゲーション */}
+        </header>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import './globals.css'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <header className="sticky top-0 h-16 bg-white">
+          {/* ナビゲーション */}
+        </header>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+スクロールコンテナに対して [`scroll-padding-top`](https://developer.mozilla.org/en-US/docs/Web/CSS/scroll-padding-top) を指定することで、その高さを考慮した余白を設定できます。
+
+```css filename="app/globals.css"
+html {
+  scroll-padding-top: 64px; /* スティッキーヘッダーの高さに合わせる */
+}
+```
+
+これは、スクロールに基づく位置を補正（オフセット）するブラウザーの CSS プロパティです。Next.js がネイティブの [`scrollIntoView()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView) API を使用するあらゆる場合に適用され、ハッシュフラグメント（`#id`）によるナビゲーションも含まれます。あるいは、グローバルなオフセットを設定する代わりに、個々のターゲット要素ごとに [`scroll-margin-top`](https://developer.mozilla.org/en-US/docs/Web/CSS/scroll-margin-top) を使用することもできます。
+
+### Proxy でのリンクのプリフェッチ
+
+認証や、ユーザーを別のページへリライトするその他の目的で [Proxy](/docs/app/api-reference/file-conventions/proxy) を使うことは一般的です。`<Link />` コンポーネントが Proxy 経由のリライトを伴うリンクを正しくプリフェッチできるようにするには、Next.js に「表示する URL」と「プリフェッチする URL」の両方を伝える必要があります。これは、どのルートをプリフェッチすべきかを判断するために、Proxy への不要なフェッチが発生するのを避けるために必要です。
+
+たとえば、認証済みビューと未ログインの訪問者向けビューを持つ `/dashboard` ルートを提供したい場合、Proxy の設定に次のように追加して、ユーザーを正しいページに振り分けることができます。
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request: Request) {
+  const nextUrl = request.nextUrl
+  if (nextUrl.pathname === '/dashboard') {
+    if (request.cookies.authToken) {
+      return NextResponse.rewrite(new URL('/auth/dashboard', request.url))
+    } else {
+      return NextResponse.rewrite(new URL('/public/dashboard', request.url))
+    }
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  const nextUrl = request.nextUrl
+  if (nextUrl.pathname === '/dashboard') {
+    if (request.cookies.authToken) {
+      return NextResponse.rewrite(new URL('/auth/dashboard', request.url))
+    } else {
+      return NextResponse.rewrite(new URL('/public/dashboard', request.url))
+    }
+  }
+}
+```
+
+この場合は、`<Link />` コンポーネントで次のコードを使用します:
+
+<AppOnly>
+  ```tsx filename="app/page.tsx" switcher
+  'use client'
+
+import Link from 'next/link'
+import useIsAuthed from './hooks/useIsAuthed' // 認証用のカスタムフック
+
+export default function Page() {
+const isAuthed = useIsAuthed()
+const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
+return (
+<Link as="/dashboard" href={path}>
+Dashboard
+</Link>
+)
+}
+
+````
+
+```js filename="app/page.js" switcher
+'use client'
+
+import Link from 'next/link'
+import useIsAuthed from './hooks/useIsAuthed' // 認証用のカスタムフック
+
+export default function Page() {
+  const isAuthed = useIsAuthed()
+  const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
+  return (
+    <Link as="/dashboard" href={path}>
+      Dashboard
+    </Link>
+  )
+}
+````
+
+</AppOnly>
+
+<PagesOnly>
+  ```tsx filename="pages/index.tsx" switcher
+  'use client'
+
+import Link from 'next/link'
+import useIsAuthed from './hooks/useIsAuthed' // 認証用のカスタムフック
+
+export default function Home() {
+const isAuthed = useIsAuthed()
+const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
+return (
+<Link as="/dashboard" href={path}>
+Dashboard
+</Link>
+)
+}
+
+````
+
+```js filename="pages/index.js" switcher
+'use client'
+
+import Link from 'next/link'
+import useIsAuthed from './hooks/useIsAuthed' // 認証用のカスタムフック
+
+export default function Home() {
+  const isAuthed = useIsAuthed()
+  const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
+  return (
+    <Link as="/dashboard" href={path}>
+      Dashboard
+    </Link>
+  )
+}
+````
+
+> **補足**: [Dynamic Routes](/docs/pages/building-your-application/routing/dynamic-routes#convention) を使用している場合は、`as` と `href` の props を調整する必要があります。たとえば、プロキシ経由で別の URL として表示したい `/dashboard/authed/[user]` のような Dynamic Route がある場合、次のように記述します: `<Link href={{ pathname: '/dashboard/authed/[user]', query: { user: username } }} as="/dashboard/[user]">Profile</Link>`.
+
+</PagesOnly>
+
+<AppOnly>
+  ### ナビゲーションのブロック
+
+`onNavigate` プロパティを使用すると、フォームに未保存の変更がある場合など、特定の条件が満たされたときにナビゲーションをブロックできます。アプリ内の複数のコンポーネントにわたってナビゲーションをブロックする必要がある場合（フォームの編集中にすべてのリンクからのナビゲーションを防ぐなど）、React Context を使用することでこのブロック状態をシンプルに共有できます。まず、ナビゲーションのブロック状態を追跡するコンテキストを作成します。
+
+```tsx filename="app/contexts/navigation-blocker.tsx" switcher
+'use client'
+
+import { createContext, useState, useContext } from 'react'
+
+interface NavigationBlockerContextType {
+  isBlocked: boolean
+  setIsBlocked: (isBlocked: boolean) => void
+}
+
+export const NavigationBlockerContext =
+  createContext<NavigationBlockerContextType>({
+    isBlocked: false,
+    setIsBlocked: () => {},
+  })
+
+export function NavigationBlockerProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [isBlocked, setIsBlocked] = useState(false)
+
+  return (
+    <NavigationBlockerContext.Provider value={{ isBlocked, setIsBlocked }}>
+      {children}
+    </NavigationBlockerContext.Provider>
+  )
+}
+
+export function useNavigationBlocker() {
+  return useContext(NavigationBlockerContext)
+}
+```
+
+```jsx filename="app/contexts/navigation-blocker.js" switcher
+'use client'
+
+import { createContext, useState, useContext } from 'react'
+
+export const NavigationBlockerContext = createContext({
+  isBlocked: false,
+  setIsBlocked: () => {},
+})
+
+export function NavigationBlockerProvider({ children }) {
+  const [isBlocked, setIsBlocked] = useState(false)
+
+  return (
+    <NavigationBlockerContext.Provider value={{ isBlocked, setIsBlocked }}>
+      {children}
+    </NavigationBlockerContext.Provider>
+  )
+}
+
+export function useNavigationBlocker() {
+  return useContext(NavigationBlockerContext)
+}
+```
+
+コンテキストを使用するフォームコンポーネントを作成します：
+
+```tsx filename="app/components/form.tsx" switcher
+'use client'
+
+import { useNavigationBlocker } from '../contexts/navigation-blocker'
+
+export default function Form() {
+  const { setIsBlocked } = useNavigationBlocker()
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        setIsBlocked(false)
+      }}
+      onChange={() => setIsBlocked(true)}
+    >
+      <input type="text" name="name" />
+      <button type="submit">Save</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/components/form.js" switcher
+'use client'
+
+import { useNavigationBlocker } from '../contexts/navigation-blocker'
+
+export default function Form() {
+  const { setIsBlocked } = useNavigationBlocker()
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        setIsBlocked(false)
+      }}
+      onChange={() => setIsBlocked(true)}
+    >
+      <input type="text" name="name" />
+      <button type="submit">Save</button>
+    </form>
+  )
+}
+```
+
+ナビゲーションをブロックするカスタムLinkコンポーネントを作成します：
+
+```tsx filename="app/components/custom-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useNavigationBlocker } from '../contexts/navigation-blocker'
+
+interface CustomLinkProps extends React.ComponentProps<typeof Link> {
+  children: React.ReactNode
+}
+
+export function CustomLink({ children, ...props }: CustomLinkProps) {
+  const { isBlocked } = useNavigationBlocker()
+
+  return (
+    <Link
+      onNavigate={(e) => {
+        if (
+          isBlocked &&
+          !window.confirm('You have unsaved changes. Leave anyway?')
+        ) {
+          e.preventDefault()
+        }
+      }}
+      {...props}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/components/custom-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useNavigationBlocker } from '../contexts/navigation-blocker'
+
+export function CustomLink({ children, ...props }) {
+  const { isBlocked } = useNavigationBlocker()
+
+  return (
+    <Link
+      onNavigate={(e) => {
+        if (
+          isBlocked &&
+          !window.confirm('You have unsaved changes. Leave anyway?')
+        ) {
+          e.preventDefault()
+        }
+      }}
+      {...props}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+ナビゲーションコンポーネントを作成します：
+
+```tsx filename="app/components/nav.tsx" switcher
+'use client'
+
+import { CustomLink as Link } from './custom-link'
+
+export default function Nav() {
+  return (
+    <nav>
+      <Link href="/">Home</Link>
+      <Link href="/about">About</Link>
+    </nav>
+  )
+}
+```
+
+```jsx filename="app/components/nav.js" switcher
+'use client'
+
+import { CustomLink as Link } from './custom-link'
+
+export default function Nav() {
+  return (
+    <nav>
+      <Link href="/">Home</Link>
+      <Link href="/about">About</Link>
+    </nav>
+  )
+}
+```
+
+最後に、ルートレイアウトでアプリを`NavigationBlockerProvider`でラップし、ページ内でコンポーネントを使用します：
+
+```tsx filename="app/layout.tsx" switcher
+import { NavigationBlockerProvider } from './contexts/navigation-blocker'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <NavigationBlockerProvider>{children}</NavigationBlockerProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { NavigationBlockerProvider } from './contexts/navigation-blocker'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <NavigationBlockerProvider>{children}</NavigationBlockerProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+次に、ページで`Nav`と`Form`コンポーネントを使用します:
+
+```tsx filename="app/page.tsx" switcher
+import Nav from './components/nav'
+import Form from './components/form'
+
+export default function Page() {
+  return (
+    <div>
+      <Nav />
+      <main>
+        <h1>Welcome to the Dashboard</h1>
+        <Form />
+      </main>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Nav from './components/nav'
+import Form from './components/form'
+
+export default function Page() {
+  return (
+    <div>
+      <Nav />
+      <main>
+        <h1>Welcome to the Dashboard</h1>
+        <Form />
+      </main>
+    </div>
+  )
+}
+```
+
+フォームに未保存の変更がある状態でユーザーが `CustomLink` を使って別のページに移動しようとすると、離脱前に確認ダイアログが表示されます。
+
+</AppOnly>
+
+## バージョン履歴
+
+| バージョン | 変更内容                                                                                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v15.4.0`  | デフォルトの `prefetch` 動作に対するエイリアスとして `auto` を追加しました。                                                                                                             |
+| `v15.3.0`  | `onNavigate` API を追加しました。                                                                                                                                                        |
+| `v13.0.0`  | 子要素としての `<a>` タグが不要になりました。コードベースを自動的に更新するための [codemod](/docs/app/guides/upgrading/codemods#remove-a-tags-from-link-components) が提供されています。 |
+| `v10.0.0`  | 動的ルートを指す `href` props が自動的に解決されるようになり、`as` prop が不要になりました。                                                                                             |
+| `v8.0.0`   | `prefetch` のパフォーマンスを改善しました。                                                                                                                                              |
+| `v1.0.0`   | `next/link` を導入しました。                                                                                                                                                             |

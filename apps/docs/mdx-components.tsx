@@ -3,7 +3,7 @@ import type { MDXComponents } from 'mdx/types'
 import NextImage, { type ImageProps } from 'next/image'
 import { ReactNode } from 'react'
 
-const IMAGE_BASE_URL = ''
+const IMAGE_BASE_URL = 'https://h8dxkfmaphn8o0p3.public.blob.vercel-storage.com'
 
 const genericComponents = {
   Image: (

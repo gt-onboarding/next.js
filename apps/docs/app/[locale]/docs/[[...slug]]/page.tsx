@@ -19,8 +19,8 @@ export default async function Page(props: {
 
   const MDXContent = page.data.body
 
-  const isApp = params.slug?.includes('01-app')
-  const isPages = params.slug?.includes('02-pages')
+  const isApp = params.slug?.includes('app')
+  const isPages = params.slug?.includes('pages')
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>

@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev-docs": "next dev --turbo",
-    "build-docs": "next build",
+    "generate": "npx tsx scripts/generate-docs.ts",
+    "dev-docs": "pnpm generate && next dev --turbo",
+    "build-docs": "pnpm generate && next build",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
     "translate": "gtx-cli translate --save-local"

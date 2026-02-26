@@ -6,6 +6,15 @@ const withMDX = createMDX()
 
 const config: NextConfig = {
   reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'h8dxkfmaphn8o0p3.public.blob.vercel-storage.com',
+        pathname: '/docs/**',
+      },
+    ],
+  },
 }
 
 const mdxConfig = withMDX(config)

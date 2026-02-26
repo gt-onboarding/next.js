@@ -22,6 +22,7 @@
 *.tsbuildinfo
 next-env.d.ts
 .source
+/generated
 
 # Logs and debug
 npm-debug.log*

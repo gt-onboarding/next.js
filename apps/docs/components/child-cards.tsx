@@ -39,7 +39,7 @@ export function ChildCards({
   if (items.length === 0) return null
 
   return (
-    <div className="grid grid-cols-2 gap-3 @container">
+    <div className="not-prose mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
       {items.map((item) => {
         const url = item.type === 'folder' ? item.index?.url : item.url
         const name = item.name
@@ -51,12 +51,11 @@ export function ChildCards({
           <Link
             key={url}
             href={url}
-            data-card
-            className="block rounded-xl border bg-fd-background pt-5 pb-4 px-5 text-fd-card-foreground @max-lg:col-span-full"
+            className="block rounded-lg border border-fd-border bg-fd-card p-5 text-fd-card-foreground transition-colors hover:bg-fd-accent/80"
           >
-            <h3 className="not-prose mb-1 text-base font-large">{name}</h3>
+            <h3 className="mb-1 text-base font-semibold">{name}</h3>
             {description ? (
-              <p className="!my-0 text-sm text-fd-muted-foreground">
+              <p className="my-0 text-sm text-fd-muted-foreground">
                 {description}
               </p>
             ) : null}

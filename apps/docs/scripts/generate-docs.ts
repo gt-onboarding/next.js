@@ -92,7 +92,6 @@ function copyAndGenerate(
         (e) => e.stripped === 'app' || e.stripped === 'pages'
       )
       pages.push(...rootOnly.map((e) => e.stripped))
-      pages.push('...')
     } else if (isRoot) {
       // Root folder meta
       pages.push('index')

@@ -9,6 +9,7 @@ import {
 // see https://fumadocs.vercel.app/docs/mdx/collections#define-docs
 export const docs = defineDocs({
   docs: {
+    async: true,
     schema: frontmatterSchema,
   },
   meta: {

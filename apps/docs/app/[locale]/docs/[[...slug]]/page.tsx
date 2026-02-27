@@ -8,7 +8,8 @@ import {
 import { notFound } from 'next/navigation'
 import { createRelativeLink } from 'fumadocs-ui/mdx'
 import { getMDXComponents } from '@/mdx-components'
-import { getDefaultLocale } from 'gt-next/server'
+import { getDefaultLocale, getLocale } from 'gt-next/server'
+import { ChildCards } from '@/components/child-cards'
 
 export default async function Page(props: {
   params: Promise<{ slug?: string[]; locale?: string }>
@@ -21,6 +22,9 @@ export default async function Page(props: {
 
   const isApp = params.slug?.includes('app')
   const isPages = params.slug?.includes('pages')
+
+  const locale = await getLocale()
+  const tree = source.pageTree[locale] ?? source.pageTree[getDefaultLocale()]
 
   return (
     <DocsPage toc={toc} full={page.data.full}>
@@ -36,6 +40,7 @@ export default async function Page(props: {
             { isApp, isPages }
           )}
         />
+        <ChildCards tree={tree} pageUrl={page.url} />
       </DocsBody>
     </DocsPage>
   )

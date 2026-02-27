@@ -15,8 +15,15 @@ function stripPrefix(name: string): string {
 /**
  * Recursively copy the docs tree into the output directory with stripped
  * numeric prefixes, generating meta.json files to preserve ordering.
+ *
+ * @param siblingDirs - stripped names of sibling directories at the same level,
+ *   passed to root folders so they can extract shared sections
  */
-function copyAndGenerate(srcDir: string, destDir: string): void {
+function copyAndGenerate(
+  srcDir: string,
+  destDir: string,
+  siblingDirs?: string[]
+): void {
   fs.mkdirSync(destDir, { recursive: true })
 
   const entries = fs.readdirSync(srcDir, { withFileTypes: true })
@@ -25,25 +32,29 @@ function copyAndGenerate(srcDir: string, destDir: string): void {
   // We sort by the original name (which sorts by numeric prefix) and store
   // the stripped name for the pages array.
   const numberedEntries: { original: string; stripped: string }[] = []
-  let hasIndex = false
+  // Track all child directory names (stripped) to pass as siblings to children
+  const childDirNames: string[] = []
+
+  const currentDirName = path.basename(destDir)
+  const isRootDir = currentDirName === 'app' || currentDirName === 'pages'
 
   for (const entry of entries) {
     const stripped = stripPrefix(entry.name)
     const hasNumericPrefix = /^\d+-/.test(entry.name)
 
     if (entry.isDirectory()) {
+      childDirNames.push(stripped)
       if (hasNumericPrefix) {
         numberedEntries.push({ original: entry.name, stripped })
       }
-      copyAndGenerate(
-        path.join(srcDir, entry.name),
-        path.join(destDir, stripped)
-      )
     } else if (entry.isFile()) {
       const nameWithoutExt = stripped.replace(/\.\w+$/, '')
-      if (nameWithoutExt === 'index') {
-        hasIndex = true
-      } else if (hasNumericPrefix) {
+
+      // Skip index.mdx for root directories — fumadocs ignores index pages
+      // in root folders, so they'd appear as unwanted sidebar items via "..."
+      if (isRootDir && nameWithoutExt === 'index') continue
+
+      if (hasNumericPrefix && nameWithoutExt !== 'index') {
         numberedEntries.push({ original: entry.name, stripped: nameWithoutExt })
       }
       fs.copyFileSync(
@@ -53,27 +64,71 @@ function copyAndGenerate(srcDir: string, destDir: string): void {
     }
   }
 
-  // Generate meta.json if this directory had any numbered children or an index page
-  if (numberedEntries.length > 0 || hasIndex) {
+  // Recurse into child directories, passing sibling info
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const stripped = stripPrefix(entry.name)
+    copyAndGenerate(
+      path.join(srcDir, entry.name),
+      path.join(destDir, stripped),
+      childDirNames
+    )
+  }
+
+  // Check if this directory contains root folders (app/pages)
+  const hasRootChildren =
+    childDirNames.includes('app') && childDirNames.includes('pages')
+
+  // Generate meta.json if this directory had numbered children
+  if (numberedEntries.length > 0) {
     // Sort by original name to preserve numeric ordering
     numberedEntries.sort((a, b) => a.original.localeCompare(b.original))
-    const pages: string[] = []
 
-    // index pages always come first
-    if (hasIndex) {
-      pages.push('index')
+    // If this directory contains root children, filter out all child directories
+    // from the pages array — roots are accessed via the dropdown, and shared
+    // sections (architecture, community) are extracted into each root
+    let filtered = numberedEntries
+    if (hasRootChildren) {
+      filtered = filtered.filter((e) => !childDirNames.includes(e.stripped))
     }
 
-    pages.push(...numberedEntries.map((e) => e.stripped))
+    const pages: string[] = filtered.map((e) => e.stripped)
 
     // Append "..." to include any non-numbered items in alphabetical order
     pages.push('...')
 
-    // Read title from index.mdx if it exists
     const meta: Record<string, unknown> = { pages }
-    const indexPath = path.join(destDir, 'index.mdx')
-    if (fs.existsSync(indexPath)) {
-      const indexContent = fs.readFileSync(indexPath, 'utf-8')
+    const dirName = path.basename(destDir)
+    const isRoot = dirName === 'app' || dirName === 'pages'
+
+    // Mark app and pages directories as roots for the sidebar toggle
+    if (isRoot) {
+      meta.root = true
+
+      // Extract shared sibling sections (non-root dirs like architecture, community)
+      if (siblingDirs) {
+        const sharedSiblings = siblingDirs.filter(
+          (name) => name !== 'app' && name !== 'pages'
+        )
+        if (sharedSiblings.length > 0) {
+          pages.push('---')
+          for (const sibling of sharedSiblings) {
+            pages.push('../' + sibling)
+          }
+        }
+      }
+    }
+
+    // Read title from index.mdx if it exists (check dest first, fall back to src)
+    const destIndex = path.join(destDir, 'index.mdx')
+    const srcIndex = path.join(srcDir, 'index.mdx')
+    const indexFile = fs.existsSync(destIndex)
+      ? destIndex
+      : fs.existsSync(srcIndex)
+        ? srcIndex
+        : null
+    if (indexFile) {
+      const indexContent = fs.readFileSync(indexFile, 'utf-8')
       const { frontmatter } = parseFrontmatter(indexContent)
       if (frontmatter.title) {
         meta.title = frontmatter.title

@@ -169,7 +169,7 @@ async function RuntimeData({ searchParams }) {
   const headerStore = await headers()
   const search = await searchParams
 
-  return <div>Not in the static shell</div>
+  return <div>静的シェルには含まれない</div>
 }
 ```
 
@@ -449,7 +449,7 @@ export default function BlogPage() {
     <>
       {/* 静的コンテンツ - 自動的にプリレンダリングされる */}
       <header>
-        <h1>Our Blog</h1>
+        <h1>ブログ</h1>
         <nav>
           <Link href="/">Home</Link> | <Link href="/about">About</Link>
         </nav>
@@ -459,7 +459,7 @@ export default function BlogPage() {
       <BlogPosts />
 
       {/* ランタイム動的コンテンツ - リクエスト時にストリーミングされる */}
-      <Suspense fallback={<p>Loading your preferences...</p>}>
+      <Suspense fallback={<p>設定を読み込み中...</p>}>
         <UserPreferences />
       </Suspense>
     </>
@@ -476,7 +476,7 @@ async function BlogPosts() {
 
   return (
     <section>
-      <h2>Latest Posts</h2>
+      <h2>最新の投稿</h2>
       <ul>
         {posts.slice(0, 5).map((post: any) => (
           <li key={post.id}>
@@ -498,8 +498,8 @@ async function UserPreferences() {
 
   return (
     <aside>
-      <p>Your theme: {theme}</p>
-      {favoriteCategory && <p>Favorite category: {favoriteCategory}</p>}
+      <p>あなたのテーマ: {theme}</p>
+      {favoriteCategory && <p>お気に入りのカテゴリ: {favoriteCategory}</p>}
     </aside>
   )
 }

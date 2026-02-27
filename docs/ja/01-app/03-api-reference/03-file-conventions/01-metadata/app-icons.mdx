@@ -199,7 +199,7 @@ export default async function Icon({ params }) {
 }
 ```
 
-| Route                           | URL         | `params`（パラメータ）             |
+| ルート                          | URL         | `params`（パラメータ）             |
 | ------------------------------- | ----------- | ---------------------------------- |
 | `app/shop/icon.js`              | `/shop`     | `undefined`                        |
 | `app/shop/[slug]/icon.js`       | `/shop/1`   | `Promise<{ slug: '1' }>`           |
@@ -211,7 +211,7 @@ export default async function Icon({ params }) {
 
 > **補足**: `ImageResponse` はこの戻り値型を満たします。
 
-### Config exports
+### 設定のエクスポート
 
 `icon` または `apple-icon` ルートから `size` と `contentType` 変数をエクスポートすることで、必要に応じてアイコンのメタデータを設定できます。
 

@@ -207,7 +207,7 @@ export default function Layout({ children }) {
   border-radius: 9999px;
   background: currentColor;
   opacity: 0;
-  visibility: hidden; /* reserve space without showing the hint */
+  visibility: hidden; /* ヒントを表示せずにスペースを確保する */
 }
 
 .link-hint.is-pending {
@@ -216,7 +216,7 @@ export default function Layout({ children }) {
   visibility: visible;
   animation-name: fadeIn, pulse;
   animation-duration: 200ms, 1s;
-  /* Appear only if navigation actually takes time */
+  /* ナビゲーションに実際に時間がかかる場合のみ表示 */
   animation-delay: 100ms, 100ms;
   animation-timing-function: ease, ease-in-out;
   animation-iteration-count: 1, infinite;

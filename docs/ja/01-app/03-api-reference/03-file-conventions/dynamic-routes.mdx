@@ -35,11 +35,11 @@ export default async function Page({ params }) {
 
 Dynamic Segments は、`params` プロップとして [`layout`](/docs/app/api-reference/file-conventions/layout)、[`page`](/docs/app/api-reference/file-conventions/page)、[`route`](/docs/app/api-reference/file-conventions/route)、および [`generateMetadata`](/docs/app/api-reference/functions/generate-metadata#generatemetadata-function) 関数に渡されます。
 
-| Route                     | Example URL | `params`        |
-| ------------------------- | ----------- | --------------- |
-| `app/blog/[slug]/page.js` | `/blog/a`   | `{ slug: 'a' }` |
-| `app/blog/[slug]/page.js` | `/blog/b`   | `{ slug: 'b' }` |
-| `app/blog/[slug]/page.js` | `/blog/c`   | `{ slug: 'c' }` |
+| ルート                    | URL の例  | `params`        |
+| ------------------------- | --------- | --------------- |
+| `app/blog/[slug]/page.js` | `/blog/a` | `{ slug: 'a' }` |
+| `app/blog/[slug]/page.js` | `/blog/b` | `{ slug: 'b' }` |
+| `app/blog/[slug]/page.js` | `/blog/c` | `{ slug: 'c' }` |
 
 ### Client Component 内で
 
@@ -87,7 +87,7 @@ export default function BlogPostPage({ params }) {
 
 たとえば、`app/shop/[...slug]/page.js` は `/shop/clothes` にマッチしますが、`/shop/clothes/tops` や `/shop/clothes/tops/t-shirts` などにもマッチします。
 
-| Route                        | Example URL   | `params`                    |
+| ルート                       | URL の例      | `params`                    |
 | ---------------------------- | ------------- | --------------------------- |
 | `app/shop/[...slug]/page.js` | `/shop/a`     | `{ slug: ['a'] }`           |
 | `app/shop/[...slug]/page.js` | `/shop/a/b`   | `{ slug: ['a', 'b'] }`      |
@@ -101,7 +101,7 @@ export default function BlogPostPage({ params }) {
 
 **キャッチオール**セグメントと**オプションのキャッチオール**セグメントの違いは、オプションの場合、パラメータなしのルート（上の例では `/shop`）にもマッチする点です。
 
-| Route                          | Example URL   | `params`                    |
+| ルート                         | URL の例      | `params`                    |
 | ------------------------------ | ------------- | --------------------------- |
 | `app/shop/[[...slug]]/page.js` | `/shop`       | `{ slug: undefined }`       |
 | `app/shop/[[...slug]]/page.js` | `/shop/a`     | `{ slug: ['a'] }`           |
@@ -114,7 +114,7 @@ TypeScript を使用する場合、設定したルートセグメントに応じ
 
 ルートの `params` の値は、実行時まで値が分からないため、`string`、`string[]`、または `undefined`（オプショナルな catch-all セグメントの場合）として型付けされます。ユーザーはアドレスバーに任意の URL を入力できるため、これらのより広い型によって、アプリケーションコードがこれらすべての可能なケースを確実に処理できるようになります。
 
-| Route                               | `params` Type Definition                 |
+| ルート                              | `params` の型定義                        |
 | ----------------------------------- | ---------------------------------------- |
 | `app/blog/[slug]/page.js`           | `{ slug: string }`                       |
 | `app/shop/[...slug]/page.js`        | `{ slug: string[] }`                     |

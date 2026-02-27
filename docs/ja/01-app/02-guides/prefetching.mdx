@@ -1,17 +1,17 @@
 ---
-title: プレフェッチ
-description: Next.js でのプレフェッチの設定方法について学びます
+title: プリフェッチ
+description: Next.js でのプリフェッチの設定方法について学びます
 ---
 
-プレフェッチによって、アプリケーション内の異なるルート間の画面遷移がほぼ即時に行われているように感じられるようになります。Next.js は、アプリケーションコード内で使用されているリンクに基づいて、デフォルトで自動的かつ賢くプレフェッチを行います。
+プリフェッチによって、アプリケーション内の異なるルート間の画面遷移がほぼ即時に行われているように感じられるようになります。Next.js は、アプリケーションコード内で使用されているリンクに基づいて、デフォルトで自動的かつ賢くプリフェッチを行います。
 
-このガイドでは、プレフェッチの仕組みと、よくある実装パターンについて説明します：
+このガイドでは、プリフェッチの仕組みと、よくある実装パターンについて説明します：
 
-- [自動プレフェッチ](#automatic-prefetch)
-- [手動プレフェッチ](#manual-prefetch)
-- [ホバーによるプレフェッチ](#hover-triggered-prefetch)
+- [自動プリフェッチ](#automatic-prefetch)
+- [手動プリフェッチ](#manual-prefetch)
+- [ホバーによるプリフェッチ](#hover-triggered-prefetch)
 - [Link の拡張または使用をやめる](#extending-or-ejecting-link)
-- [プレフェッチの無効化](#disabled-prefetch)
+- [プリフェッチの無効化](#disabled-prefetch)
 
 ## プリフェッチはどのように動作しますか？
 
@@ -119,9 +119,9 @@ export function HoverPrefetchLink({
 
 ## Link の拡張またはイジェクト
 
-`<Link>` コンポーネントを拡張して、独自のカスタムのプレフェッチ戦略を作成できます。たとえば、ユーザーのカーソルの向きを予測してリンクをプレフェッチする [ForesightJS](https://foresightjs.com/docs/integrations/nextjs) ライブラリを使用する方法があります。
+`<Link>` コンポーネントを拡張して、独自のカスタムのプリフェッチ戦略を作成できます。たとえば、ユーザーのカーソルの向きを予測してリンクをプリフェッチする [ForesightJS](https://foresightjs.com/docs/integrations/nextjs) ライブラリを使用する方法があります。
 
-あるいは、[`useRouter`](/docs/app/api-reference/functions/use-router) を使用して、ネイティブの `<Link>` の挙動の一部を再現することもできます。ただし、その場合はプレフェッチとキャッシュの無効化を自分で管理する必要がある点に注意してください。
+あるいは、[`useRouter`](/docs/app/api-reference/functions/use-router) を使用して、ネイティブの `<Link>` の挙動の一部を再現することもできます。ただし、その場合はプリフェッチとキャッシュの無効化を自分で管理する必要がある点に注意してください。
 
 ```tsx
 'use client'
@@ -186,7 +186,7 @@ function NoPrefetchLink({
 
 たとえば、アプリケーション全体で `<Link>` を統一して使いたい場合でも、フッター内のリンクはビューポートに入ったときにプリフェッチする必要はないかもしれません。
 
-## プレフェッチの最適化
+## プリフェッチの最適化
 
 ### クライアントキャッシュ
 

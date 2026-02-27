@@ -148,7 +148,7 @@ export default function MyApp({ Component, pageProps }) {
 
 `next/font/google` で使用されます。
 
-- 省略可
+- 省略可能
 
 例:
 
@@ -174,7 +174,7 @@ export default function MyApp({ Component, pageProps }) {
 
 `next/font/google` と `next/font/local` で使用されます
 
-- 任意
+- 省略可能
 
 例:
 
@@ -196,7 +196,7 @@ export default function MyApp({ Component, pageProps }) {
 
 フォントを読み込めなかった場合に使用するフォールバックフォント。デフォルトはなく、フォールバックフォント名の文字列配列で指定します。
 
-- オプション
+- 省略可能
 
 `next/font/google` と `next/font/local` で使用されます。
 
@@ -211,7 +211,7 @@ export default function MyApp({ Component, pageProps }) {
 
 `next/font/google` と `next/font/local` で使用されます。
 
-- オプションです。
+- 省略可能
 
 例:
 
@@ -224,7 +224,7 @@ export default function MyApp({ Component, pageProps }) {
 
 `next/font/google` と `next/font/local` で使用されます。
 
-- 任意
+- 省略可能
 
 例:
 
@@ -685,11 +685,11 @@ export default function RootLayout({ children }) {
 const myFont = localFont({ src: './my-font.woff2' })
 
 export default function MyApp({ Component, pageProps }) {
-return (
-<main className={myFont.className}>
-<Component {...pageProps} />
-</main>
-)
+  return (
+    <main className={myFont.className}>
+      <Component {...pageProps} />
+    </main>
+  )
 }
 
 ````
@@ -811,11 +811,11 @@ variable: '--font-roboto-mono',
 })
 
 export default function MyApp({ Component, pageProps }) {
-return (
-<main className={`${inter.variable} ${roboto_mono.variable} font-sans`}>
-<Component {...pageProps} />
-</main>
-)
+  return (
+    <main className={`${inter.variable} ${roboto_mono.variable} font-sans`}>
+      <Component {...pageProps} />
+    </main>
+  )
 }
 
 ````

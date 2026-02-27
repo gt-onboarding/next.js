@@ -19,7 +19,7 @@ Next.js は **ファイルシステムベースのルーティング** を採用
 **ページ**とは、特定のルートでレンダーされる UI のことです。ページを作成するには、`app` ディレクトリ内に [`page` ファイル](/docs/app/api-reference/file-conventions/page) を追加し、React コンポーネントをデフォルトエクスポートします。たとえば、ルート `/` のインデックスページを作成するには次のようにします。
 
 <Image
-  alt="page.js special file"
+  alt="page.js 特殊ファイル"
   srcLight="/docs/light/page-special-file.png"
   srcDark="/docs/dark/page-special-file.png"
   width="1600"
@@ -47,7 +47,7 @@ export default function Page() {
 例えば、インデックスページを子として受け取るレイアウトを作成するには、`app` ディレクトリ内に `layout` ファイルを追加します。
 
 <Image
-  alt="layout.js special file"
+  alt="layout.js 特殊ファイル"
   srcLight="/docs/light/layout-special-file.png"
   srcDark="/docs/dark/layout-special-file.png"
   width="1600"
@@ -130,7 +130,7 @@ export default async function Page() {
 ```
 
 ```jsx filename="app/blog/[slug]/page.js" switcher
-// ダミーのインポート
+// ダミーインポート
 import { getPosts } from '@/lib/posts'
 import { Post } from '@/ui/post'
 

@@ -51,20 +51,20 @@ const segment = useSelectedLayoutSegment(parallelRoutesKey?: string)
 
 たとえば、次の Layout と URL の組み合わせでは、返されるセグメントは次のとおりです:
 
-| Layout                    | Visited URL                    | Returned Segment |
-| ------------------------- | ------------------------------ | ---------------- |
-| `app/layout.js`           | `/`                            | `null`           |
-| `app/layout.js`           | `/dashboard`                   | `'dashboard'`    |
-| `app/dashboard/layout.js` | `/dashboard`                   | `null`           |
-| `app/dashboard/layout.js` | `/dashboard/settings`          | `'settings'`     |
-| `app/dashboard/layout.js` | `/dashboard/analytics`         | `'analytics'`    |
-| `app/dashboard/layout.js` | `/dashboard/analytics/monthly` | `'analytics'`    |
+| レイアウト                | アクセスした URL               | 返されるセグメント |
+| ------------------------- | ------------------------------ | ------------------ |
+| `app/layout.js`           | `/`                            | `null`             |
+| `app/layout.js`           | `/dashboard`                   | `'dashboard'`      |
+| `app/dashboard/layout.js` | `/dashboard`                   | `null`             |
+| `app/dashboard/layout.js` | `/dashboard/settings`          | `'settings'`       |
+| `app/dashboard/layout.js` | `/dashboard/analytics`         | `'analytics'`      |
+| `app/dashboard/layout.js` | `/dashboard/analytics/monthly` | `'analytics'`      |
 
 キャッチオールルート (`[...slug]`) の場合、返されるセグメントは、一致したすべてのパスセグメントを 1 つの文字列として連結したものになります:
 
-| Layout               | Visited URL   | Returned Segment |
-| -------------------- | ------------- | ---------------- |
-| `app/blog/layout.js` | `/blog/a/b/c` | `'a/b/c'`        |
+| レイアウト           | アクセスした URL | 返されるセグメント |
+| -------------------- | ---------------- | ------------------ |
+| `app/blog/layout.js` | `/blog/a/b/c`    | `'a/b/c'`          |
 
 ## 例
 
@@ -129,7 +129,7 @@ export default function BlogNavLink({ slug, children }) {
 ```
 
 ```tsx filename="app/blog/layout.tsx" switcher
-// Client ComponentをServer Componentである親レイアウトにインポートする
+// クライアントコンポーネントを親レイアウト（サーバーコンポーネント）にインポートする
 import { BlogNavLink } from './blog-nav-link'
 import getFeaturedPosts from './get-featured-posts'
 

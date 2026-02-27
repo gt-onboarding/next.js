@@ -163,7 +163,7 @@ Activity がコンポーネントを非表示にするときにフォームフ�
 ```tsx
 <form
   ref={(form) => {
-    // クリーンアップ関数 - ActivityがこのコンポーネントをHideするときに実行される
+    // クリーンアップ関数 - Activityがこのコンポーネントを非表示にするときに実行される
     return () => form?.reset()
   }}
 >
@@ -208,7 +208,7 @@ function CommentForm() {
 
   const shouldReset = useRef(false)
 
-  // ActivityがこのコンポーネントをhideするときにRESETをdispatchする
+  // Activityがこのコンポーネントを非表示にするときにRESETをdispatchする
   useLayoutEffect(() => {
     return () => {
       if (shouldReset.current) {

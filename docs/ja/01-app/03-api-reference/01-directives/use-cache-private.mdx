@@ -162,10 +162,10 @@ async function getRecommendations(productId) {
 
 | API            | `use cache` で許可 | `'use cache: private'` で許可 |
 | -------------- | ------------------ | ----------------------------- |
-| `cookies()`    | No                 | Yes                           |
-| `headers()`    | No                 | Yes                           |
-| `searchParams` | No                 | Yes                           |
-| `connection()` | No                 | No                            |
+| `cookies()`    | いいえ             | はい                          |
+| `headers()`    | いいえ             | はい                          |
+| `searchParams` | いいえ             | はい                          |
+| `connection()` | いいえ             | いいえ                        |
 
 > **補足:** [`connection()`](https://nextjs.org/docs/app/api-reference/functions/connection) API は、接続固有の情報を提供し、これを安全にキャッシュできないため、`use cache` と `'use cache: private'` の両方で使用が禁止されています。
 

@@ -128,12 +128,12 @@ module.exports = class CacheHandler {
   }
 
   async get(key) {
-    // This could be stored anywhere, like durable storage
+    // 永続ストレージなど、任意の場所に保存できます
     return cache.get(key)
   }
 
   async set(key, data, ctx) {
-    // This could be stored anywhere, like durable storage
+    // 永続ストレージなど、任意の場所に保存できます
     cache.set(key, {
       value: data,
       lastModified: Date.now(),
@@ -153,8 +153,8 @@ module.exports = class CacheHandler {
     }
   }
 
-  // If you want to have temporary in memory cache for a single request that is reset
-  // before the next request you can leverage this method
+  // 次のリクエストの前にリセットされる、単一リクエスト向けの
+  // 一時的なインメモリキャッシュが必要な場合は、このメソッドを利用できます
   resetRequestCache() {}
 }
 ```

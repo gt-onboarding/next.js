@@ -169,7 +169,7 @@ export function InteractiveComponent() {
 - `props` - 現在のルートのパラメーターを含むオブジェクト:
   - `params` - ルートの先頭セグメントから、`generateMetadata` が呼び出されるセグメントまでの[動的ルートパラメーター](/docs/app/api-reference/file-conventions/dynamic-routes)オブジェクトを含むオブジェクト。例:
 
-    | Route                           | URL         | `params`                  |
+    | ルート                          | URL         | `params`                  |
     | ------------------------------- | ----------- | ------------------------- |
     | `app/shop/[slug]/page.js`       | `/shop/1`   | `{ slug: '1' }`           |
     | `app/shop/[tag]/[item]/page.js` | `/shop/1/2` | `{ tag: '1', item: '2' }` |
@@ -277,7 +277,7 @@ export const metadata = {
   title: 'About',
 }
 
-// Output: <title>About | Acme</title>
+// 出力: <title>About | Acme</title>
 ```
 
 > **補足**:
@@ -329,7 +329,7 @@ export const metadata = {
   },
 }
 
-// Output: <title>About</title>
+// 出力: <title>About</title>
 ```
 
 > **補足**:
@@ -1116,7 +1116,7 @@ export const metadata = {
 
 次のメタデータタイプは、現在組み込みのサポートはありません。ただし、レイアウトまたはページ内でレンダリングすることは可能です。
 
-| Metadata                      | 推奨事項                                                                                                                                                                                                                                                 |
+| メタデータ                    | 推奨事項                                                                                                                                                                                                                                                 |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<meta http-equiv="...">`     | [`redirect()`](/docs/app/api-reference/functions/redirect)、[Proxy](/docs/app/api-reference/file-conventions/proxy#nextresponse)、[Security Headers](/docs/app/api-reference/config/next-config-js/headers) など、適切な HTTP ヘッダーを使用してください |
 | `<base>`                      | レイアウトまたはページ内でタグをレンダリングしてください。                                                                                                                                                                                               |

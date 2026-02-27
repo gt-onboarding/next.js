@@ -46,7 +46,7 @@ export default function Page({ repo }) {
 
 `context` パラメーターは、次のキーを含むオブジェクトです。
 
-| Name               | Description                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 名前               | 説明                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `params`           | [動的ルート](/docs/pages/building-your-application/routing/dynamic-routes)を使用するページのルートパラメーターを含みます。たとえば、ページ名が `[id].js` の場合、`params` は `{ id: ... }` のようになります。これは後述する `getStaticPaths` と組み合わせて使用する必要があります。                                                                                                                                                  |
 | `preview`          | (`draftMode` では非推奨) ページが[プレビューモード](/docs/pages/guides/preview-mode)の場合は `preview` が `true`、それ以外の場合は `false` です。                                                                                                                                                                                                                                                                                    |
@@ -218,12 +218,12 @@ export default Blog
 
 ## バージョン履歴
 
-| Version   | 変更点                                                                                                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `v13.4.0` | [App Router](/docs/app/getting-started/fetching-data) が安定版になり、データ取得が簡素化されました。                                                                      |
-| `v12.2.0` | [On-Demand Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) が安定版になりました。         |
-| `v12.1.0` | [On-Demand Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) が追加されました（ベータ版）。 |
-| `v10.0.0` | `locale`、`locales`、`defaultLocale`、`notFound` オプションが追加されました。                                                                                             |
-| `v10.0.0` | 戻り値のオプション `fallback: 'blocking'` が追加されました。                                                                                                              |
-| `v9.5.0`  | [Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration) が安定版になりました。                                                              |
-| `v9.3.0`  | `getStaticProps` が導入されました。                                                                                                                                       |
+| バージョン | 変更点                                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.4.0`  | [App Router](/docs/app/getting-started/fetching-data) が安定版になり、データ取得が簡素化されました。                                                                      |
+| `v12.2.0`  | [On-Demand Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) が安定版になりました。         |
+| `v12.1.0`  | [On-Demand Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration#on-demand-revalidation-with-revalidatepath) が追加されました（ベータ版）。 |
+| `v10.0.0`  | `locale`、`locales`、`defaultLocale`、`notFound` オプションが追加されました。                                                                                             |
+| `v10.0.0`  | 戻り値のオプション `fallback: 'blocking'` が追加されました。                                                                                                              |
+| `v9.5.0`   | [Incremental Static Regeneration](/docs/pages/guides/incremental-static-regeneration) が安定版になりました。                                                              |
+| `v9.3.0`   | `getStaticProps` が導入されました。                                                                                                                                       |

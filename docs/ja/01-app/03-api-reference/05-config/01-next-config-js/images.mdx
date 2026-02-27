@@ -1,5 +1,5 @@
 ---
-title: 画像
+title: images
 description: next/image ローダーのカスタム設定
 ---
 
@@ -23,7 +23,7 @@ module.exports = {
   'use client'
 
 export default function myImageLoader({ src, width, quality }) {
-return `https://example.com/${src}?w=${width}&q=${quality || 75}`
+  return `https://example.com/${src}?w=${width}&q=${quality || 75}`
 }
 
 ````

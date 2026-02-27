@@ -14,7 +14,7 @@ Next.js では、リダイレクトを扱う方法がいくつかあります。
 
 <AppOnly>
 
-| API                                                           | Purpose                                                  | Where                                                  | Status Code                            |
+| API                                                           | 目的                                                     | 使用場所                                               | ステータスコード                       |
 | ------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |
 | [`redirect`](#redirect-function)                              | ミューテーションやイベント後にユーザーをリダイレクトする | サーバーコンポーネント、サーバー関数、ルートハンドラー | 307 (Temporary) or 303 (Server Action) |
 | [`permanentRedirect`](#permanentredirect-function)            | ミューテーションやイベント後にユーザーをリダイレクトする | サーバーコンポーネント、サーバー関数、ルートハンドラー | 308 (Permanent)                        |
@@ -26,7 +26,7 @@ Next.js では、リダイレクトを扱う方法がいくつかあります。
 
 <PagesOnly>
 
-| API                                                           | Purpose                                        | Where                     | Status Code                        |
+| API                                                           | 目的                                           | 使用場所                  | ステータスコード                   |
 | ------------------------------------------------------------- | ---------------------------------------------- | ------------------------- | ---------------------------------- |
 | [`useRouter`](#userouter-hook)                                | クライアントサイドナビゲーションを行う         | コンポーネント            | N/A                                |
 | [`redirects` in `next.config.js`](#redirects-in-nextconfigjs) | パスに基づいて受信リクエストをリダイレクトする | `next.config.js` ファイル | 307 (Temporary) or 308 (Permanent) |
@@ -50,9 +50,9 @@ import { revalidatePath } from 'next/cache'
 
 export async function createPost(id: string) {
   try {
-    // Call database
+    // データベースを呼び出す
   } catch (error) {
-    // Handle errors
+    // エラーを処理する
   }
 
   revalidatePath('/posts') // キャッシュされた投稿を更新
@@ -68,9 +68,9 @@ import { revalidatePath } from 'next/cache'
 
 export async function createPost(id) {
   try {
-    // Call database
+    // データベースを呼び出す
   } catch (error) {
-    // Handle errors
+    // エラーを処理する
   }
 
   revalidatePath('/posts') // キャッシュされた投稿を更新
@@ -102,9 +102,9 @@ import { revalidateTag } from 'next/cache'
 
 export async function updateUsername(username: string, formData: FormData) {
   try {
-    // Call database
+    // データベースを呼び出す
   } catch (error) {
-    // Handle errors
+    // エラーを処理する
   }
 
   revalidateTag('username') // username へのすべての参照を更新
@@ -120,9 +120,9 @@ import { revalidateTag } from 'next/cache'
 
 export async function updateUsername(username, formData) {
   try {
-    // Call database
+    // データベースを呼び出す
   } catch (error) {
-    // Handle errors
+    // エラーを処理する
   }
 
   revalidateTag('username') // username へのすべての参照を更新

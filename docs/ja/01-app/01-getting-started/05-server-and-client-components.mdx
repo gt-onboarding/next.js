@@ -636,7 +636,7 @@ export default function Gallery() {
   return (
     <div>
       <button onClick={() => setIsOpen(true)}>View pictures</button>
-      {/*  Client Component 内で使用されているため、動作します */}
+      {/* クライアントコンポーネント内で使用されているため、Carouselは正常に動作します */}
       {isOpen && <Carousel />}
     </div>
   )

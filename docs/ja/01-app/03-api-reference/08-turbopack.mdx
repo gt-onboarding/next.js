@@ -20,12 +20,12 @@ Next.js のパフォーマンスを最大限に引き出すために、Turbopack
 
 Turbopack にはプラットフォーム固有のネイティブバインディングが必要です。現在、次のプラットフォームがサポートされています:
 
-| Platform       | Architecture |
-| -------------- | ------------ |
-| macOS (Darwin) | x64, ARM64   |
-| Windows        | x64, ARM64   |
-| Linux (glibc)  | x64, ARM64   |
-| Linux (musl)   | x64, ARM64   |
+| プラットフォーム | アーキテクチャ |
+| ---------------- | -------------- |
+| macOS (Darwin)   | x64, ARM64     |
+| Windows          | x64, ARM64     |
+| Linux (glibc)    | x64, ARM64     |
+| Linux (musl)     | x64, ARM64     |
 
 ネイティブバインディングが存在しないプラットフォーム（例: FreeBSD、OpenBSD）では、Next.js は WebAssembly (WASM) バインディングにフォールバックします。WASM バインディングはコンパイルやミニファイなどの SWC のコア機能をサポートしますが、**Turbopack はサポートしていません**。これらのプラットフォームでは、`--webpack` フラグを使用してください:
 
@@ -128,7 +128,7 @@ Next.js の Turbopack は、一般的なユースケースに対しては**ゼ�
 
 Turbopack は、インポート動作を制御するための webpack 互換のマジックコメントをサポートしています。これらのコメントは動的な `import()`, `require()`, `require.resolve()`, `new Worker()` の式で機能します（静的な `import` 文には対応していません）。
 
-| Comment                   | Webpack | Turbopack | 説明                                   |
+| コメント                  | Webpack | Turbopack | 説明                                   |
 | ------------------------- | ------- | --------- | -------------------------------------- |
 | `webpackIgnore: true`     | ✓       | ✓         | バンドル対象から除外し、import を保持  |
 | `turbopackIgnore: true`   | ✗       | ✓         | バンドル対象から除外（Turbopack 専用） |

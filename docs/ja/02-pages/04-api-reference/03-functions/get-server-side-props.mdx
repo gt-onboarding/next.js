@@ -56,7 +56,7 @@ export default function Page({ repo }) {
 
 `context` パラメーターは、次のキーを含むオブジェクトです:
 
-| Name            | Description                                                                                                                                                                                                                      |
+| 名前            | 説明                                                                                                                                                                                                                             |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `params`        | このページが[動的ルート](/docs/pages/building-your-application/routing/dynamic-routes)を使用している場合、`params` にはルートパラメーターが含まれます。ページ名が `[id].js` の場合、`params` は `{ id: ... }` のようになります。 |
 | `req`           | [`HTTP` IncomingMessage オブジェクト](https://nodejs.org/api/http.html#http_class_http_incomingmessage)。追加で `cookies` プロパティを持ち、これは文字列キーと、そのキーに対応するクッキーの文字列値からなるオブジェクトです。   |
@@ -133,8 +133,8 @@ export async function getServerSideProps(context) {
 
 ## バージョン履歴
 
-| Version   | 変更点                                                                                             |
-| --------- | -------------------------------------------------------------------------------------------------- |
-| `v13.4.0` | [App Router](/docs/app/getting-started/fetching-data) が安定版となり、データ取得が簡素化されました |
-| `v10.0.0` | `locale`、`locales`、`defaultLocale`、`notFound` オプションが追加されました。                      |
-| `v9.3.0`  | `getServerSideProps` が導入されました。                                                            |
+| バージョン | 変更点                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| `v13.4.0`  | [App Router](/docs/app/getting-started/fetching-data) が安定版となり、データ取得が簡素化されました |
+| `v10.0.0`  | `locale`、`locales`、`defaultLocale`、`notFound` オプションが追加されました。                      |
+| `v9.3.0`   | `getServerSideProps` が導入されました。                                                            |

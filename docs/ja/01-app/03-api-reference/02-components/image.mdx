@@ -35,7 +35,7 @@ export default function Page() {
 利用可能な props は次のとおりです:
 
 <div style={{ overflowX: 'auto', width: '100%' }}>
-| Prop                                      | 例                                      | 型              | ステータス |
+| プロパティ                                | 例                                      | 型              | ステータス |
 | ----------------------------------------- | ---------------------------------------- | --------------- | ---------- |
 | [`src`](#src)                             | `src="/profile.png"`                     | String          | 必須       |
 | [`alt`](#alt)                             | `alt="Picture of the author"`            | String          | 必須       |
@@ -629,7 +629,7 @@ module.exports = {
   'use client'
 
 export default function myImageLoader({ src, width, quality }) {
-return `https://example.com/${src}?w=${width}&q=${quality || 75}`
+  return `https://example.com/${src}?w=${width}&q=${quality || 75}`
 }
 
 ````

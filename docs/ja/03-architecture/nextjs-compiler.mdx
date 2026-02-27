@@ -16,7 +16,7 @@ SWC はコンパイル、minify（圧縮）、バンドルなどに利用でき�
 私たちが SWC を採用した理由はいくつかあります。
 
 - **拡張性:** SWC は、ライブラリを fork したり設計上の制約を回避することなく、Next.js 内でクレートとして利用できます。
-- **パフォーマンス:** SWC に切り替えることで、Next.js における Fast Refresh を約 3 倍、高速ビルドはビルド時間を約 5 倍短縮でき、さらに最適化の余地も残されています。
+- **パフォーマンス:** SWC に切り替えることで、Next.js における Fast Refresh を約 3 倍、ビルドを約 5 倍高速化でき、さらに最適化の余地も残されています。
 - **WebAssembly:** Rust の WASM サポートは、あらゆるプラットフォームをサポートし、Next.js の開発をどこでも可能にするために不可欠です。
 - **コミュニティ:** Rust のコミュニティとエコシステムは素晴らしく、今も成長を続けています。
 
@@ -319,7 +319,7 @@ module.exports = {
 
 有効化すると、swc は `.next/` 配下に `swc-trace-profile-${timestamp}.json` という名前のトレースファイルを生成します。Chromium のトレースビューア（chrome://tracing/, https://ui.perfetto.dev/）や、互換性のあるフレームグラフビューア（https://www.speedscope.app/）で生成されたトレースを読み込んで可視化できます。
 
-### SWC Plugins (experimental)
+### SWC プラグイン（実験的）
 
 `swc` の transform を設定して、wasm で実装された SWC の実験的なプラグインサポートを利用し、変換処理の挙動をカスタマイズできます。
 
@@ -348,11 +348,11 @@ module.exports = {
 
 ## バージョン履歴
 
-| Version   | 変更点                                                                                                                                                                                                                 |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `v13.1.0` | [Module Transpilation](https://nextjs.org/blog/next-13-1#built-in-module-transpilation-stable) と [Modularize Imports](https://nextjs.org/blog/next-13-1#import-resolution-for-smaller-bundles) が安定版になりました。 |
-| `v13.0.0` | デフォルトで SWC Minifier が有効になりました。                                                                                                                                                                         |
-| `v12.3.0` | SWC Minifier が [安定版](https://nextjs.org/blog/next-12-3#swc-minifier-stable) になりました。                                                                                                                         |
-| `v12.2.0` | [SWC Plugins](#swc-plugins-experimental) の実験的サポートが追加されました。                                                                                                                                            |
-| `v12.1.0` | Styled Components、Jest、Relay、Remove React Properties、Legacy Decorators、Remove Console、および jsxImportSource へのサポートが追加されました。                                                                      |
-| `v12.0.0` | Next.js Compiler が [導入されました](https://nextjs.org/blog/next-12)。                                                                                                                                                |
+| バージョン | 変更点                                                                                                                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.1.0`  | [Module Transpilation](https://nextjs.org/blog/next-13-1#built-in-module-transpilation-stable) と [Modularize Imports](https://nextjs.org/blog/next-13-1#import-resolution-for-smaller-bundles) が安定版になりました。 |
+| `v13.0.0`  | デフォルトで SWC Minifier が有効になりました。                                                                                                                                                                         |
+| `v12.3.0`  | SWC Minifier が [安定版](https://nextjs.org/blog/next-12-3#swc-minifier-stable) になりました。                                                                                                                         |
+| `v12.2.0`  | [SWC Plugins](#swc-plugins-experimental) の実験的サポートが追加されました。                                                                                                                                            |
+| `v12.1.0`  | Styled Components、Jest、Relay、Remove React Properties、Legacy Decorators、Remove Console、および jsxImportSource へのサポートが追加されました。                                                                      |
+| `v12.0.0`  | Next.js Compiler が [導入されました](https://nextjs.org/blog/next-12)。                                                                                                                                                |

@@ -57,7 +57,7 @@ Fast Refresh は、編集中のコンポーネントのローカルな React sta
 
 ## Fast Refresh と Hooks
 
-可能な場合、Fast Refresh は編集の間でコンポーネントのステートを保持しようとします。特に、`useState` と `useRef` は、その引数や Hook 呼び出しの順序を変更しない限り、これまでの値を保持します。
+可能な場合、Fast Refresh は編集の間でコンポーネントの state を保持しようとします。特に、`useState` と `useRef` は、その引数や Hook 呼び出しの順序を変更しない限り、これまでの値を保持します。
 
 `useEffect`、`useMemo`、`useCallback` のような依存配列を持つ Hook は、Fast Refresh 中は _必ず_ 更新されます。Fast Refresh 中は、それらの依存配列は無視されます。
 

@@ -14,7 +14,7 @@ description: 組み込みの `next/link` コンポーネントで高速なクラ
   import Link from 'next/link'
 
 export default function Page() {
-return <Link href="/dashboard">Dashboard</Link>
+  return <Link href="/dashboard">Dashboard</Link>
 }
 
 ````
@@ -34,7 +34,7 @@ export default function Page() {
   import Link from 'next/link'
 
 export default function Home() {
-return <Link href="/dashboard">Dashboard</Link>
+  return <Link href="/dashboard">Dashboard</Link>
 }
 
 ````
@@ -55,28 +55,28 @@ export default function Home() {
 
 <PagesOnly>
 
-| プロパティ                  | 例                       | 型                | 必須 |
-| --------------------------- | ------------------------ | ----------------- | ---- |
-| [`href`](#href-required)    | `href="/dashboard"`      | String or Object  | Yes  |
-| [`as`](#as)                 | `as="/post/abc"`         | String or Object  | -    |
-| [`replace`](#replace)       | `replace={false}`        | Boolean           | -    |
-| [`scroll`](#scroll)         | `scroll={false}`         | Boolean           | -    |
-| [`prefetch`](#prefetch)     | `prefetch={false}`       | Boolean           | -    |
-| [`shallow`](#shallow)       | `shallow={false}`        | Boolean           | -    |
-| [`locale`](#locale)         | `locale="fr"`            | String or Boolean | -    |
-| [`onNavigate`](#onnavigate) | `onNavigate={(e) => {}}` | Function          | -    |
+| プロパティ                  | 例                       | 型                       | 必須 |
+| --------------------------- | ------------------------ | ------------------------ | ---- |
+| [`href`](#href-required)    | `href="/dashboard"`      | 文字列またはオブジェクト | はい |
+| [`as`](#as)                 | `as="/post/abc"`         | 文字列またはオブジェクト | -    |
+| [`replace`](#replace)       | `replace={false}`        | 真偽値                   | -    |
+| [`scroll`](#scroll)         | `scroll={false}`         | 真偽値                   | -    |
+| [`prefetch`](#prefetch)     | `prefetch={false}`       | 真偽値                   | -    |
+| [`shallow`](#shallow)       | `shallow={false}`        | 真偽値                   | -    |
+| [`locale`](#locale)         | `locale="fr"`            | 文字列または真偽値       | -    |
+| [`onNavigate`](#onnavigate) | `onNavigate={(e) => {}}` | 関数                     | -    |
 
 </PagesOnly>
 
 <AppOnly>
 
-| プロパティ                  | 例                       | 型               | 必須 |
-| --------------------------- | ------------------------ | ---------------- | ---- |
-| [`href`](#href-required)    | `href="/dashboard"`      | String or Object | Yes  |
-| [`replace`](#replace)       | `replace={false}`        | Boolean          | -    |
-| [`scroll`](#scroll)         | `scroll={false}`         | Boolean          | -    |
-| [`prefetch`](#prefetch)     | `prefetch={false}`       | Boolean or null  | -    |
-| [`onNavigate`](#onnavigate) | `onNavigate={(e) => {}}` | Function         | -    |
+| プロパティ                  | 例                       | 型                       | 必須 |
+| --------------------------- | ------------------------ | ------------------------ | ---- |
+| [`href`](#href-required)    | `href="/dashboard"`      | 文字列またはオブジェクト | はい |
+| [`replace`](#replace)       | `replace={false}`        | 真偽値                   | -    |
+| [`scroll`](#scroll)         | `scroll={false}`         | 真偽値                   | -    |
+| [`prefetch`](#prefetch)     | `prefetch={false}`       | 真偽値または null        | -    |
+| [`onNavigate`](#onnavigate) | `onNavigate={(e) => {}}` | 関数                     | -    |
 
 </AppOnly>
 
@@ -980,13 +980,13 @@ import Link from 'next/link'
 import useIsAuthed from './hooks/useIsAuthed' // 認証用のカスタムフック
 
 export default function Page() {
-const isAuthed = useIsAuthed()
-const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
-return (
-<Link as="/dashboard" href={path}>
-Dashboard
-</Link>
-)
+  const isAuthed = useIsAuthed()
+  const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
+  return (
+    <Link as="/dashboard" href={path}>
+      Dashboard
+    </Link>
+  )
 }
 
 ````
@@ -1018,13 +1018,13 @@ import Link from 'next/link'
 import useIsAuthed from './hooks/useIsAuthed' // 認証用のカスタムフック
 
 export default function Home() {
-const isAuthed = useIsAuthed()
-const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
-return (
-<Link as="/dashboard" href={path}>
-Dashboard
-</Link>
-)
+  const isAuthed = useIsAuthed()
+  const path = isAuthed ? '/auth/dashboard' : '/public/dashboard'
+  return (
+    <Link as="/dashboard" href={path}>
+      Dashboard
+    </Link>
+  )
 }
 
 ````

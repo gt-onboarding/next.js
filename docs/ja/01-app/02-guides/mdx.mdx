@@ -229,7 +229,7 @@ Checkout my React component:
   import Welcome from '@/markdown/welcome.mdx'
 
 export default function Page() {
-return <Welcome />
+  return <Welcome />
 }
 
 ````
@@ -249,7 +249,7 @@ export default function Page() {
   import Welcome from '@/markdown/welcome.mdx'
 
 export default function Page() {
-return <Welcome />
+  return <Welcome />
 }
 
 ````
@@ -635,9 +635,9 @@ export const metadata = {
   import BlogPost, { metadata } from '@/content/blog-post.mdx'
 
 export default function Page() {
-console.log('metadata: ', metadata)
-//=> { author: 'John Doe' }
-return <BlogPost />
+  console.log('metadata: ', metadata)
+  //=> { author: 'John Doe' }
+  return <BlogPost />
 }
 
 ````
@@ -659,9 +659,9 @@ export default function Page() {
   import BlogPost, { metadata } from '@/content/blog-post.mdx'
 
 export default function Page() {
-console.log('metadata: ', metadata)
-//=> { author: 'John Doe' }
-return <BlogPost />
+  console.log('metadata: ', metadata)
+  //=> { author: 'John Doe' }
+  return <BlogPost />
 }
 
 ````
@@ -731,9 +731,9 @@ const nextConfig = {
 const withMDX = createMDX({
   options: {
     remarkPlugins: [
-      // Without options
+      // オプションなし
       'remark-gfm',
-      // With options
+      // オプションあり
       ['remark-toc', { heading: 'The Table' }],
     ],
     rehypePlugins: [

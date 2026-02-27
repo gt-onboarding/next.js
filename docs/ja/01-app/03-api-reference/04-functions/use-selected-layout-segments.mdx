@@ -63,7 +63,7 @@ const segments = useSelectedLayoutSegments(parallelRoutesKey?: string)
 
 たとえば、以下のレイアウトと URL の場合、返されるセグメントは次のようになります:
 
-| Layout                    | Visited URL           | Returned Segments           |
+| レイアウト                | アクセスした URL      | 返されるセグメント          |
 | ------------------------- | --------------------- | --------------------------- |
 | `app/layout.js`           | `/`                   | `[]`                        |
 | `app/layout.js`           | `/dashboard`          | `['dashboard']`             |
@@ -73,10 +73,10 @@ const segments = useSelectedLayoutSegments(parallelRoutesKey?: string)
 
 キャッチオールルート (`[...slug]`) の場合、すべての一致したパスセグメントが結合され、配列内の 1 つの文字列として返されます:
 
-| Layout               | Visited URL   | Returned Segments   |
-| -------------------- | ------------- | ------------------- |
-| `app/layout.js`      | `/blog/a/b/c` | `['blog', 'a/b/c']` |
-| `app/blog/layout.js` | `/blog/a/b/c` | `['a/b/c']`         |
+| レイアウト           | アクセスした URL | 返されるセグメント  |
+| -------------------- | ---------------- | ------------------- |
+| `app/layout.js`      | `/blog/a/b/c`    | `['blog', 'a/b/c']` |
+| `app/blog/layout.js` | `/blog/a/b/c`    | `['a/b/c']`         |
 
 ## バージョン履歴
 

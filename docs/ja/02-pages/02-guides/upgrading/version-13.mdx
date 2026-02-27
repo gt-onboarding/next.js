@@ -28,13 +28,13 @@ bun add next@13 react@latest react-dom@latest eslint-config-next@13
 
 ### v13 の概要
 
-- [Supported Browsers](/docs/architecture/supported-browsers) が更新され、Internet Explorer のサポートが終了し、モダンなブラウザのみを対象とするようになりました。
+- [サポートされているブラウザ](/docs/architecture/supported-browsers) が更新され、Internet Explorer のサポートが終了し、モダンなブラウザのみを対象とするようになりました。
 - 最小 Node.js バージョンが 12.22.0 から 16.14.0 に引き上げられました。これは 12.x および 14.x がサポート終了 (end-of-life) となったためです。
 - 最小 React バージョンが 17.0.2 から 18.2.0 に引き上げられました。
 - `swcMinify` 設定プロパティのデフォルト値が `false` から `true` に変更されました。詳細は [Next.js Compiler](/docs/architecture/nextjs-compiler) を参照してください。
 - `next/image` インポートは `next/legacy/image` に名称変更されました。`next/future/image` インポートは `next/image` に名称変更されました。インポートを安全かつ自動的にリネームするための [codemod が利用可能](/docs/pages/guides/upgrading/codemods#next-image-to-legacy-image) です。
 - `next/link` の子要素として `<a>` を使用できなくなりました。レガシーな挙動を利用するには `legacyBehavior` prop を追加するか、アップグレードするには `<a>` を削除してください。コードを自動的にアップグレードするための [codemod が利用可能](/docs/pages/guides/upgrading/codemods#new-link) です。
-- `target` 設定プロパティは削除され、代わりに [Output File Tracing](/docs/pages/api-reference/config/next-config-js/output) に置き換えられました。
+- `target` 設定プロパティは削除され、代わりに [出力ファイルトレーシング](/docs/pages/api-reference/config/next-config-js/output) に置き換えられました。
 
 ## 共有機能の移行
 
@@ -42,7 +42,7 @@ Next.js 13 では、新しい機能と規約を備えた [`app` ディレクト�
 
 更新された [Image コンポーネント](#image-component)、[Link コンポーネント](#link-component)、[Script コンポーネント](#script-component)、[フォント最適化](#font-optimization) など、`app` と `pages` の両方のディレクトリで動作する新機能は、引き続き `pages` で利用できます。
 
-### `<Image/>` Component
+### `<Image/>` コンポーネント
 
 Next.js 12 では、一時的なインポート先である `next/future/image` を通じて Image コンポーネントに多くの改善が導入されました。これらの改善には、クライアントサイド JavaScript の削減、画像の拡張やスタイリングを簡単に行えるようにする仕組みの提供、アクセシビリティの向上、そしてブラウザネイティブな遅延読み込みが含まれます。
 
@@ -53,7 +53,7 @@ Next.js 13 からは、この新しい挙動が `next/image` のデフォルト�
 - [next-image-to-legacy-image](/docs/pages/guides/upgrading/codemods#next-image-to-legacy-image): この codemod は、`next/image` のインポートを安全かつ自動的に `next/legacy/image` にリネームし、Next.js 12 と同じ挙動を維持します。Next.js 13 へのアップグレードを自動で素早く行うために、この codemod を実行することを推奨します。
 - [next-image-experimental](/docs/pages/guides/upgrading/codemods#next-image-experimental): 前の codemod を実行した後、任意でこの experimental な codemod を実行し、`next/legacy/image` を新しい `next/image` にアップグレードできます。これにより、未使用の props が削除され、インラインスタイルが追加されます。この codemod は experimental であり、静的な使用法 (例: `<Image src={img} layout="responsive" />`) のみを対象としており、動的な使用法 (例: `<Image {...props} />`) は対象外である点に注意してください。
 
-または、[migration guide](/docs/pages/guides/upgrading/codemods#next-image-experimental) に従って手動でアップデートすることもできます。あわせて [legacy comparison](/docs/pages/api-reference/components/image-legacy#comparison) も参照してください。
+または、[移行ガイド](/docs/pages/guides/upgrading/codemods#next-image-experimental) に従って手動でアップデートすることもできます。あわせて [レガシー版との比較](/docs/pages/api-reference/components/image-legacy#comparison) も参照してください。
 
 ### `<Link>` コンポーネント
 
@@ -77,7 +77,7 @@ import Link from 'next/link'
 
 リンクを Next.js 13 用に移行するには、[`new-link` codemod](/docs/pages/guides/upgrading/codemods#new-link) を使用できます。
 
-### `<Script>` Component
+### `<Script>` コンポーネント
 
 [`next/script`](/docs/pages/api-reference/components/script) コンポーネントの動作は、`pages` と `app` の両方をサポートするように更新されました。`app` を段階的に導入する場合は、[アップグレードガイド](/docs/pages/guides/upgrading) を参照してください。
 

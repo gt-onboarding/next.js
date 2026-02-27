@@ -47,9 +47,9 @@ ESLint CLI（フラットコンフィグ）を使って、すばやく Lint を�
 
    const eslintConfig = defineConfig([
      ...nextVitals,
-     // Override default ignores of eslint-config-next.
+     // eslint-config-next のデフォルトの無視設定を上書きする
      globalIgnores([
-       // Default ignores of eslint-config-next:
+       // eslint-config-next のデフォルトの無視設定:
        '.next/**',
        'out/**',
        'build/**',
